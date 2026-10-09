@@ -1,0 +1,33 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<p><a href="{% url 'founder_admin:ai-content' %}">All summaries</a></p>
+<h1>{{ version.ipo.issuer_name }} {{ version.get_content_type_display }}</h1>
+{% if error %}<p role="alert" class="errornote">{{ error }}</p>{% endif %}
+<dl>
+  <dt>Source document</dt><dd>{{ version.source_document_id }}</dd>
+  <dt>Provider</dt><dd>{{ version.provider_key }}</dd>
+  <dt>Model</dt><dd>{{ version.model_name|default:"Manual/local" }}</dd>
+  <dt>Prompt version</dt><dd>{{ version.prompt_version|default:"—" }}</dd>
+  <dt>Generated</dt><dd>{{ version.generated_at }}</dd>
+  <dt>Review state</dt><dd>{{ version.get_review_state_display }}</dd>
+</dl>
+{% if version.source_document_url %}<p><a href="{{ version.source_document_url }}">Source document</a></p>{% endif %}
+<h2>Original draft</h2>
+<blockquote>{{ version.draft_text }}</blockquote>
+<h2>Publish reviewed summary</h2>
+<form method="post">
+  {% csrf_token %}<input type="hidden" name="action" value="publish">
+  <p><label for="summary-text">Published text</label><textarea id="summary-text" name="text" rows="8" maxlength="20000" required>{% if revisions %}{{ revisions.0.text }}{% else %}{{ version.draft_text }}{% endif %}</textarea></p>
+  <p><label for="summary-reason">Reason</label><textarea id="summary-reason" name="reason" maxlength="500" required></textarea></p>
+  <button type="submit">Publish summary</button>
+</form>
+<h2>Published history</h2>
+<table>
+  <thead><tr><th scope="col">Text</th><th scope="col">Reason</th><th scope="col">Reviewer</th><th scope="col">Time</th></tr></thead>
+  <tbody>
+    {% for revision in revisions %}<tr><th scope="row">{{ revision.text }}</th><td>{{ revision.reason }}</td><td>{{ revision.created_by.email }}</td><td>{{ revision.created_at }}</td></tr>
+    {% empty %}<tr><td colspan="4">No reviewed publication yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

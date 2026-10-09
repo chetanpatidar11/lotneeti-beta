@@ -1,0 +1,12 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<p><a href="{% url 'founder_admin:index' %}">Staff home</a> · <a href="{% url 'founder_admin:ipo-exceptions' %}">Conflicts</a> · <a href="{% url 'founder_admin:gmp-providers' %}">GMP providers</a></p>
+<h1>Live data</h1>
+<p>{{ published_count }} published IPOs. InvestorGain supplies IPO facts and GMP. Automatic refreshes run at 12:01 AM and hourly from 9:00 AM through 7:00 PM IST. Founder Admin manual refreshes may run at any time and are audit logged.</p>
+{% if sync_result %}<div role="status" aria-live="polite">{% for provider, result in sync_result.items %}<p>{{ provider|upper }}: {{ result.status }}{% if result.discovered != None %} · {{ result.discovered }} discovered, {{ result.ready }} ready, {{ result.changed }} changed{% endif %}{% if result.fetched %} · {{ result.fetched }} fetched{% endif %}{% if result.reason %} · {{ result.reason }}{% endif %}{% if result.error %} · {{ result.error }}{% endif %}</p>{% endfor %}</div>{% endif %}
+<form method="post">{% csrf_token %}
+  <button type="submit" name="action" value="sync_investorgain">Refresh IPOs and GMP now</button>
+</form>
+<h2>InvestorGain IPO data and GMP</h2>
+<p>{{ gmp_count }} GMP observations. Last attempt: {{ gmp_sync_state.last_attempt_at|default:"Never" }} · Last success: {{ gmp_sync_state.last_success_at|default:"Never" }} · State: {{ gmp_sync_state.last_status|default:"Never" }}{% if gmp_sync_state.last_safe_error %} · {{ gmp_sync_state.last_safe_error }}{% endif %}.</p>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<p><a href="{% url 'founder_admin:index' %}">Staff home</a></p>
+<h1>Planner policies</h1>
+{% if error %}<p role="alert" class="errornote">{{ error }}</p>{% endif %}
+<p>Current global default: <strong>{{ current_global }}</strong></p>
+<h2>Set an effective-dated policy</h2>
+<form method="post">
+  {% csrf_token %}
+  <p><label for="policy-scope">Scope</label><select id="policy-scope" name="scope" required><option value="GLOBAL">Global default</option><option value="BANK">Bank override</option></select></p>
+  <p><label for="policy-bank">Bank</label><select id="policy-bank" name="bank_id"><option value="">Global default</option>{% for bank in banks %}<option value="{{ bank.pk }}">{{ bank.bank_name }} · {{ bank.owner.name }}</option>{% endfor %}</select></p>
+  <p><label for="policy-value">Policy</label><select id="policy-value" name="policy" required><option value="ALLOW">Allow</option><option value="WARN">Warn</option><option value="DISALLOW">Disallow</option></select></p>
+  <p><label for="policy-from">Effective from</label><input id="policy-from" name="effective_from" type="datetime-local" required></p>
+  <p><label for="policy-until">Effective until (optional)</label><input id="policy-until" name="effective_until" type="datetime-local"></p>
+  <p><label for="policy-reason">Reason</label><textarea id="policy-reason" name="reason" maxlength="500" required></textarea></p>
+  <button type="submit">Save planner policy</button>
+</form>
+
+<h2>Policy history</h2>
+<table>
+  <thead><tr><th scope="col">Scope</th><th scope="col">Bank</th><th scope="col">Policy</th><th scope="col">Effective window</th><th scope="col">Reason</th><th scope="col">Created by</th></tr></thead>
+  <tbody>
+    {% for item in policies %}
+      <tr><th scope="row">{{ item.get_scope_display }}</th><td>{% if item.bank %}{{ item.bank.bank_name }} · {{ item.bank.owner.name }}{% else %}All banks{% endif %}</td><td>{{ item.get_policy_display }}</td><td>{{ item.effective_from }} to {{ item.effective_until|default:"open" }}</td><td>{{ item.reason }}</td><td>{{ item.created_by.email }}</td></tr>
+    {% empty %}<tr><td colspan="6">No database policy changes yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

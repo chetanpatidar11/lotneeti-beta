@@ -1,0 +1,21 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<p><a href="{% url 'founder_admin:index' %}">Staff home</a></p>
+<p><a href="{% url 'founder_admin:gmp-policy' %}">Edit GMP policy</a> · <a href="{% url 'founder_admin:ipo-exceptions' %}">IPO data exceptions</a></p>
+<h1>GMP provider health</h1>
+<table>
+  <thead><tr><th scope="col">Provider</th><th scope="col">Enabled</th><th scope="col">Last success</th><th scope="col">Last error</th><th scope="col">Override</th></tr></thead>
+  <tbody>
+    {% for state in states %}
+      <tr>
+        <th scope="row"><a href="{% url 'founder_admin:gmp-provider-detail' state.provider_key %}">{{ state.provider_key }}</a></th>
+        <td>{{ state.enabled|yesno:"Yes,No" }}</td>
+        <td>{{ state.last_success_at|default:"—" }}</td>
+        <td>{{ state.last_error_at|default:"—" }}{% if state.last_error_type %} ({{ state.last_error_type }}){% endif %}</td>
+        <td>{% if state.override_value_per_share and state.override_expires_at %}{{ state.override_value_per_share }} until {{ state.override_expires_at }}{% else %}None{% endif %}</td>
+      </tr>
+    {% empty %}<tr><td colspan="5">No provider health records yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

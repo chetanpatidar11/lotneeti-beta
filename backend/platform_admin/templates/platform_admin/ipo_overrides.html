@@ -1,0 +1,24 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<p><a href="{% url 'founder_admin:index' %}">Staff home</a></p>
+<h1>IPO field corrections</h1>
+<form method="get">
+  <label for="ipo-query">Issuer or symbol</label>
+  <input id="ipo-query" type="search" name="q" value="{{ query }}" maxlength="100">
+  <button type="submit">Search</button>
+</form>
+<table>
+  <thead><tr><th scope="col">Issuer</th><th scope="col">Symbol</th><th scope="col">Source</th><th scope="col">Publication</th></tr></thead>
+  <tbody>
+    {% for ipo in ipos %}
+      <tr>
+        <th scope="row"><a href="{% url 'founder_admin:ipo-override-detail' ipo.pk %}">{{ ipo.issuer_name }}</a></th>
+        <td>{{ ipo.symbol|default:"—" }}</td><td>{{ ipo.source_key }}</td><td>{{ ipo.publication_state }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4">No IPOs found.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

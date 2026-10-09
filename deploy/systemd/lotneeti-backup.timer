@@ -1,0 +1,10 @@
+[Unit]
+Description=Run LotNeeti encrypted PostgreSQL backup nightly
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+Persistent=true
+Unit=lotneeti-backup.service
+
+[Install]
+WantedBy=timers.target

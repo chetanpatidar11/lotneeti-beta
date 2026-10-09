@@ -1,0 +1,16 @@
+[Unit]
+Description=LotNeeti encrypted PostgreSQL backup to private S3
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=lotneeti
+Group=lotneeti
+WorkingDirectory=/opt/lotneeti/backend
+EnvironmentFile=/etc/lotneeti/backup.env
+ExecStart=/opt/lotneeti/.venv/bin/python -m ops.backup
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+

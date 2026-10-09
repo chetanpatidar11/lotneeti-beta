@@ -1,0 +1,17 @@
+[Unit]
+Description=LotNeeti Celery worker
+After=network-online.target postgresql.service redis.service
+Wants=network-online.target
+
+[Service]
+User=lotneeti
+Group=lotneeti
+WorkingDirectory=/opt/lotneeti/backend
+EnvironmentFile=/etc/lotneeti/app.env
+ExecStart=/opt/lotneeti/.venv/bin/celery -A config.celery:app worker --loglevel=INFO --concurrency=2
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,39 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<p><a href="{% url 'founder_admin:gmp-observations' %}">All observations</a></p>
+<h1>{{ observation.ipo.issuer_name }} GMP observation</h1>
+{% if error %}<p role="alert" class="errornote">{{ error }}</p>{% endif %}
+<dl>
+  <dt>Provider</dt><dd>{{ observation.source_key }}</dd>
+  <dt>Source value</dt><dd>{{ observation.value_per_share }}</dd>
+  <dt>Effective value</dt><dd>{{ effective }}</dd>
+  <dt>Observed at</dt><dd>{{ observation.observed_at }}</dd>
+  <dt>Fetched at</dt><dd>{{ observation.fetched_at }}</dd>
+  <dt>Freshness age</dt><dd>{{ freshness_seconds }} seconds</dd>
+</dl>
+{% if observation.source_url %}<p><a href="{{ observation.source_url }}">Source record</a></p>{% endif %}
+{% if active %}
+  <p>Active correction: {{ active.value_per_share }} until {{ active.expires_at }}. Reason: {{ active.reason }}</p>
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="resume"><button type="submit">Resume automatic source value</button></form>
+{% else %}<p>Automatic source value is active.</p>{% endif %}
+
+<h2>Temporary correction</h2>
+<form method="post">
+  {% csrf_token %}<input type="hidden" name="action" value="set">
+  <p><label for="gmp-value">Corrected value per share</label><input id="gmp-value" name="value_per_share" inputmode="decimal" required></p>
+  <p><label for="gmp-expires">Expires at</label><input id="gmp-expires" name="expires_at" type="datetime-local" required></p>
+  <p><label for="gmp-reason">Reason</label><textarea id="gmp-reason" name="reason" maxlength="500" required></textarea></p>
+  <button type="submit">Save correction</button>
+</form>
+
+<h2>Correction history</h2>
+<table>
+  <thead><tr><th scope="col">Value</th><th scope="col">Reason</th><th scope="col">Set by</th><th scope="col">Resumed by</th></tr></thead>
+  <tbody>
+    {% for item in history %}
+      <tr><th scope="row">{{ item.value_per_share }}</th><td>{{ item.reason }}</td><td>{{ item.created_by.email }} · {{ item.created_at }}</td><td>{% if item.resumed_at %}{{ item.resumed_by.email }} · {{ item.resumed_at }}{% else %}Active{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="4">No corrections recorded.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

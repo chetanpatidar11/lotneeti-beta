@@ -1,0 +1,17 @@
+[Unit]
+Description=LotNeeti Django API
+After=network-online.target postgresql.service redis.service
+Wants=network-online.target
+
+[Service]
+User=lotneeti
+Group=lotneeti
+WorkingDirectory=/opt/lotneeti/backend
+EnvironmentFile=/etc/lotneeti/app.env
+ExecStart=/opt/lotneeti/.venv/bin/gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers 2 --error-logfile -
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

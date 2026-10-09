@@ -1,0 +1,35 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<p><a href="{% url 'founder_admin:gmp-providers' %}">All providers</a></p>
+<h1>GMP provider: {{ state.provider_key }}</h1>
+{% if error %}<p role="alert" class="errornote">{{ error }}</p>{% endif %}
+<dl>
+  <dt>Status</dt><dd>{{ state.enabled|yesno:"Enabled,Disabled" }}</dd>
+  <dt>Last success</dt><dd>{{ state.last_success_at|default:"—" }}</dd>
+  <dt>Last error</dt><dd>{{ state.last_error_at|default:"—" }}{% if state.last_error_type %} ({{ state.last_error_type }}){% endif %}</dd>
+</dl>
+
+<h2>Provider status</h2>
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="{% if state.enabled %}disable{% else %}enable{% endif %}">
+  <label for="status-reason">Reason</label>
+  <input id="status-reason" name="reason" maxlength="500" required>
+  <button type="submit">{% if state.enabled %}Disable{% else %}Enable{% endif %} provider</button>
+</form>
+
+<h2>Temporary manual value</h2>
+{% if state.override_value_per_share and state.override_expires_at %}
+  <p>Active value: {{ state.override_value_per_share }} until {{ state.override_expires_at }}. Reason: {{ state.override_reason }}</p>
+  <form method="post"><input type="hidden" name="action" value="clear">{% csrf_token %}<button type="submit">Clear manual value</button></form>
+{% else %}<p>No active manual value.</p>{% endif %}
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="override">
+  <p><label for="override-value">Value per share</label><input id="override-value" name="value_per_share" inputmode="decimal" required></p>
+  <p><label for="override-expires">Expires at</label><input id="override-expires" name="expires_at" type="datetime-local" required></p>
+  <p><label for="override-reason">Reason</label><textarea id="override-reason" name="reason" maxlength="500" required></textarea></p>
+  <button type="submit">Save temporary value</button>
+</form>
+{% endblock %}

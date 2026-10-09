@@ -1,0 +1,28 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<form method="get" role="search">
+  <label for="workspace-query">Workspace name or ID</label>
+  <input id="workspace-query" type="search" name="q" value="{{ query }}" minlength="3" maxlength="100" required>
+  <button type="submit">Search</button>
+</form>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% if query and not error %}
+  <p>{{ results|length }} matching workspace{{ results|length|pluralize }} shown, up to 20.</p>
+  {% for item in results %}
+    <section aria-label="Workspace {{ item.id }}">
+      <h2>{{ item.name }}</h2>
+      <p>ID: {{ item.id }} · Created: {{ item.created_at }}</p>
+      <ul>
+        <li>Members: {{ item.members }}</li>
+        <li>Investors: {{ item.investors }}</li>
+        <li>Banks: {{ item.banks }}</li>
+        <li>Plans: {{ item.plans }} · Latest plan: {{ item.latest_plan_status }}</li>
+        <li>Applications: {{ item.applications }} · Blocked: {{ item.blocked }} · Allotted: {{ item.allotted }}</li>
+      </ul>
+    </section>
+  {% empty %}
+    <p>No matching workspaces.</p>
+  {% endfor %}
+{% endif %}
+{% endblock %}

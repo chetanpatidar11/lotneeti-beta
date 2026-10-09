@@ -1,0 +1,22 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<p><a href="{% url 'founder_admin:index' %}">Staff home</a></p>
+<h1>AI content review</h1>
+<form method="get">
+  <label for="content-query">Issuer, document or summary type</label>
+  <input id="content-query" type="search" name="q" value="{{ query }}" maxlength="100">
+  <button type="submit">Search</button>
+</form>
+<table>
+  <thead><tr><th scope="col">IPO</th><th scope="col">Type</th><th scope="col">Document</th><th scope="col">Provider/model</th><th scope="col">Review state</th></tr></thead>
+  <tbody>
+    {% for version in versions %}
+      <tr>
+        <th scope="row"><a href="{% url 'founder_admin:ai-content-detail' version.pk %}">{{ version.ipo.issuer_name }}</a></th>
+        <td>{{ version.get_content_type_display }}</td><td>{{ version.source_document_id }}</td><td>{{ version.provider_key }}{% if version.model_name %} / {{ version.model_name }}{% endif %}</td><td>{{ version.get_review_state_display }}</td>
+      </tr>
+    {% empty %}<tr><td colspan="5">No generated summaries found.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

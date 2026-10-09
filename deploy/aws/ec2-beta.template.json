@@ -1,0 +1,149 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Single-host LotNeeti founder beta: public VPC subnet, restricted SSH, encrypted EBS and one EC2 instance.",
+  "Parameters": {
+    "ImageId": {"Type": "AWS::EC2::Image::Id"},
+    "KeyName": {"Type": "AWS::EC2::KeyPair::KeyName"},
+    "OperatorCidr": {
+      "Type": "String",
+      "AllowedPattern": "^(?:(?:[0-9]{1,3})\\.){3}(?:[0-9]{1,3})/32$",
+      "Description": "Operator public IPv4 address as a /32 CIDR for SSH"
+    },
+    "InstanceProfileName": {"Type": "String"},
+    "InstanceType": {
+      "Type": "String",
+      "Default": "t4g.small",
+      "AllowedValues": ["t4g.small", "t4g.medium"]
+    }
+  },
+  "Resources": {
+    "BetaVpc": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.71.0.0/24",
+        "EnableDnsSupport": true,
+        "EnableDnsHostnames": true,
+        "Tags": [
+          {"Key": "Name", "Value": "lotneeti-beta-vpc"},
+          {"Key": "Project", "Value": "LotNeeti"},
+          {"Key": "Environment", "Value": "Beta"}
+        ]
+      }
+    },
+    "BetaSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {"Ref": "BetaVpc"},
+        "CidrBlock": "10.71.0.0/26",
+        "AvailabilityZone": {"Fn::Select": [0, {"Fn::GetAZs": ""}]},
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {"Key": "Name", "Value": "lotneeti-beta-public"},
+          {"Key": "Project", "Value": "LotNeeti"},
+          {"Key": "Environment", "Value": "Beta"}
+        ]
+      }
+    },
+    "BetaInternetGateway": {
+      "Type": "AWS::EC2::InternetGateway",
+      "Properties": {
+        "Tags": [
+          {"Key": "Project", "Value": "LotNeeti"},
+          {"Key": "Environment", "Value": "Beta"}
+        ]
+      }
+    },
+    "BetaGatewayAttachment": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": {"Ref": "BetaVpc"},
+        "InternetGatewayId": {"Ref": "BetaInternetGateway"}
+      }
+    },
+    "BetaRouteTable": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {"Ref": "BetaVpc"},
+        "Tags": [
+          {"Key": "Project", "Value": "LotNeeti"},
+          {"Key": "Environment", "Value": "Beta"}
+        ]
+      }
+    },
+    "PublicRoute": {
+      "Type": "AWS::EC2::Route",
+      "DependsOn": "BetaGatewayAttachment",
+      "Properties": {
+        "RouteTableId": {"Ref": "BetaRouteTable"},
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {"Ref": "BetaInternetGateway"}
+      }
+    },
+    "SubnetRouteAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {"Ref": "BetaSubnet"},
+        "RouteTableId": {"Ref": "BetaRouteTable"}
+      }
+    },
+    "BetaSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "LotNeeti beta HTTPS, HTTP certificate challenge and operator-only SSH",
+        "VpcId": {"Ref": "BetaVpc"},
+        "SecurityGroupIngress": [
+          {"IpProtocol": "tcp", "FromPort": 22, "ToPort": 22, "CidrIp": {"Ref": "OperatorCidr"}},
+          {"IpProtocol": "tcp", "FromPort": 80, "ToPort": 80, "CidrIp": "0.0.0.0/0"},
+          {"IpProtocol": "tcp", "FromPort": 443, "ToPort": 443, "CidrIp": "0.0.0.0/0"}
+        ],
+        "Tags": [
+          {"Key": "Name", "Value": "lotneeti-beta-web"},
+          {"Key": "Project", "Value": "LotNeeti"},
+          {"Key": "Environment", "Value": "Beta"}
+        ]
+      }
+    },
+    "BetaInstance": {
+      "Type": "AWS::EC2::Instance",
+      "DependsOn": ["PublicRoute", "SubnetRouteAssociation"],
+      "Properties": {
+        "ImageId": {"Ref": "ImageId"},
+        "InstanceType": {"Ref": "InstanceType"},
+        "CreditSpecification": {"CPUCredits": "standard"},
+        "KeyName": {"Ref": "KeyName"},
+        "IamInstanceProfile": {"Ref": "InstanceProfileName"},
+        "SubnetId": {"Ref": "BetaSubnet"},
+        "SecurityGroupIds": [{"Ref": "BetaSecurityGroup"}],
+        "MetadataOptions": {
+          "HttpEndpoint": "enabled",
+          "HttpTokens": "required",
+          "HttpPutResponseHopLimit": 1
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/sda1",
+            "Ebs": {
+              "VolumeSize": 30,
+              "VolumeType": "gp3",
+              "Encrypted": true,
+              "DeleteOnTermination": true
+            }
+          }
+        ],
+        "Tags": [
+          {"Key": "Name", "Value": "lotneeti-beta"},
+          {"Key": "Project", "Value": "LotNeeti"},
+          {"Key": "Environment", "Value": "Beta"}
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "InstanceId": {"Value": {"Ref": "BetaInstance"}},
+    "PublicIp": {"Value": {"Fn::GetAtt": ["BetaInstance", "PublicIp"]}},
+    "PublicDnsName": {"Value": {"Fn::GetAtt": ["BetaInstance", "PublicDnsName"]}},
+    "SecurityGroupId": {"Value": {"Ref": "BetaSecurityGroup"}},
+    "VpcId": {"Value": {"Ref": "BetaVpc"}},
+    "SubnetId": {"Value": {"Ref": "BetaSubnet"}}
+  }
+}

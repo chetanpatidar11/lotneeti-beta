@@ -1,0 +1,17 @@
+[Unit]
+Description=LotNeeti Next.js web
+After=network-online.target lotneeti-api.service
+Wants=network-online.target
+
+[Service]
+User=lotneeti
+Group=lotneeti
+WorkingDirectory=/opt/lotneeti/web
+EnvironmentFile=/etc/lotneeti/app.env
+ExecStart=/usr/bin/npm run start -- --hostname 127.0.0.1 --port 3000
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

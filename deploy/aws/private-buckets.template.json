@@ -1,0 +1,319 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Private LotNeeti beta export and PostgreSQL backup buckets with scoped IAM policies.",
+  "Parameters": {
+    "ExportBucketName": {
+      "Type": "String",
+      "Description": "Globally unique private export bucket name"
+    },
+    "BackupBucketName": {
+      "Type": "String",
+      "Description": "Globally unique private backup bucket name"
+    },
+    "SESSenderEmail": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Optional single verified SES email identity for beta sign-in sending"
+    }
+  },
+  "Conditions": {
+    "HasSESSender": {"Fn::Not": [{"Fn::Equals": [{"Ref": "SESSenderEmail"}, ""]}]}
+  },
+  "Resources": {
+    "ExportBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": {
+          "Ref": "ExportBucketName"
+        },
+        "Tags": [
+          {"Key": "Project", "Value": "LotNeeti"},
+          {"Key": "Environment", "Value": "Beta"}
+        ],
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "IgnorePublicAcls": true,
+          "BlockPublicPolicy": true,
+          "RestrictPublicBuckets": true
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "BackupBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": {
+          "Ref": "BackupBucketName"
+        },
+        "Tags": [
+          {"Key": "Project", "Value": "LotNeeti"},
+          {"Key": "Environment", "Value": "Beta"}
+        ],
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "IgnorePublicAcls": true,
+          "BlockPublicPolicy": true,
+          "RestrictPublicBuckets": true
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ExportBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "ExportBucketName"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "DenyInsecureTransport",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::Sub": "arn:aws:s3:::${ExportBucketName}"
+                },
+                {
+                  "Fn::Sub": "arn:aws:s3:::${ExportBucketName}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              }
+            },
+            {
+              "Sid": "DenyUnencryptedUploads",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Sub": "arn:aws:s3:::${ExportBucketName}/*"
+              },
+              "Condition": {
+                "StringNotEquals": {
+                  "s3:x-amz-server-side-encryption": "AES256"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "BackupBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "BackupBucketName"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "DenyInsecureTransport",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::Sub": "arn:aws:s3:::${BackupBucketName}"
+                },
+                {
+                  "Fn::Sub": "arn:aws:s3:::${BackupBucketName}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              }
+            },
+            {
+              "Sid": "DenyUnencryptedUploads",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Sub": "arn:aws:s3:::${BackupBucketName}/*"
+              },
+              "Condition": {
+                "StringNotEquals": {
+                  "s3:x-amz-server-side-encryption": "AES256"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ExportAccessPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "Description": "Attach only to the LotNeeti application instance role.",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "s3:PutObject",
+                "s3:GetObject"
+              ],
+              "Resource": {
+                "Fn::Sub": "arn:aws:s3:::${ExportBucketName}/exports/*"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "BackupAccessPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "Description": "Attach only to the LotNeeti backup instance role.",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "s3:PutObject",
+                "s3:GetObject",
+                "s3:DeleteObject"
+              ],
+              "Resource": {
+                "Fn::Sub": "arn:aws:s3:::${BackupBucketName}/backups/postgres/*"
+              }
+            },
+            {
+              "Effect": "Allow",
+              "Action": "s3:ListBucket",
+              "Resource": {
+                "Fn::Sub": "arn:aws:s3:::${BackupBucketName}"
+              },
+              "Condition": {
+                "StringLike": {
+                  "s3:prefix": "backups/postgres/*"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "SESAccessPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Condition": "HasSESSender",
+      "Properties": {
+        "Description": "Allow the beta instance to send only from its verified SES email identity.",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Effect": "Allow",
+            "Action": "ses:SendRawEmail",
+            "Resource": {"Fn::Sub": "arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/${SESSenderEmail}"}
+          }]
+        }
+      }
+    },
+    "BetaInstanceRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "ec2.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {"Ref": "ExportAccessPolicy"},
+          {"Ref": "BackupAccessPolicy"},
+          {"Fn::If": ["HasSESSender", {"Ref": "SESAccessPolicy"}, {"Ref": "AWS::NoValue"}]}
+        ],
+        "Tags": [
+          {"Key": "Project", "Value": "LotNeeti"},
+          {"Key": "Environment", "Value": "Beta"}
+        ]
+      }
+    },
+    "BetaInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [{"Ref": "BetaInstanceRole"}]
+      }
+    }
+  },
+  "Outputs": {
+    "ExportBucket": {
+      "Value": {
+        "Ref": "ExportBucketName"
+      }
+    },
+    "BackupBucket": {
+      "Value": {
+        "Ref": "BackupBucketName"
+      }
+    },
+    "ExportPolicyArn": {
+      "Value": {
+        "Ref": "ExportAccessPolicy"
+      }
+    },
+    "BackupPolicyArn": {
+      "Value": {
+        "Ref": "BackupAccessPolicy"
+      }
+    },
+    "SESAccessPolicyArn": {
+      "Condition": "HasSESSender",
+      "Value": {"Ref": "SESAccessPolicy"}
+    },
+    "InstanceProfileArn": {
+      "Value": {"Fn::GetAtt": ["BetaInstanceProfile", "Arn"]}
+    },
+    "InstanceProfileName": {
+      "Value": {"Ref": "BetaInstanceProfile"}
+    },
+    "InstanceRoleArn": {
+      "Value": {"Fn::GetAtt": ["BetaInstanceRole", "Arn"]}
+    }
+  }
+}

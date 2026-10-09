@@ -1,0 +1,22 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<p><a href="{% url 'founder_admin:index' %}">Staff home</a></p>
+<h1>GMP source observations</h1>
+<form method="get">
+  <label for="gmp-query">Issuer or provider</label>
+  <input id="gmp-query" type="search" name="q" value="{{ query }}" maxlength="100">
+  <button type="submit">Search</button>
+</form>
+<table>
+  <thead><tr><th scope="col">IPO</th><th scope="col">Provider</th><th scope="col">Source value</th><th scope="col">Observed</th><th scope="col">Fetched</th></tr></thead>
+  <tbody>
+    {% for observation in observations %}
+      <tr>
+        <th scope="row"><a href="{% url 'founder_admin:gmp-observation-detail' observation.pk %}">{{ observation.ipo.issuer_name }}</a></th>
+        <td>{{ observation.source_key }}</td><td>{{ observation.value_per_share }}</td><td>{{ observation.observed_at }}</td><td>{{ observation.fetched_at }}</td>
+      </tr>
+    {% empty %}<tr><td colspan="5">No observations found.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "admin/index.html" %}
+{% load i18n %}
+
+{% block content %}
+<section class="staff-areas" aria-label="Founder operations">
+  <h1>Founder operations</h1>
+  <div class="staff-groups">
+    <div class="staff-group"><h2>IPO Data</h2><ul>
+      <li><a href="{% url 'founder_admin:live-data' %}">Live data</a></li>
+      <li><a href="{% url 'founder_admin:ipos_ipo_changelist' %}">IPO master</a></li>
+      <li><a href="{% url 'founder_admin:ipo-overrides' %}">Field corrections</a></li>
+      <li><a href="{% url 'founder_admin:ipo-exceptions' %}">Data exceptions</a></li>
+      <li><a href="{% url 'founder_admin:ipos_ipofeedbatch_changelist' %}">Exchange imports</a></li>
+      <li><a href="{% url 'founder_admin:ipos_ipofeedobservation_changelist' %}">Exchange history</a></li>
+    </ul></div>
+    <div class="staff-group"><h2>GMP &amp; Providers</h2><ul>
+      <li><a href="{% url 'founder_admin:gmp-providers' %}">Provider health</a></li>
+      <li><a href="{% url 'founder_admin:gmp-observations' %}">Source observations</a></li>
+      <li><a href="{% url 'founder_admin:ipos_gmpobservation_changelist' %}">GMP history</a></li>
+      <li><a href="{% url 'founder_admin:gmp-policy' %}">GMP policy</a></li>
+    </ul></div>
+    <div class="staff-group"><h2>Planner &amp; Content</h2><ul>
+      <li><a href="{% url 'founder_admin:planner-policies' %}">Planner policies</a></li>
+      <li><a href="{% url 'founder_admin:planner_planrun_changelist' %}">Planner runs</a></li>
+      <li><a href="{% url 'founder_admin:ai-content' %}">Content review</a></li>
+    </ul></div>
+    <div class="staff-group"><h2>Access &amp; Audit</h2><ul>
+      <li><a href="{% url 'founder_admin:accounts_user_changelist' %}">Users and workspaces</a></li>
+      <li><a href="{% url 'founder_admin:core_auditevent_changelist' %}">Security audit</a></li>
+      <li><a href="{% url 'founder_admin:core_betaevent_changelist' %}">Beta milestones</a></li>
+      <li><a href="{% url 'founder_admin:support-workspaces' %}">Support lookup</a></li>
+    </ul></div>
+  </div>
+</section>
+{{ block.super }}
+{% endblock %}

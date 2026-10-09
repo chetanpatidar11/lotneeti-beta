@@ -1,0 +1,26 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.sqlite3
+
+# Founder-supplied account workbook; keep identifiers outside Git.
+docs/DematAccounts_testing.xlsx
+
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+mobile/dist/
+
+dist/
+build/
+*.egg-info/

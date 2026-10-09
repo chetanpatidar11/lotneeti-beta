@@ -1,0 +1,22 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<p><a href="{% url 'founder_admin:index' %}">Staff home</a> · <a href="{% url 'founder_admin:gmp-policy' %}">Edit GMP policy</a></p>
+<h1>IPO data exceptions</h1>
+<p>Freshness: {{ policy.freshness_hours }} hours · Conflict: {{ policy.conflict_threshold_percent_points }} GMP percentage points</p>
+<table>
+  <thead><tr><th scope="col">IPO</th><th scope="col">Review needed</th><th scope="col">Fresh sources</th><th scope="col">Stale sources</th><th scope="col">Current GMP</th></tr></thead>
+  <tbody>
+    {% for row in rows %}
+      <tr>
+        <th scope="row"><a href="{% url 'founder_admin:ipo-override-detail' row.ipo.pk %}">{{ row.ipo.issuer_name }}</a></th>
+        <td>{% for issue in row.issues %}{{ issue }}{% if not forloop.last %}; {% endif %}{% endfor %}</td>
+        <td>{{ row.resolution.source_count }}</td>
+        <td>{% for key in row.resolution.stale_source_keys %}{{ key }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
+        <td>{% if row.resolution.effective %}₹{{ row.resolution.effective.value_per_share }}{% else %}—{% endif %}</td>
+      </tr>
+    {% empty %}<tr><td colspan="5">No published IPOs need GMP review.</td></tr>{% endfor %}
+  </tbody>
+</table>
+<p><a href="{% url 'founder_admin:gmp-observations' %}">Review all source observations</a></p>
+{% endblock %}

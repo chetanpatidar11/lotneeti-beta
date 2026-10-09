@@ -1,0 +1,18 @@
+[Unit]
+Description=LotNeeti Celery Beat
+After=network-online.target postgresql.service redis.service
+Wants=network-online.target
+
+[Service]
+User=lotneeti
+Group=lotneeti
+WorkingDirectory=/opt/lotneeti/backend
+EnvironmentFile=/etc/lotneeti/app.env
+ExecStart=/opt/lotneeti/.venv/bin/celery -A config.celery:app beat --loglevel=INFO --schedule=/var/lib/lotneeti/celerybeat-schedule
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/lotneeti
+
+[Install]
+WantedBy=multi-user.target

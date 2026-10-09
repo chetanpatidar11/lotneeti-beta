@@ -1,0 +1,725 @@
+{
+  "retail_17": {
+    "input_snapshot_hash": "91f31daf55517b9b1b79f6d2106b372110bf1b9e480feb5f8028c45f920e407c",
+    "output_hash": "6d2666bcbdbf1294b6f97dcad8097da61122db373d5ea16e5b8e9d9ff1a8b3d1",
+    "planner_version": "planner-v2.0",
+    "rows": [
+      {
+        "amount": "15000.00",
+        "applicant": "member-01",
+        "bank": "bank-01",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-01"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-02",
+        "bank": "bank-02",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-02"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-03",
+        "bank": "bank-03",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-03"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-04",
+        "bank": "bank-04",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-04"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-05",
+        "bank": "bank-05",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-05"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-06",
+        "bank": "bank-06",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-06"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-07",
+        "bank": "bank-07",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-07"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-08",
+        "bank": "bank-08",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-08"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-09",
+        "bank": "bank-09",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-09"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-10",
+        "bank": "bank-10",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-10"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-11",
+        "bank": "bank-11",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-11"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-12",
+        "bank": "bank-12",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-12"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-13",
+        "bank": "bank-13",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-13"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-14",
+        "bank": "bank-14",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-14"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-15",
+        "bank": "bank-15",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-15"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-16",
+        "bank": "bank-16",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-16"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-17",
+        "bank": "bank-17",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-17"
+      }
+    ],
+    "uncovered": []
+  },
+  "scarce_12": {
+    "input_snapshot_hash": "185c18e32cf457934772d2c4dab22bc9bd1a4b949a7804105b1e33ff91e6da5e",
+    "output_hash": "7ea2bb2691065004ba8ecdb9f7eba4b745bca542288cb4bb5c90837ad3fa5b0d",
+    "planner_version": "planner-v2.0",
+    "rows": [
+      {
+        "amount": "15000.00",
+        "applicant": "member-01",
+        "bank": "bank-01",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-01"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-02",
+        "bank": "bank-02",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-02"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-03",
+        "bank": "bank-03",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-03"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-04",
+        "bank": "bank-04",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-04"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-05",
+        "bank": "bank-05",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-05"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-06",
+        "bank": "bank-06",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-06"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-07",
+        "bank": "bank-07",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-07"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-08",
+        "bank": "bank-08",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-08"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-09",
+        "bank": "bank-09",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-09"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-10",
+        "bank": "bank-10",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-10"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-11",
+        "bank": "bank-11",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-11"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-12",
+        "bank": "bank-12",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-12"
+      }
+    ],
+    "uncovered": [
+      {
+        "applicant": "member-13",
+        "ipo": "ipo-higher",
+        "reason": "NO_FEASIBLE_WALLET"
+      },
+      {
+        "applicant": "member-14",
+        "ipo": "ipo-higher",
+        "reason": "NO_FEASIBLE_WALLET"
+      },
+      {
+        "applicant": "member-15",
+        "ipo": "ipo-higher",
+        "reason": "NO_FEASIBLE_WALLET"
+      },
+      {
+        "applicant": "member-16",
+        "ipo": "ipo-higher",
+        "reason": "NO_FEASIBLE_WALLET"
+      },
+      {
+        "applicant": "member-17",
+        "ipo": "ipo-higher",
+        "reason": "NO_FEASIBLE_WALLET"
+      }
+    ]
+  },
+  "shni_4": {
+    "input_snapshot_hash": "5f65e3ee4a014427cca7f2a9cc02de5a666839451108e4f6e500acb3b150f554",
+    "output_hash": "8db3bc1e21e79b0ddbeb8261e5c1a4a5d7c356ea7812054e11524429b73db682",
+    "planner_version": "planner-v2.0",
+    "rows": [
+      {
+        "amount": "210000.00",
+        "applicant": "member-01",
+        "bank": "bank-01",
+        "category": "SHNI",
+        "ipo": "ipo-higher",
+        "lots": 14,
+        "upi": "upi-01"
+      },
+      {
+        "amount": "210000.00",
+        "applicant": "member-02",
+        "bank": "bank-02",
+        "category": "SHNI",
+        "ipo": "ipo-higher",
+        "lots": 14,
+        "upi": "upi-02"
+      },
+      {
+        "amount": "210000.00",
+        "applicant": "member-03",
+        "bank": "bank-03",
+        "category": "SHNI",
+        "ipo": "ipo-higher",
+        "lots": 14,
+        "upi": "upi-03"
+      },
+      {
+        "amount": "210000.00",
+        "applicant": "member-04",
+        "bank": "bank-04",
+        "category": "SHNI",
+        "ipo": "ipo-higher",
+        "lots": 14,
+        "upi": "upi-04"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-05",
+        "bank": "bank-05",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-05"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-06",
+        "bank": "bank-06",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-06"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-07",
+        "bank": "bank-07",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-07"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-08",
+        "bank": "bank-08",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-08"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-09",
+        "bank": "bank-09",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-09"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-10",
+        "bank": "bank-10",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-10"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-11",
+        "bank": "bank-11",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-11"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-12",
+        "bank": "bank-12",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-12"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-13",
+        "bank": "bank-13",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-13"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-14",
+        "bank": "bank-14",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-14"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-15",
+        "bank": "bank-15",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-15"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-16",
+        "bank": "bank-16",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-16"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-17",
+        "bank": "bank-17",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-17"
+      }
+    ],
+    "uncovered": []
+  },
+  "two_ipos_20": {
+    "input_snapshot_hash": "247f632a9f2a234d5eb7f9e48e0fe1428e814c7e322e474871d2eaec613c492e",
+    "output_hash": "c96d2aad6c0ad429f2494e168009becd13c35c48157b8aaf4ba8039429fe65ea",
+    "planner_version": "planner-v2.0",
+    "rows": [
+      {
+        "amount": "15000.00",
+        "applicant": "member-01",
+        "bank": "bank-01",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-01"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-02",
+        "bank": "bank-02",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-02"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-03",
+        "bank": "bank-03",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-03"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-04",
+        "bank": "bank-04",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-04"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-05",
+        "bank": "bank-05",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-05"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-06",
+        "bank": "bank-06",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-06"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-07",
+        "bank": "bank-07",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-07"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-08",
+        "bank": "bank-08",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-08"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-09",
+        "bank": "bank-09",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-09"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-10",
+        "bank": "bank-10",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-10"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-11",
+        "bank": "bank-11",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-11"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-12",
+        "bank": "bank-12",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-12"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-13",
+        "bank": "bank-13",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-13"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-14",
+        "bank": "bank-14",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-14"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-15",
+        "bank": "bank-15",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-15"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-16",
+        "bank": "bank-16",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-16"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-17",
+        "bank": "bank-17",
+        "category": "RETAIL",
+        "ipo": "ipo-higher",
+        "lots": 1,
+        "upi": "upi-17"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-01",
+        "bank": "bank-01",
+        "category": "RETAIL",
+        "ipo": "ipo-lower",
+        "lots": 1,
+        "upi": "upi-01"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-02",
+        "bank": "bank-02",
+        "category": "RETAIL",
+        "ipo": "ipo-lower",
+        "lots": 1,
+        "upi": "upi-02"
+      },
+      {
+        "amount": "15000.00",
+        "applicant": "member-03",
+        "bank": "bank-03",
+        "category": "RETAIL",
+        "ipo": "ipo-lower",
+        "lots": 1,
+        "upi": "upi-03"
+      }
+    ],
+    "uncovered": [
+      {
+        "applicant": "member-04",
+        "ipo": "ipo-lower",
+        "reason": "NO_FEASIBLE_WALLET"
+      },
+      {
+        "applicant": "member-05",
+        "ipo": "ipo-lower",
+        "reason": "NO_FEASIBLE_WALLET"
+      },
+      {
+        "applicant": "member-06",
+        "ipo": "ipo-lower",
+        "reason": "NO_FEASIBLE_WALLET"
+      },
+      {
+        "applicant": "member-07",
+        "ipo": "ipo-lower",
+        "reason": "NO_FEASIBLE_WALLET"
+      },
+      {
+        "applicant": "member-08",
+        "ipo": "ipo-lower",
+        "reason": "NO_FEASIBLE_WALLET"
+      },
+      {
+        "applicant": "member-09",
+        "ipo": "ipo-lower",
+        "reason": "NO_FEASIBLE_WALLET"
+      },
+      {
+        "applicant": "member-10",
+        "ipo": "ipo-lower",
+        "reason": "NO_FEASIBLE_WALLET"
+      },
+      {
+        "applicant": "member-11",
+        "ipo": "ipo-lower",
+        "reason": "NO_FEASIBLE_WALLET"
+      },
+      {
+        "applicant": "member-12",
+        "ipo": "ipo-lower",
+        "reason": "NO_FEASIBLE_WALLET"
+      },
+      {
+        "applicant": "member-13",
+        "ipo": "ipo-lower",
+        "reason": "NO_FEASIBLE_WALLET"
+      },
+      {
+        "applicant": "member-14",
+        "ipo": "ipo-lower",
+        "reason": "NO_FEASIBLE_WALLET"
+      },
+      {
+        "applicant": "member-15",
+        "ipo": "ipo-lower",
+        "reason": "NO_FEASIBLE_WALLET"
+      },
+      {
+        "applicant": "member-16",
+        "ipo": "ipo-lower",
+        "reason": "NO_FEASIBLE_WALLET"
+      },
+      {
+        "applicant": "member-17",
+        "ipo": "ipo-lower",
+        "reason": "NO_FEASIBLE_WALLET"
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "case_id": "HIST-001",
+  "snapshot_at": "2026-01-01T10:00:00+05:30",
+  "synthetic_inputs": {
+    "selected_ipos": [],
+    "applicants": [],
+    "banks": [],
+    "upis": [],
+    "funding_preferences": [],
+    "scheduled_debits": [],
+    "existing_blocks": [],
+    "manual_locks": []
+  },
+  "expected_rows": [],
+  "expected_uncovered": [],
+  "business_reason": "Explain why this expected plan is correct.",
+  "founder_approved": false,
+  "approval_date": null
+}

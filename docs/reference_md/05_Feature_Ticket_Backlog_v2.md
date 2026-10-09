@@ -38,7 +38,7 @@ Version 2.1 • Development backlog • September 2026
 | B05 | UPI CRUD | P0 | 3 | - | UPI linked to bank, active/verified state and optional limit overrides. |
 | B06 | Applicant priority UI | P0 | 2 | - | User can set/reorder numeric priority; lower number clearly explained. |
 | B07 | Account Excel import parser | P0 | 5 | - | Uploaded sample-format workbook imports investor/demat/bank/UPI with row errors. |
-| B08 | Import preview/confirm UI | P0 | 5 | B07 | User reviews parsed rows and only confirmed valid rows are persisted. |
+| B08 | Import preview/auto-import UI | P0 | 5 | B07 | Upload automatically persists all valid rows; masked preview and row errors remain visible, and invalid rows are skipped. |
 | B09 | Investor active/inactive handling | P0 | 2 | - | Inactive applicant is excluded from automatic planning. |
 
 # 4. Epic C - Balances, Recurring Debits & Funding Preferences

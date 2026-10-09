@@ -1,0 +1,78 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<p><a href="{% url 'founder_admin:ipo-overrides' %}">All IPOs</a></p>
+<h1>{{ ipo.issuer_name }} field corrections</h1>
+<p>Source: {{ ipo.source_key }} · Last observed: {{ ipo.source_observed_at }}</p>
+{% if ipo.source_url %}<p><a href="{{ ipo.source_url }}">Source record</a></p>{% endif %}
+{% if error %}<p role="alert" class="errornote">{{ error }}</p>{% endif %}
+
+<table>
+  <thead><tr><th scope="col">Field</th><th scope="col">Source values</th><th scope="col">Effective value</th><th scope="col">Correction</th></tr></thead>
+  <tbody>
+    {% for field in fields %}
+      <tr>
+        <th scope="row">{{ field.label }}</th>
+        <td>
+          {% for item in field.sources %}<div>{{ item.key|upper }}: {{ item.value|default_if_none:"—" }}</div>{% empty %}Cached: {{ field.source|default_if_none:"—" }}{% endfor %}
+          {% if field.conflict %}<strong>Exchange values differ</strong>{% endif %}
+          {% if field.document_disagreement %}<strong>RHP value differs</strong>{% endif %}
+        </td>
+        <td>{{ field.effective|default_if_none:"—" }}<br><small>Provenance: {{ field.provenance|upper }}</small></td>
+        <td>
+          {% if field.override %}
+            <p>Manual · {{ field.override.created_by.email }} · {{ field.override.created_at }}</p>
+            <p>Reason: {{ field.override.reason }}</p>
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="resume">
+              <input type="hidden" name="field_name" value="{{ field.name }}">
+              <button type="submit">Resume auto for {{ field.label }}</button>
+            </form>
+          {% else %}Automatic{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Linked source snapshots</h2>
+<p>Source records remain available for review. Only sources with documented reuse approval affect the current issue facts.</p>
+{% for row in source_rows %}
+  <details>
+    <summary>{{ row.link.source_key|upper }} · {{ row.link.source_record_id }} · {{ row.snapshot.observed_at }} · {% if row.link.canonical_enabled %}Approved{% else %}Review only{% endif %}</summary>
+    {% if row.link.canonical_enabled %}<p>Permission reference: {{ row.link.rights_reference }}</p>{% endif %}
+    <pre>{{ row.payload }}</pre>
+  </details>
+{% empty %}<p>No linked source snapshots yet.</p>{% endfor %}
+
+<h2>Set a correction</h2>
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="set">
+  <p><label for="field-name">Field</label>
+    <select id="field-name" name="field_name" required>
+      {% for field in fields %}<option value="{{ field.name }}">{{ field.label }}</option>{% endfor %}
+    </select></p>
+  <p><label for="field-value">Corrected value</label>
+    <input id="field-value" name="value" type="text">
+    <span>Leave blank only to clear an optional field.</span></p>
+  <p><label for="field-reason">Reason</label>
+    <textarea id="field-reason" name="reason" maxlength="500" required></textarea></p>
+  <button type="submit">Save correction</button>
+</form>
+
+<h2>Correction history</h2>
+<table>
+  <thead><tr><th scope="col">Field</th><th scope="col">Value</th><th scope="col">Reason</th><th scope="col">Set by</th><th scope="col">Resumed by</th></tr></thead>
+  <tbody>
+    {% for item in history %}
+      <tr>
+        <th scope="row">{{ item.field_name }}</th><td>{{ item.value|default:"—" }}</td>
+        <td>{{ item.reason }}</td><td>{{ item.created_by.email }} · {{ item.created_at }}</td>
+        <td>{% if item.resumed_at %}{{ item.resumed_by.email }} · {{ item.resumed_at }}{% else %}Active{% endif %}</td>
+      </tr>
+    {% empty %}<tr><td colspan="5">No corrections recorded.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

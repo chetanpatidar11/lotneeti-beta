@@ -1,0 +1,12 @@
+server {
+    listen 80;
+    server_name __DOMAIN__;
+    access_log off;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+    }
+    location / {
+        return 404;
+    }
+}

@@ -1,0 +1,7 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | LotNeeti Founder Admin{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'platform_admin/founder.css' %}">{% endblock %}
+{% block branding %}<div id="site-name"><a href="{% url 'founder_admin:index' %}"><span class="brand-symbol" aria-hidden="true">L</span> Lot<span class="brand-accent">Neeti</span> <small>FOUNDER ADMIN</small></a></div>{% endblock %}
+{% block nav-global %}{% endblock %}
