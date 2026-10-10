@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { authRequestHeaders } from "@/lib/auth-request";
 
 type Mode = "sign-in" | "create" | "reset";
 
@@ -23,7 +24,11 @@ export default function SignInForm({ linkError }: { linkError: boolean }) {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (mode === "create" && password !== confirm) {
+    const fields = new FormData(event.currentTarget);
+    const submittedEmail = String(fields.get("email") ?? "");
+    const submittedPassword = String(fields.get("password") ?? "");
+    const submittedConfirm = String(fields.get("confirm") ?? "");
+    if (mode === "create" && submittedPassword !== submittedConfirm) {
       setMessage("Passwords do not match.");
       return;
     }
@@ -35,8 +40,10 @@ export default function SignInForm({ linkError }: { linkError: boolean }) {
         : mode === "create" ? "/api/auth/register" : "/api/auth/password/reset/start";
       const response = await fetch(path, {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(mode === "reset" ? { email } : { email, password }),
+        headers: authRequestHeaders,
+        body: JSON.stringify(mode === "reset"
+          ? { email: submittedEmail }
+          : { email: submittedEmail, password: submittedPassword }),
       });
       if (response.ok && mode === "sign-in") {
         router.replace("/");
@@ -45,15 +52,22 @@ export default function SignInForm({ linkError }: { linkError: boolean }) {
       }
       if (response.ok) {
         setMessage(mode === "create"
-          ? "If this address can be registered, check your email once to verify it."
+          ? "If this address needs verification, check your email. Already verified? Sign in."
           : "If this account exists, check your email for a password reset link.");
       } else if (response.status === 429) {
         setMessage("Too many attempts. Please wait a minute and try again.");
+      } else if (response.status === 403) {
+        setMessage("This browser could not submit the form. Refresh the page and try again.");
+      } else if (response.status >= 500) {
+        setMessage("Sign-in is temporarily unavailable. Please try again.");
       } else if (mode === "sign-in") {
         setMessage("Email or password is incorrect.");
       } else {
         const result = await response.json().catch(() => ({}));
-        setMessage(Array.isArray(result.password) ? result.password[0] : "Please check your details and try again.");
+        const fieldError = ["email", "password", "confirm"]
+          .map((field) => result[field])
+          .find((value) => Array.isArray(value) && value.length > 0);
+        setMessage(fieldError?.[0] ?? "Please check your details and try again.");
       }
     } catch {
       setMessage("Sign-in is temporarily unavailable. Please try again.");
@@ -74,16 +88,16 @@ export default function SignInForm({ linkError }: { linkError: boolean }) {
             : "We’ll send a one-time reset link to your email."}</p>
         <form onSubmit={submit} className="sign-in-form">
           <label htmlFor="email">Email address</label>
-          <input id="email" type="email" autoComplete="email" required value={email}
+          <input id="email" name="email" type="email" autoComplete="email" required value={email}
             onChange={(event) => setEmail(event.target.value)} />
           {mode !== "reset" && <>
             <label htmlFor="password">Password</label>
-            <input id="password" type="password" autoComplete={mode === "create" ? "new-password" : "current-password"}
+            <input id="password" name="password" type="password" autoComplete={mode === "create" ? "new-password" : "current-password"}
               minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} />
           </>}
           {mode === "create" && <>
             <label htmlFor="confirm">Confirm password</label>
-            <input id="confirm" type="password" autoComplete="new-password" minLength={8} required
+            <input id="confirm" name="confirm" type="password" autoComplete="new-password" minLength={8} required
               value={confirm} onChange={(event) => setConfirm(event.target.value)} />
           </>}
           <button type="submit" disabled={busy}>

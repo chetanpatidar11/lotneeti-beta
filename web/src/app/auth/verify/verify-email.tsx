@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { authRequestHeaders } from "@/lib/auth-request";
 
 export default function VerifyEmail({ token }: { token: string }) {
   const router = useRouter();
@@ -14,7 +15,7 @@ export default function VerifyEmail({ token }: { token: string }) {
     try {
       const response = await fetch("/api/auth/register/verify", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: authRequestHeaders,
         body: JSON.stringify({ token }),
       });
       if (response.ok) {

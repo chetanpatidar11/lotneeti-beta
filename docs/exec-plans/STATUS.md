@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## A05 Safari account-creation repair — 2026-10-10
+
+- A member reported Safari showing a generic Create account error while the same details in the ChatGPT browser produced the verification email. The live proxy returned 403 `Invalid request origin` for an Origin-less JSON POST, and the corresponding Safari attempt did not reach Django; the successful registration and verification did reach Django. The proxy previously required an exact `Origin` header even for a same-origin request.
+- Website auth requests now carry a JSON-only custom header. The proxy accepts a request with no `Origin` when that header is present, while rejecting mismatched origins, cross-site Fetch Metadata, plain forms and missing headers before forwarding to Django. The browser reads submitted form values from the actual fields so Safari autofill cannot leave the submitted email/password behind the visible values. Registration shows field errors and explains that already-verified members should sign in.
+- Regression tests cover Origin-less acceptance, rejected cross-site/form requests and validation response forwarding. Full `scripts/check.sh` passed: 360 backend tests, 32 web tests, one Android package test, Planner matrix, Ruff, migration/system checks, web lint/typecheck/build and Capacitor sync. This entry records the local fix before deployment.
+
 ## A05/L05 beta redeployment — 2026-10-10
 
 - Deployed committed password sign-in/one-time verification and the web dependency update to the existing HTTPS beta at `https://44-192-105-250.sslip.io/`. Final source commit `03b6cc2`, release archive SHA-256 `44a7ccbad1ce8cf7d2319314928dbc628fcb3138cb1aa6c6f9c919269cb2f6fb`. The existing SSH security-group rule was changed from the previous workstation address to the current single `/32`; no additional AWS host or paid service was created.

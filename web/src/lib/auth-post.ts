@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
 import { copyAuthCookies } from "./auth-cookies";
+import { AUTH_REQUEST_HEADER } from "./auth-request";
 import { backendUrl, frontendBaseUrl } from "./backend";
 
 export async function authPost(request: Request, path: string, withCookies = false): Promise<NextResponse> {
   const origin = new URL(frontendBaseUrl).origin;
-  if (request.headers.get("origin") !== origin) {
+  const requestOrigin = request.headers.get("origin");
+  const fetchSite = request.headers.get("sec-fetch-site");
+  const contentType = request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
+  if (
+    (requestOrigin !== null && requestOrigin !== origin) ||
+    (fetchSite !== null && !["same-origin", "none"].includes(fetchSite)) ||
+    request.headers.get(AUTH_REQUEST_HEADER) !== "1" ||
+    contentType !== "application/json"
+  ) {
     return NextResponse.json({ message: "Invalid request origin." }, { status: 403 });
   }
   try {

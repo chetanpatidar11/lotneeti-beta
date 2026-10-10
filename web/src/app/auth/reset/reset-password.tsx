@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { authRequestHeaders } from "@/lib/auth-request";
 
 export default function ResetPassword({ token }: { token: string }) {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function ResetPassword({ token }: { token: string }) {
     setBusy(true);
     try {
       const response = await fetch("/api/auth/password/reset/complete", {
-        method: "POST", headers: { "content-type": "application/json" },
+        method: "POST", headers: authRequestHeaders,
         body: JSON.stringify({ token, password }),
       });
       if (response.ok) {
