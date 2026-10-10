@@ -1,5 +1,12 @@
 # LotNeeti execution status
 
+## A05/L05 beta redeployment — 2026-10-10
+
+- Deployed committed password sign-in/one-time verification and the web dependency update to the existing HTTPS beta at `https://44-192-105-250.sslip.io/`. Final source commit `03b6cc2`, release archive SHA-256 `44a7ccbad1ce8cf7d2319314928dbc628fcb3138cb1aa6c6f9c919269cb2f6fb`. The existing SSH security-group rule was changed from the previous workstation address to the current single `/32`; no additional AWS host or paid service was created.
+- Before release, the complete `scripts/check.sh` gate passed again (360 backend tests, 29 web tests, Android package test, Planner matrix, migration/system checks, lint, typecheck and builds). `accounts.0006` applied on the host. Production dependency audit reports zero vulnerabilities after updating Next.js to 16.4.0 and safe transitive packages; five high findings remain in development-only tooling and require a separate dependency review.
+- The encrypted pre-release S3 snapshot is `backups/postgres/releases/2026-10-10-before-password-auth-f4c09c7.dump.gcm` (195885 bytes); the post-release snapshot is `backups/postgres/releases/2026-10-10-after-password-auth-f4c09c7.dump.gcm` (196145 bytes). Both have S3 AES256 encryption in the existing private bucket. The post-release archive authenticated and restored into an isolated database; live/restore counts matched for 63 migrations, one workspace, zero plan runs and zero applications. The isolated database was removed after the check; the nightly backup timer remains active.
+- Public `/`, `/sign-in`, `/ipos` and API health returned 200 with valid HTTPS. An invalid password request reached the new endpoint and returned 400; old email-start and production local-preview endpoints returned 404. API, web, worker, beat, PostgreSQL, Redis and backup timer were active. A real verification email was not requested to avoid an unnecessary SES send; SES remains in sandbox and recipients beyond the verified beta inbox cannot receive mail until verified or production access is granted.
+
 ## A05 password sign-in and one-time verification — local, 2026-10-10
 
 - Replaced repeated email-link sign-in with password registration, a single-use 15-minute email verification link, and password sign-in. Existing email-link members can use Create account once to set a password. Password reset uses a separate single-use email link; verification and reset requests are limited to one email per address per 15 minutes. Founder Admin password and TOTP flow stays separate.
