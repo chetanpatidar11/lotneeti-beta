@@ -84,3 +84,13 @@ def test_public_ipo_status_closes_at_5pm_ist_on_close_date(now, expected_status)
 
     with patch("ipos.public_serializers.timezone.now", return_value=now):
         assert PublicIPOSerializer(ipo).data["status"] == expected_status
+
+
+@pytest.mark.django_db
+def test_past_due_upcoming_source_row_is_displayed_as_closed():
+    ipo = issue(status=IPO.Status.UPCOMING, publication_state=IPO.PublicationState.PUBLISHED)
+    ipo.save()
+    now = datetime(2026, 10, 4, 9, 0, tzinfo=ZoneInfo("Asia/Kolkata"))
+
+    with patch("ipos.public_serializers.timezone.now", return_value=now):
+        assert PublicIPOSerializer(ipo).data["status"] == IPO.Status.CLOSED

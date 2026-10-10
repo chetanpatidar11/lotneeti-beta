@@ -127,7 +127,10 @@ class PublicIPOSerializer(serializers.ModelSerializer):
         close_at = datetime.combine(
             effective["close_date"], time(17), tzinfo=ZoneInfo("Asia/Kolkata")
         )
-        if effective["status"] == IPO.Status.OPEN and timezone.now() >= close_at:
+        if (
+            effective["status"] in {IPO.Status.OPEN, IPO.Status.UPCOMING}
+            and timezone.now() >= close_at
+        ):
             result["status"] = IPO.Status.CLOSED
         return result
 
