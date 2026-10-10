@@ -3,6 +3,7 @@
 from copy import copy
 from dataclasses import replace
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import CharField, F, OuterRef, Subquery
@@ -86,11 +87,16 @@ def published_ipos():
     publication_override = IPOFieldOverride.objects.filter(
         ipo_id=OuterRef("pk"), field_name="publication_state", resumed_at__isnull=True
     ).values("value")[:1]
-    return IPO.objects.annotate(
+    queryset = IPO.objects.annotate(
         effective_publication_state=Coalesce(
             Subquery(publication_override), F("publication_state"), output_field=CharField()
         )
     ).filter(effective_publication_state=IPO.PublicationState.PUBLISHED)
+    return (
+        queryset.filter(source_key=settings.ACTIVE_IPO_SOURCE)
+        if settings.ACTIVE_IPO_SOURCE
+        else queryset
+    )
 
 
 def _validate_effective(ipo: IPO, values: dict) -> None:

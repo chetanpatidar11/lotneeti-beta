@@ -242,9 +242,14 @@ def sync_investorgain_gmp(*, manual: bool = False) -> dict:
     now = timezone.now()
     if manual:
         sync_state, _ = IPOProviderSyncState.objects.get_or_create(source_key=PROVIDER_KEY)
+        if sync_state.last_attempt_at and timedelta(
+            0
+        ) <= now - sync_state.last_attempt_at < timedelta(minutes=5):
+            return {"status": "RATE_LIMITED", "provider": PROVIDER_KEY, "requested": 0}
+        sync_state.last_attempt_at = now
         sync_state.last_status = "RUNNING"
         sync_state.last_safe_error = ""
-        sync_state.save(update_fields=["last_status", "last_safe_error"])
+        sync_state.save(update_fields=["last_attempt_at", "last_status", "last_safe_error"])
     else:
         slot_error, sync_state = reserve_refresh_slot(PROVIDER_KEY, at=now)
         if slot_error:

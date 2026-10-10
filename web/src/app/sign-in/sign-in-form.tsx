@@ -6,9 +6,9 @@ import { authRequestHeaders } from "@/lib/auth-request";
 
 type Mode = "sign-in" | "create" | "reset";
 
-export default function SignInForm({ linkError }: { linkError: boolean }) {
+export default function SignInForm({ linkError, initialMode = "sign-in" }: { linkError: boolean; initialMode?: "sign-in" | "create" }) {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("sign-in");
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");

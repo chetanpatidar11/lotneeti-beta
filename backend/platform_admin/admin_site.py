@@ -38,6 +38,7 @@ from ipos.models import (
 from ipos.overrides import (
     OVERRIDABLE_FIELDS,
     effective_ipo_resolution,
+    published_ipos,
     resume_ipo_auto,
     set_ipo_override,
 )
@@ -135,7 +136,7 @@ class FounderAdminSite(AdminSite):
                 "nse_state": IPOProviderSyncState.objects.filter(source_key="nse").first(),
                 "bse_state": IPOProviderSyncState.objects.filter(source_key="bse").first(),
                 "filings": SEBIFiling.objects.all()[:25],
-                "published_count": IPO.objects.filter(publication_state="PUBLISHED").count(),
+                "published_count": published_ipos().count(),
                 "gmp_states": GMPProviderState.objects.all(),
                 "gmp_sync_state": IPOProviderSyncState.objects.filter(
                     source_key="investorgain"

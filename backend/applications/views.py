@@ -20,6 +20,7 @@ from applications.services import (
     start_tracking_plan,
 )
 from ipos.models import IPO
+from ipos.overrides import published_ipos
 from planner.models import PlanRun
 from portfolio.models import Sale
 from portfolio.reports import profit_report
@@ -154,8 +155,8 @@ class WorkspaceOperationsView(APIView):
         )
         return Response(
             {
-                "active_ipos": IPO.objects.filter(
-                    publication_state=IPO.PublicationState.PUBLISHED,
+                "active_ipos": published_ipos()
+                .filter(
                     open_date__lte=today,
                     close_date__gte=today,
                 )

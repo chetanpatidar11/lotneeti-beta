@@ -36,6 +36,18 @@ body { margin: 0; }
   box-shadow: 0 12px 36px rgb(24 50 40 / 6%);
 }
 .home-shell { width: min(100%, 72rem); }
+.market-feed-status { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; padding: 1rem 1.2rem; border: 1px solid #cce4d2; border-radius: .75rem; background: #f0f8f1; }
+.market-feed-status > div:first-child { display: grid; gap: .3rem; }
+.market-feed-status small { color: #52665a; }
+.live-sync-control { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.live-sync-control span { max-width: 22rem; color: #28563c; }
+.ipo-market-intro { display: flex; flex-wrap: wrap; gap: .4rem 1rem; align-items: center; margin: 0 0 1.2rem; padding: .85rem 1rem; border-radius: .65rem; background: #eef6ef; color: #294a35; }
+.ipo-market-intro span { color: #52665a; }
+.ipo-calendar { margin: 0 0 1.5rem; padding: 1rem; border: 1px solid #dfe8df; border-radius: .75rem; }
+.ipo-calendar ul { list-style: none; margin: .75rem 0 0; padding: 0; display: grid; gap: .5rem; }
+.ipo-calendar li { display: grid; grid-template-columns: 7rem minmax(10rem, 1fr) minmax(10rem, 1fr) auto; align-items: center; gap: .75rem; padding: .65rem .75rem; background: #f8faf7; border-radius: .5rem; }
+.ipo-calendar-date { font-weight: 700; color: #246143; }
+@media (max-width: 700px) { .ipo-calendar li { grid-template-columns: 1fr auto; } .ipo-calendar li > :nth-child(3) { grid-column: 1 / -1; } }
 .capital-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin: 1.5rem 0; }
 .capital-grid > div { display: grid; gap: .45rem; padding: 1.25rem; border: 1px solid #dfe8df; border-radius: .75rem; background: #eef6ef; }
 .capital-grid span { font-weight: 700; color: #385a45; }

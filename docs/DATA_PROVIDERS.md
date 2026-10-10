@@ -4,6 +4,8 @@
 
 The Founder selected **InvestorGain as the single IPO and GMP source**. The scheduled and Founder Admin refresh use its authorised report endpoint for active/upcoming issue name, category, price, lot, open/close, basis-of-allotment, listing and GMP fields. One response creates/updates the InvestorGain-backed IPOs and appends GMP observations. Rows missing a planner-required field are skipped rather than guessed.
 
+As of 2026-10-10, the Founder also confirmed that the private written permission covers public display of these fields and dashboard manual refresh. The permission document remains outside Git. The active customer IPO list, decisions, planner and dashboard issue count are filtered to InvestorGain in production. The public landing exposes a bounded issue preview from the same saved records. Founder dashboard refresh requires an MFA-verified session, and all manual paths coalesce repeat requests within five minutes. The customer website does not fetch NSE/BSE/SEBI or expose their historical watch pages.
+
 NSE, BSE and SEBI jobs are no longer scheduled or exposed as Founder Admin refresh actions. Their existing code and historical records are retained for audit/recovery but are not called by the active source workflow. Founder Admin can refresh InvestorGain repeatedly at any time; automatic jobs remain at 00:01 and hourly 09:00–19:00 Asia/Kolkata.
 
 ## Earlier local provider state — 2026-10-02

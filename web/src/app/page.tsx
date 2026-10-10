@@ -5,6 +5,8 @@ import { backendUrl } from "@/lib/backend";
 import { formatInr } from "@/lib/money";
 import { selectedWorkspace } from "@/lib/workspace";
 import { EmptyState, MetricCard, PageHeader, SectionHeading, StatusBadge } from "@/components/ui";
+import LiveSyncButton from "./live-sync-button";
+import LandingPage from "./landing";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,7 @@ type Bank = { id: string; bank_name: string; account_masked: string; current_bal
 type Application = { id: string; ipo_name: string; applicant_name: string; status: string };
 type Payment = { id: string; name: string; next_due_date: string; active: boolean; amount: string };
 type Workspace = { id: string; name: string };
+type FeedStatus = { provider: string; founder: boolean; can_sync: boolean; last_success_at: string | null; status: string };
 
 async function getData<T>(path: string, cookieHeader: string): Promise<T | null> {
   try {
@@ -35,19 +38,20 @@ function modeLabel(mode: string): string {
 
 export default async function HomePage() {
   const cookieHeader = (await cookies()).toString();
-  if (!cookieHeader.includes("sessionid=")) redirect("/sign-in");
+  if (!cookieHeader.includes("sessionid=")) return <LandingPage />;
   const workspaces = await getData<Workspace[]>("workspaces/", cookieHeader);
   if (!workspaces) redirect("/sign-in");
   const workspace = await selectedWorkspace(workspaces);
   if (!workspace) return <main className="page"><div className="shell home-shell"><PageHeader eyebrow="Overview" title="Operations dashboard" description="Your IPO activity and available money in one place." /><EmptyState title="Create a workspace to begin" detail="Add your investors and bank accounts, then select IPOs to plan applications." action={<Link className="button-link" href="/settings/investors">Set up workspace</Link>} /></div></main>;
   const prefix = `workspaces/${workspace.id}`;
-  const [capital, operations, ipos, decisions, banks, applications] = await Promise.all([
+  const [capital, operations, ipos, decisions, banks, applications, feed] = await Promise.all([
     getData<Capital>(`${prefix}/capital/`, cookieHeader),
     getData<Operations>(`${prefix}/operations/`, cookieHeader),
     getData<IPO[]>("ipos/", cookieHeader),
     getData<Decision[]>(`${prefix}/ipo-decisions/`, cookieHeader),
     getData<Bank[]>(`${prefix}/banks/`, cookieHeader),
     getData<Application[]>(`${prefix}/applications/`, cookieHeader),
+    getData<FeedStatus>("ipos/live-sync/", cookieHeader),
   ]);
   const paymentLists = await Promise.all((banks ?? []).map((bank) => getData<Payment[]>(`${prefix}/banks/${bank.id}/recurring-debits/`, cookieHeader)));
   const payments = paymentLists.flatMap((items) => items ?? []);
@@ -70,6 +74,7 @@ export default async function HomePage() {
 
   return <main className="page"><div className="shell home-shell">
     <PageHeader eyebrow="Overview" title="Operations dashboard" description={workspace.name} action={<Link className="button-link" href="/plan">Review plan <span aria-hidden="true">↗</span></Link>} />
+    <div className="market-feed-status"><div><strong>IPO market data · InvestorGain</strong><small>{feed?.last_success_at ? `Last synced ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(new Date(feed.last_success_at))} IST` : "Waiting for the first successful sync"}{feed?.status === "ERROR" ? " · Latest attempt failed" : ""}</small></div>{feed?.can_sync ? <LiveSyncButton /> : feed?.founder ? <a href="/admin/login/?next=/">Verify as founder to enable Live sync</a> : null}</div>
     {!capital || !operations ? <div className="plan-error" role="alert">Dashboard data is temporarily unavailable. <Link href="/">Retry</Link></div> : <>
       <section className="metric-grid" aria-label="Money overview">
         <MetricCard label="Total Balance" value={formatInr(capital.balance)} note="Across your banks" href="/funds" />

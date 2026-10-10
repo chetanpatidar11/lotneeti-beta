@@ -72,6 +72,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = "en-in"
 TIME_ZONE = "Asia/Kolkata"
+ACTIVE_IPO_SOURCE = "investorgain"
 USE_I18N = True
 USE_TZ = True
 

@@ -173,8 +173,11 @@ def test_founder_manual_gmp_sync_bypasses_the_automatic_schedule():
         ),
     ):
         result = sync_gmp_sources(manual=True)
+        repeated = sync_gmp_sources(manual=True)
     assert result["status"] == "OK"
     assert result["created"] == 1
+    assert repeated["status"] == "RATE_LIMITED"
+    assert repeated["requested"] == 0
 
 
 @pytest.mark.django_db

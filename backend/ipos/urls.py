@@ -3,7 +3,9 @@ from django.urls import path
 from ipos.decision_views import WorkspaceIPODecisionView, WorkspaceIPOListView
 from ipos.public_views import (
     GMPHistoryView,
+    InvestorGainSyncView,
     IPOFeedWatchView,
+    MarketPreviewView,
     PublicIPOViewSet,
     SEBIFilingWatchView,
 )
@@ -23,6 +25,8 @@ urlpatterns = [
         name="workspace-ipo-decision-detail",
     ),
     path("ipos/", ipo_list, name="ipo-list"),
+    path("market/ipos/", MarketPreviewView.as_view(), name="market-ipo-preview"),
+    path("ipos/live-sync/", InvestorGainSyncView.as_view(), name="ipo-live-sync"),
     path("ipos/feed-watch/", IPOFeedWatchView.as_view(), name="ipo-feed-watch"),
     path("ipos/filing-watch/", SEBIFilingWatchView.as_view(), name="ipo-filing-watch"),
     path("ipos/<uuid:pk>/", ipo_detail, name="ipo-detail"),
