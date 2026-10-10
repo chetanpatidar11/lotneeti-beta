@@ -1,8 +1,10 @@
+from datetime import timedelta
 from hashlib import sha256
 
 import pytest
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APIClient
 from test_planner_persistence import setup_plan
 
@@ -10,7 +12,7 @@ from accounts.models import User, WorkspaceMembership
 from core.models import AuditEvent
 from exports.models import PlanExport
 from exports.storage import DOWNLOAD_TTL_SECONDS, S3ExportStorage
-from ipos.models import IPOUserDecision
+from ipos.models import IPO, IPOUserDecision
 from planner.models import PlanRun
 from planner.persistence import create_plan_run
 
@@ -109,6 +111,12 @@ def test_s3_storage_requires_server_side_encryption_and_short_lived_url():
 @override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="ALLOW")
 def test_reviewed_manual_plan_saves_exact_rows_and_blocks_stale_amount_export(monkeypatch):
     owner, workspace, snapshot = setup_plan()
+    ipo = IPO.objects.get(pk=snapshot.ipos[0].id)
+    today = timezone.localdate()
+    ipo.open_date = today - timedelta(days=1)
+    ipo.close_date = today + timedelta(days=2)
+    ipo.allotment_date = today + timedelta(days=5)
+    ipo.save(update_fields=["open_date", "close_date", "allotment_date"])
     IPOUserDecision.objects.create(
         workspace=workspace, ipo_id=snapshot.ipos[0].id, decision="APPLY"
     )

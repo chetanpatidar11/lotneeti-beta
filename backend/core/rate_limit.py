@@ -13,10 +13,18 @@ from django.http import JsonResponse
 def _scope(request):
     path = request.path_info
     method = request.method
-    if path == "/api/v1/auth/email/start/" and method == "POST":
+    if (
+        path in {"/api/v1/auth/register/", "/api/v1/auth/password/reset/start/"}
+        and method == "POST"
+    ):
         return "auth_start"
-    if path == "/api/v1/auth/email/verify/" and method == "POST":
+    if (
+        path in {"/api/v1/auth/register/verify/", "/api/v1/auth/password/reset/complete/"}
+        and method == "POST"
+    ):
         return "auth_verify"
+    if path == "/api/v1/auth/password/login/" and method == "POST":
+        return "auth_password"
     if path == "/admin/login/" and method == "POST":
         return "admin_login"
     if path.startswith("/admin/") or path.startswith("/api/v1/platform/"):
@@ -59,7 +67,7 @@ class RateLimitMiddleware:
         user = getattr(request, "user", None)
         identity = (
             f"user:{user.pk}"
-            if scope not in {"auth_start", "auth_verify", "admin_login"}
+            if scope not in {"auth_start", "auth_verify", "auth_password", "admin_login"}
             and user is not None
             and user.is_authenticated
             else f"ip:{_client_ip(request)}"

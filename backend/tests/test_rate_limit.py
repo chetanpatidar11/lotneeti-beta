@@ -20,6 +20,7 @@ def clean_cache():
     RATE_LIMIT_RULES={
         "auth_start": (2, 60),
         "auth_verify": (2, 60),
+        "auth_password": (2, 60),
         "admin_login": (2, 60),
         "admin": (2, 60),
         "import": (2, 60),
@@ -32,8 +33,11 @@ def test_sensitive_routes_are_limited_and_retry_after_is_returned():
     factory = RequestFactory()
     middleware = RateLimitMiddleware(lambda request: HttpResponse(status=204))
     routes = [
-        ("post", "/api/v1/auth/email/start/"),
-        ("post", "/api/v1/auth/email/verify/"),
+        ("post", "/api/v1/auth/register/"),
+        ("post", "/api/v1/auth/register/verify/"),
+        ("post", "/api/v1/auth/password/login/"),
+        ("post", "/api/v1/auth/password/reset/start/"),
+        ("post", "/api/v1/auth/password/reset/complete/"),
         ("post", "/admin/login/"),
         ("get", "/admin/"),
         ("get", "/api/v1/platform/"),
@@ -68,7 +72,7 @@ def test_trusted_proxy_ip_and_user_isolation_ignore_untrusted_forwarding():
         request.user = SimpleNamespace(pk=user_id, is_authenticated=user_id is not None)
         return middleware(request).status_code
 
-    auth = "/api/v1/auth/email/start/"
+    auth = "/api/v1/auth/register/"
     assert call(auth, "127.0.0.1", "198.51.100.1") == 204
     assert call(auth, "127.0.0.1", "198.51.100.1") == 429
     assert call(auth, "127.0.0.1", "198.51.100.2") == 204
@@ -86,18 +90,20 @@ def test_trusted_proxy_ip_and_user_isolation_ignore_untrusted_forwarding():
     RATE_LIMIT_ENABLED=True,
     RATE_LIMIT_RULES={"auth_start": (1, 60)},
 )
-def test_email_start_endpoint_returns_429_after_limit(client):
+def test_registration_endpoint_returns_429_after_limit(client):
     first = client.post(
-        "/api/v1/auth/email/start/",
-        data={"email": "rate-limit@example.invalid"},
+        "/api/v1/auth/register/",
+        data={"email": "rate-limit@example.invalid", "password": "Safe test password 284!"},
         content_type="application/json",
         REMOTE_ADDR="192.0.2.10",
+        HTTP_ORIGIN="http://127.0.0.1:3000",
     )
     second = client.post(
-        "/api/v1/auth/email/start/",
-        data={"email": "rate-limit@example.invalid"},
+        "/api/v1/auth/register/",
+        data={"email": "rate-limit@example.invalid", "password": "Safe test password 284!"},
         content_type="application/json",
         REMOTE_ADDR="192.0.2.10",
+        HTTP_ORIGIN="http://127.0.0.1:3000",
     )
     assert first.status_code == 200
     assert second.status_code == 429

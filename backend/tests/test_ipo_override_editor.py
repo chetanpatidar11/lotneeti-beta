@@ -23,7 +23,15 @@ def test_staff_override_editor_requires_mfa_and_drives_public_and_planner_values
     workspace = create_workspace(name="Synthetic workspace", owner=member)
     workspace.auto_select_gmp_percent = Decimal("20.00")
     workspace.save()
-    ipo = issue(publication_state="DRAFT")
+    today = timezone.localdate()
+    ipo = issue(
+        publication_state="DRAFT",
+        status="OPEN",
+        open_date=today - timedelta(days=1),
+        close_date=today + timedelta(days=2),
+        allotment_date=today + timedelta(days=5),
+        listing_date=today + timedelta(days=7),
+    )
     ipo.save()
     GMPObservation.objects.create(
         ipo=ipo,

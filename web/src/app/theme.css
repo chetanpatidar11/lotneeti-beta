@@ -125,6 +125,9 @@ label:has(input), label:has(select) { display: grid; gap: 5px; }
 .sign-in-form { display: grid; gap: 10px; margin: 0; }
 .sign-in-form input, .settings-shell select, .threshold-setting input, .sale-form input, .sale-form select, .allotment-form input, .profit-period input { border-color: var(--border-strong); border-radius: 7px; background: #11191b; color: var(--text); font: inherit; }
 .sign-in-form input { padding: 8px 10px; }
+.auth-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.text-button { border: 0; background: transparent; color: var(--accent, #65c79a); padding: 8px 0; font-weight: 650; }
+.text-button:hover:not(:disabled) { background: transparent; text-decoration: underline; transform: none; }
 input[type="file"] { max-width: 100%; border: 1px dashed var(--border-strong); background: #11191b; }
 input[type="checkbox"] { min-height: auto; accent-color: var(--accent); }
 .app-drawer { position: fixed; inset: 0 0 0 auto; width: min(100%, 420px); height: 100%; max-height: 100%; margin: 0; padding: 0; border: 0; border-left: 1px solid var(--border-strong); background: var(--surface); color: var(--text); box-shadow: var(--shadow); }

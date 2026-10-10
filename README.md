@@ -34,8 +34,12 @@ npm run dev
 
 The web app reads `API_BASE_URL` from the environment (default:
 `http://127.0.0.1:8000/api/v1`) and shows the API connection state on its home page.
-Local sign-in links are written to the backend terminal by Django's console email backend.
-Production settings require SMTP configuration supplied through environment variables.
+Create an account with an email and password, then open the one-time verification
+link written to the backend terminal by Django's console email backend. After
+verification, sign in with the password; the secure session lasts up to 30 days
+and renews when the website is used. Existing email-link users can use Create
+account once to set a password. Forgot password sends a one-time reset link.
+Production email delivery can use SES or SMTP as configured in the environment.
 
 For the founder staff account, run `createsuperuser` and then
 `enroll_founder_totp <email>` with `backend/manage.py`. Add the one-time URI to an

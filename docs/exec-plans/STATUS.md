@@ -1,5 +1,12 @@
 # LotNeeti execution status
 
+## A05 password sign-in and one-time verification — local, 2026-10-10
+
+- Replaced repeated email-link sign-in with password registration, a single-use 15-minute email verification link, and password sign-in. Existing email-link members can use Create account once to set a password. Password reset uses a separate single-use email link; verification and reset requests are limited to one email per address per 15 minutes. Founder Admin password and TOTP flow stays separate.
+- Django's Secure/HttpOnly 30-day session cookie remains the member session mechanism. An authenticated website visit renews its expiry. Public auth POSTs require the configured frontend origin, token use is atomic, password hashes are never emailed, and generic registration/reset responses avoid confirming whether an address exists.
+- `bash scripts/check.sh` passed: 360 backend tests, 29 web tests, one Android package test, Planner matrix 115/115 P0 and 5/5 P1, Ruff, migration/system checks, lint, typecheck and production builds. A local Next → Django flow with synthetic data passed registration, one verification email, login, session renewal, logout, reset, old-password rejection and new-password login. Safari rendered the create-account form. Three older tests were updated to use currently open synthetic IPO dates or inspect the admin context after the filing list was removed from its page.
+- This is local code only. No AWS deployment, SES send, live account change or Android product work was performed. Apply `accounts.0006` when deploying; production email delivery and browser acceptance remain to be verified after release.
+
 ## Planner preview configuration and closed IPO state — local, 2026-10-02
 
 - Reproduced the reported plan failure as HTTP 503: the founder-approved local `WARN` policy was lowercase in `.env`. Corrected the local value and restarted Django with `WARN`; preview now returns HTTP 200.

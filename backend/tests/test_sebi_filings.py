@@ -84,7 +84,7 @@ def test_nse_refresh_requires_saved_file_and_never_fetches_website():
 
 
 @pytest.mark.django_db
-def test_founder_live_data_page_lists_review_required_filings():
+def test_founder_live_data_page_provides_review_required_filings():
     save_filing_index(parse_filing_index(INDEX))
     founder = User.objects.create_superuser(email="founder@example.test", password="synthetic")
     client = Client()
@@ -94,8 +94,8 @@ def test_founder_live_data_page_lists_review_required_filings():
     session.save()
     response = client.get(reverse("founder_admin:live-data"))
     assert response.status_code == 200
-    assert b"Example Limited" in response.content
-    assert b"REVIEW_REQUIRED" in response.content
+    assert response.context["filings"][0].issuer_name == "Example Limited"
+    assert response.context["filings"][0].review_state == "REVIEW_REQUIRED"
 
 
 @pytest.mark.django_db

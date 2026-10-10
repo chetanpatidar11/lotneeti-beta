@@ -113,6 +113,7 @@ RATE_LIMIT_TRUSTED_PROXY_IPS: set[str] = set()
 RATE_LIMIT_RULES = {
     "auth_start": (5, 60),
     "auth_verify": (20, 60),
+    "auth_password": (5, 60),
     "admin_login": (5, 60),
     "admin": (120, 60),
     "import": (5, 60),

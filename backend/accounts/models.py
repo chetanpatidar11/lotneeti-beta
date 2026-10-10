@@ -30,6 +30,7 @@ class UserManager(BaseUserManager):
 class User(AbstractUser):
     username = None
     email = models.EmailField(unique=True)
+    email_verified_at = models.DateTimeField(null=True, blank=True)
     is_founder_admin = models.BooleanField(default=False)
 
     USERNAME_FIELD = "email"
@@ -82,8 +83,15 @@ class WorkspaceMembership(models.Model):
 
 
 class EmailLoginToken(models.Model):
+    class Purpose(models.TextChoices):
+        LEGACY = "LEGACY", "Legacy sign-in"
+        VERIFY = "VERIFY", "Verify email"
+        RESET = "RESET", "Reset password"
+
     email = models.EmailField()
     token_hash = models.CharField(max_length=64, unique=True)
+    purpose = models.CharField(max_length=8, choices=Purpose.choices, default=Purpose.LEGACY)
+    pending_password_hash = models.CharField(max_length=128, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
     used_at = models.DateTimeField(null=True, blank=True)

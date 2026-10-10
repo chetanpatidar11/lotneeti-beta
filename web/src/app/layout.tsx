@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/session";
 import { localPreviewEnabled } from "@/lib/local-preview";
 import { selectedWorkspace } from "@/lib/workspace";
 import AppNav from "./app-nav";
+import SessionKeeper from "./session-keeper";
 import "./globals.css";
 import "./theme.css";
 
@@ -33,9 +34,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const workspace = await selectedWorkspace(workspaces);
   return (
     <html lang="en">
+      <head><meta name="referrer" content="no-referrer" /></head>
       <body>
         <a className="skip-link" href="#main-content">Skip to content</a>
-        {user ? <div className="app-layout"><AppNav email={user.email} workspaces={workspaces} selectedId={workspace?.id} founderAdmin={founderAdmin} localPreview={localPreviewEnabled() && user.email === "local-preview@lotneeti.test"} /><div className="app-main" id="main-content" tabIndex={-1}>{children}</div></div> : <div id="main-content" tabIndex={-1}>{children}</div>}
+        {user ? <div className="app-layout"><SessionKeeper /><AppNav email={user.email} workspaces={workspaces} selectedId={workspace?.id} founderAdmin={founderAdmin} localPreview={localPreviewEnabled() && user.email === "local-preview@lotneeti.test"} /><div className="app-main" id="main-content" tabIndex={-1}>{children}</div></div> : <div id="main-content" tabIndex={-1}>{children}</div>}
       </body>
     </html>
   );

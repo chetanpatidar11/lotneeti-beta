@@ -5,11 +5,17 @@ from django.conf import settings
 from django.contrib.auth import login, logout
 from django.http import Http404
 from rest_framework import serializers, status
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.auth import consume_email_login, request_email_login
+from accounts.auth import (
+    complete_password_reset,
+    consume_registration,
+    login_with_password,
+    request_password_reset,
+    request_registration,
+)
 from accounts.models import User, WorkspaceMembership
 from accounts.services import create_workspace
 from core.audit import record_event
@@ -23,25 +29,75 @@ class TokenSerializer(serializers.Serializer):
     token = serializers.CharField(min_length=32, max_length=256)
 
 
-class EmailLoginStartView(APIView):
+class PasswordSerializer(EmailSerializer):
+    password = serializers.CharField(trim_whitespace=False, min_length=8, max_length=128)
+
+
+class PasswordResetSerializer(TokenSerializer):
+    password = serializers.CharField(trim_whitespace=False, min_length=8, max_length=128)
+
+
+class FrontendOrigin(BasePermission):
+    def has_permission(self, request, view):
+        frontend = urlparse(settings.FRONTEND_BASE_URL)
+        expected = f"{frontend.scheme}://{frontend.netloc}"
+        return request.headers.get("Origin") == expected
+
+
+class RegisterView(APIView):
     authentication_classes = []
-    permission_classes = [AllowAny]
+    permission_classes = [FrontendOrigin]
 
     def post(self, request):
-        serializer = EmailSerializer(data=request.data)
+        serializer = PasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        request_email_login(serializer.validated_data["email"])
-        return Response({"message": "If this address can sign in, an email is on its way."})
+        request_registration(**serializer.validated_data)
+        return Response(
+            {"message": "If this address can be registered, a verification email is on its way."}
+        )
 
 
-class EmailLoginVerifyView(APIView):
+class RegisterVerifyView(APIView):
     authentication_classes = []
-    permission_classes = [AllowAny]
+    permission_classes = [FrontendOrigin]
 
     def post(self, request):
         serializer = TokenSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = consume_email_login(request, serializer.validated_data["token"])
+        user = consume_registration(request, serializer.validated_data["token"])
+        return Response({"id": user.pk, "email": user.email}, status=status.HTTP_200_OK)
+
+
+class PasswordLoginView(APIView):
+    authentication_classes = []
+    permission_classes = [FrontendOrigin]
+
+    def post(self, request):
+        serializer = PasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = login_with_password(request, **serializer.validated_data)
+        return Response({"id": user.pk, "email": user.email}, status=status.HTTP_200_OK)
+
+
+class PasswordResetStartView(APIView):
+    authentication_classes = []
+    permission_classes = [FrontendOrigin]
+
+    def post(self, request):
+        serializer = EmailSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        request_password_reset(serializer.validated_data["email"])
+        return Response({"message": "If this account exists, a reset email is on its way."})
+
+
+class PasswordResetCompleteView(APIView):
+    authentication_classes = []
+    permission_classes = [FrontendOrigin]
+
+    def post(self, request):
+        serializer = PasswordResetSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = complete_password_reset(request, **serializer.validated_data)
         return Response({"id": user.pk, "email": user.email}, status=status.HTTP_200_OK)
 
 
@@ -85,6 +141,14 @@ class MeView(APIView):
 
     def get(self, request):
         return Response({"id": request.user.pk, "email": request.user.email})
+
+
+class SessionRefreshView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        request.session.set_expiry(settings.SESSION_COOKIE_AGE)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class LogoutView(APIView):
