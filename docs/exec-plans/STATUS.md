@@ -4,7 +4,7 @@
 
 - The IPO list defaults to Open + Upcoming and Mainboard; All clears filters. Closed IPO cards retain issue facts and the last GMP but omit the entire GMP-history/selection action block. Active cards show the selection badge beside the IPO status, with a tighter action row.
 - Draft automatic selection and planner snapshots now use the last enabled recorded GMP when no fresh observation exists. The public quote continues to say `Last GMP` and shows its recorded time. The one-hour auto-select warning and API freshness reason were removed. The threshold, issue type and open-first rules still apply; closed issues remain excluded from new plans.
-- `scripts/check.sh` passed: 365 backend tests, 34 web tests, one Android package test, Planner matrix, Ruff, Django checks/migration drift, web lint/typecheck/build and Capacitor sync. A regression covers the same older GMP selecting an open IPO and exclusion after it closes. Beta deployment is pending.
+- `scripts/check.sh` passed: 365 backend tests, 34 web tests, one Android package test, Planner matrix, Ruff, Django checks/migration drift, web lint/typecheck/build and Capacitor sync. A regression covers the same older GMP selecting an open IPO and exclusion after it closes. The pre-release backup succeeded and archive SHA-256 `ccdbb71b2089f2faa8af43f24c3782c5ee762cdd3f15e3258ec2e577c58e748b` was deployed to the HTTPS beta. No migration was needed; home, sign-in and API health returned 200 and API/web/worker/beat services are active. A read-only live check confirmed HD Fire Protect's last recorded 28.41% GMP now yields `GMP_THRESHOLD` selection in the founder workspace.
 
 ## J01 selection control and GMP explanation — 2026-10-11
 
