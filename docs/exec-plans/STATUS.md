@@ -4,7 +4,7 @@
 
 - Kept live issuer search and combinable filters, but placed Search, All, Open, Upcoming, Closed, Mainboard, SME, Selected and Skipped in one horizontally scrollable row. Removed the requested automatic-selection help/success text, IPO-choice success text, empty exchange badge, freshness/source-count badges and sentence under the IPO page title. The last stored GMP still shows as `Last GMP` with its observation time; it remains ineligible for automatic selection.
 - Automatic selection now considers open IPOs of the workspace's enabled issue types first. It may auto-select upcoming IPOs only if no such open IPO remains. The decision API and planner snapshot share this rule; manual Apply/Skip still outrank it, and expired IPOs cannot be auto-selected. Tests cover the open/upcoming fallback and mainboard/SME choices.
-- Full `scripts/check.sh` passed: 365 backend tests, 34 web tests, one Android package test, Planner matrix, Ruff, migrations/system checks, web lint/typecheck/build and Capacitor sync. Deployment is pending.
+- Full `scripts/check.sh` passed: 365 backend tests, 34 web tests, one Android package test, Planner matrix, Ruff, migrations/system checks, web lint/typecheck/build and Capacitor sync. The encrypted backup service succeeded. Deployed archive SHA-256 `95fac1bdad45134df66792c4e594219019a29c0b870223abddce2111d4869306` to the existing HTTPS beta; no migration was needed. Home, sign-in and API health returned HTTP 200; API, web, worker and beat services are active. The deployed IPO page contains the single filter row and no longer contains the removed observation copy.
 
 ## J01/GMP automatic selection and IPO discovery — 2026-10-11
 
