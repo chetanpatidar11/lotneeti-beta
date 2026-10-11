@@ -1,5 +1,12 @@
 # LotNeeti execution status
 
+## B07/UI Applicant deletion and product interface — 2026-10-11
+
+- Applicant deletion now archives each linked bank's balance history transactionally before removing the applicant and unused accounts. Saved plan references are retained as historical snapshots; applications and scheduled payments or policy records still protect their linked accounts.
+- Settings is being changed to show active and inactive investors/accounts together, with row status and contextual Activate/Deactivate actions. The redundant help sentence and Show inactive control are removed.
+- The existing Django/Next.js application now uses a cohesive warm finance design across the public landing, sign-in and product pages: new color/type/spacing tokens, stronger card and table hierarchy, cleaner forms and navigation icons, and responsive mobile styling. The sign-in page was reviewed in a local browser preview.
+- Full `scripts/check.sh` passed: 372 backend tests, 35 web tests, one Android package test, Planner matrix, Ruff, Django checks/migration drift, web lint/typecheck/build and Capacitor sync. Additional web lint/typecheck/build passed after the final navigation change. Focused applicant deletion tests cover balance history and saved plan snapshots. Beta deployment pending.
+
 ## B07 Deleted bank balance history — 2026-10-11
 
 - A bank with recorded balance changes can now be permanently deleted from Settings. Its balance entries are copied transactionally into immutable, workspace-scoped history with the bank name, masked account, amounts, notes, actor and original timestamps. The bank row and original linked entries are removed; Funds shows a Deleted bank history section even when no active banks remain. A recorded nonzero final balance is retained as history and no longer keeps the bank in current planning.

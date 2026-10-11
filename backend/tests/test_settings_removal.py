@@ -17,6 +17,7 @@ from funding.models import (
     UPIHandle,
 )
 from investors.models import DematAccount, Investor
+from planner.models import PlanRun
 from planner.persistence import create_plan_run
 
 
@@ -234,6 +235,63 @@ def test_bank_with_recorded_nonzero_balance_can_be_deleted_without_losing_histor
     assert not BankAccount.objects.filter(pk=bank.pk).exists()
     history = client.get(reverse("bank-balance-history", args=[workspace.pk, bank.pk]))
     assert history.data[0]["balance"] == "250.00"
+
+
+@pytest.mark.django_db
+def test_deleting_investor_archives_linked_bank_history():
+    owner = User.objects.create_user(email="owner@example.test")
+    workspace = create_workspace(name="Synthetic", owner=owner)
+    investor = create_investor(workspace, "First", "TESTX0001A")
+    bank = create_bank(workspace, investor, "DEMO-ACCOUNT-0004", Decimal("500.00"))
+    BalanceChange.objects.create(
+        bank=bank,
+        operation=BalanceChange.Operation.ADD,
+        old_balance=0,
+        delta=500,
+        new_balance=500,
+        actor=owner,
+    )
+    client = APIClient()
+    client.force_authenticate(owner)
+    response = client.post(
+        selection_url(workspace),
+        {"kind": "investor", "action": "delete", "ids": [str(investor.pk)]},
+        format="json",
+    )
+    assert response.status_code == 200
+    assert not Investor.objects.filter(pk=investor.pk).exists()
+    assert not BankAccount.objects.filter(pk=bank.pk).exists()
+    history = client.get(reverse("bank-balance-history", args=[workspace.pk, bank.pk]))
+    assert history.status_code == 200
+    assert history.data[0]["balance"] == "500.00"
+
+
+@pytest.mark.django_db
+def test_deleting_investor_keeps_saved_plan_snapshot():
+    owner, workspace, snapshot = setup_plan()
+    run = create_plan_run(workspace=workspace, snapshot=snapshot, actor=owner)
+    investor_id = snapshot.applicants[0].id
+    bank_id = snapshot.banks[0].id
+    BalanceChange.objects.create(
+        bank_id=bank_id,
+        operation=BalanceChange.Operation.SET,
+        old_balance=0,
+        delta=50000,
+        new_balance=50000,
+        actor=owner,
+    )
+    client = APIClient()
+    client.force_authenticate(owner)
+    response = client.post(
+        selection_url(workspace),
+        {"kind": "investor", "action": "delete", "ids": [investor_id]},
+        format="json",
+    )
+    assert response.status_code == 200
+    assert not Investor.objects.filter(pk=investor_id).exists()
+    assert PlanRun.objects.filter(pk=run.pk).exists()
+    assert run.rows.filter(applicant_ref=investor_id, bank_ref=bank_id).exists()
+    assert ArchivedBalanceChange.objects.filter(bank_ref=bank_id).exists()
 
 
 @pytest.mark.django_db
