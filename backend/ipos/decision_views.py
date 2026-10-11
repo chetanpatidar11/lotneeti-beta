@@ -49,6 +49,8 @@ class WorkspaceIPOListView(APIView):
                 decision=decision,
                 gmp_percent=current_percent,
                 threshold=workspace.auto_select_gmp_percent,
+                issue_type=ipo.issue_type,
+                auto_issue_types=tuple(workspace.auto_select_issue_types or ["MAINBOARD"]),
             )
             rows.append(
                 {
@@ -99,6 +101,8 @@ class WorkspaceIPODecisionView(APIView):
             decision=decision.decision,
             gmp_percent=current_percent,
             threshold=workspace.auto_select_gmp_percent,
+            issue_type=ipo.issue_type,
+            auto_issue_types=tuple(workspace.auto_select_issue_types or ["MAINBOARD"]),
         )
         return Response(
             {

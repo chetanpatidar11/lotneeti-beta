@@ -185,7 +185,7 @@ input[type="checkbox"] { min-height: auto; accent-color: var(--accent); }
 .ipo-document-links { display: grid; justify-items: start; gap: 3px; margin-top: 5px; }
 .ipo-document-links a { font-size: 11px; line-height: 1.35; }
 .gmp-quote { display: grid; justify-items: end; gap: 3px; white-space: nowrap; }
-.gmp-quote strong { color: var(--text); font-size: 17px; }
+.gmp-quote strong { color: var(--text); font-size: 17px; white-space: normal; }
 .gmp-quote small { font-size: 11px; }
 .ipo-facts { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; margin: 14px 0 0; }
 .ipo-facts > div { min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: #11191b; }
@@ -208,6 +208,9 @@ input[type="checkbox"] { min-height: auto; accent-color: var(--accent); }
 .threshold-setting p { color: var(--muted); }
 .threshold-setting form { align-items: end; }
 .threshold-setting input { width: 125px; }
+.threshold-setting .auto-issue-types input { width: auto; }
+.auto-issue-types { border-color: var(--border-strong); }
+.ipo-list-toolbar input { border-color: var(--border-strong); background: var(--surface); color: var(--text); }
 .gmp-trend { height: 42px; }
 .gmp-history { margin: 8px 0 0; padding-left: 18px; }
 .gmp-history li { border-color: var(--border); }

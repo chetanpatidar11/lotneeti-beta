@@ -5,6 +5,10 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 
+def default_auto_select_issue_types():
+    return ["MAINBOARD"]
+
+
 class UserManager(BaseUserManager):
     use_in_migrations = True
 
@@ -58,6 +62,7 @@ class Workspace(models.Model):
     auto_select_gmp_percent = models.DecimalField(
         max_digits=6, decimal_places=2, null=True, blank=True
     )
+    auto_select_issue_types = models.JSONField(default=default_auto_select_issue_types)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

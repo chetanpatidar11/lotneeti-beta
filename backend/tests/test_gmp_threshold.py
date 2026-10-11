@@ -1,12 +1,17 @@
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
+from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from accounts.models import User, WorkspaceMembership
 from accounts.services import create_workspace
 from core.models import AuditEvent
+from ipos.models import IPO, GMPObservation
+from planner.snapshot_builder import build_snapshot
 
 
 @pytest.mark.django_db
@@ -46,3 +51,80 @@ def test_only_owner_can_change_auto_select_threshold():
         ).status_code
         == 403
     )
+
+
+@pytest.mark.django_db
+@override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="WARN")
+def test_automatic_issue_types_default_to_mainboard_and_manual_apply_still_wins():
+    owner = User.objects.create_user(email="types@example.test")
+    workspace = create_workspace(name="Types", owner=owner)
+    workspace.auto_select_gmp_percent = Decimal("20.00")
+    workspace.save()
+    today = timezone.localdate()
+    issues = []
+    for issue_type in (IPO.IssueType.MAINBOARD, IPO.IssueType.SME):
+        ipo = IPO.objects.create(
+            issuer_name=f"Synthetic {issue_type}",
+            issue_type=issue_type,
+            lower_price=Decimal("100.00"),
+            upper_price=Decimal("100.00"),
+            lot_size=100,
+            open_date=today,
+            close_date=today + timedelta(days=3),
+            allotment_date=today + timedelta(days=7),
+            status=IPO.Status.OPEN,
+            publication_state=IPO.PublicationState.PUBLISHED,
+            source_key="synthetic-fixture",
+            source_record_id=issue_type,
+        )
+        GMPObservation.objects.create(
+            ipo=ipo,
+            source_key="synthetic",
+            value_per_share=Decimal("30.00"),
+            observed_at=timezone.now() - timedelta(minutes=5),
+        )
+        issues.append(ipo)
+    client = APIClient()
+    client.force_authenticate(owner)
+    url = reverse("workspace-detail", args=[workspace.pk])
+    decisions_url = reverse("workspace-ipo-decision-list", args=[workspace.pk])
+
+    assert workspace.auto_select_issue_types == ["MAINBOARD"]
+    assert {row["ipo"]: row["selected"] for row in client.get(decisions_url).data} == {
+        str(issues[0].pk): True,
+        str(issues[1].pk): False,
+    }
+    assert {item.id for item in build_snapshot(workspace=workspace).ipos} == {str(issues[0].pk)}
+
+    assert (
+        client.patch(
+            url, {"auto_select_issue_types": ["MAINBOARD", "SME"]}, format="json"
+        ).status_code
+        == 200
+    )
+    workspace.refresh_from_db()
+    assert all(row["selected"] for row in client.get(decisions_url).data)
+    selected_ids = {item.id for item in build_snapshot(workspace=workspace).ipos}
+    assert selected_ids == {str(ipo.pk) for ipo in issues}
+
+    assert client.patch(url, {"auto_select_issue_types": ["SME"]}, format="json").status_code == 200
+    workspace.refresh_from_db()
+    assert {row["ipo"]: row["selected"] for row in client.get(decisions_url).data} == {
+        str(issues[0].pk): False,
+        str(issues[1].pk): True,
+    }
+    assert (
+        client.patch(
+            reverse("workspace-ipo-decision-detail", args=[workspace.pk, issues[0].pk]),
+            {"decision": "APPLY"},
+            format="json",
+        ).data["selected"]
+        is True
+    )
+    selected_ids = {item.id for item in build_snapshot(workspace=workspace).ipos}
+    assert selected_ids == {str(ipo.pk) for ipo in issues}
+    for invalid in ([], ["SME", "SME"], ["UNKNOWN"]):
+        assert (
+            client.patch(url, {"auto_select_issue_types": invalid}, format="json").status_code
+            == 400
+        )

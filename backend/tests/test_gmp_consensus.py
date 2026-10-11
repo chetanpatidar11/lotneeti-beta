@@ -204,6 +204,9 @@ def test_stale_gmp_does_not_auto_select_or_enter_planner_snapshot():
     public = api.get(reverse("ipo-detail", args=[ipo.pk]))
     assert public.data["current_gmp"] is None
     assert public.data["gmp_data_state"] == "STALE"
+    assert public.data["last_stale_gmp"] == "40.00"
+    assert public.data["last_stale_gmp_percent"] == "40.00"
+    assert public.data["last_stale_gmp_observed_at"] is not None
     assert (
         api.get(reverse("workspace-ipo-decision-list", args=[workspace.pk])).data[0]["selected"]
         is False

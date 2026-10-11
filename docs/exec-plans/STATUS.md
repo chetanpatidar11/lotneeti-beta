@@ -1,5 +1,12 @@
 # LotNeeti execution status
 
+## J01/GMP automatic selection and IPO discovery — 2026-10-11
+
+- IPO list filters now combine status, Mainboard/SME type and selected/skipped choices. Users may pick multiple values within a group, combine groups, and clear all filters. Issuer search filters in the browser as each character is entered; no Search submit is needed.
+- When every GMP observation is stale, the IPO API exposes the most recent enabled stored value, its percentage against the current upper price and its observation time for display. The existing fresh-only current GMP, automatic selection and planner rules remain unchanged, so stale figures cannot trigger an automatic application.
+- Workspace automatic IPO selection now stores Mainboard/SME eligibility, defaulting to Mainboard for existing and new workspaces. Owners can choose Mainboard, SME or both; an empty or invalid choice is rejected. Manual Apply/Skip retains priority. Decision API and planner snapshots use the same eligibility rule.
+- Full `scripts/check.sh` passed: 364 backend tests, 34 web tests, one Android package test, Planner matrix, Ruff, Django system/migration checks, web lint/typecheck/build and Capacitor sync. Deployment result follows the release.
+
 ## J01 IPO page tabs — 2026-10-11
 
 - Removed the InvestorGain feed notice requested by the founder. The signed-in IPO page now offers separate IPOs and Calendar views; the Calendar view shows open/upcoming issues without the IPO card list or selection controls underneath. It has an empty state when no dates are available. The list view keeps its existing search, filters and choices. Calendar navigation does not request per-IPO GMP histories.

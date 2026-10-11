@@ -70,6 +70,9 @@ class PublicIPOSerializer(serializers.ModelSerializer):
     gmp_source_conflict = serializers.SerializerMethodField()
     gmp_stale_source_count = serializers.SerializerMethodField()
     gmp_data_state = serializers.SerializerMethodField()
+    last_stale_gmp = serializers.SerializerMethodField()
+    last_stale_gmp_percent = serializers.SerializerMethodField()
+    last_stale_gmp_observed_at = serializers.SerializerMethodField()
     gmp_has_founder_correction = serializers.SerializerMethodField()
     company_summary = serializers.SerializerMethodField()
     financial_summary = serializers.SerializerMethodField()
@@ -104,6 +107,9 @@ class PublicIPOSerializer(serializers.ModelSerializer):
             "gmp_source_conflict",
             "gmp_stale_source_count",
             "gmp_data_state",
+            "last_stale_gmp",
+            "last_stale_gmp_percent",
+            "last_stale_gmp_observed_at",
             "gmp_has_founder_correction",
             "company_summary",
             "financial_summary",
@@ -194,6 +200,36 @@ class PublicIPOSerializer(serializers.ModelSerializer):
             if resolution.stale_source_keys
             else "MISSING"
         )
+
+    def _last_stale(self, obj):
+        resolution = self._resolution(obj)
+        if resolution.effective or not resolution.stale_source_keys:
+            return None
+        if not hasattr(obj, "_last_stale_gmp"):
+            obj._last_stale_gmp = next(
+                (
+                    item
+                    for item in obj.gmp_observations.all()
+                    if item.source_key in resolution.stale_source_keys
+                ),
+                None,
+            )
+        return obj._last_stale_gmp
+
+    def get_last_stale_gmp(self, obj):
+        observation = self._last_stale(obj)
+        return str(observation.value_per_share) if observation else None
+
+    def get_last_stale_gmp_percent(self, obj):
+        observation = self._last_stale(obj)
+        if observation is None:
+            return None
+        upper_price = effective_ipo_values(obj)["upper_price"]
+        return str(gmp_percent(observation.value_per_share, upper_price))
+
+    def get_last_stale_gmp_observed_at(self, obj):
+        observation = self._last_stale(obj)
+        return observation.observed_at.isoformat() if observation else None
 
     def get_gmp_has_founder_correction(self, obj):
         latest = self._latest(obj)

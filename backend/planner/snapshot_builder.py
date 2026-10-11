@@ -62,6 +62,8 @@ def build_snapshot(
             decision=decision.decision if decision else IPOUserDecision.Decision.DEFAULT,
             gmp_percent=current_gmp,
             threshold=workspace.auto_select_gmp_percent,
+            issue_type=ipo.issue_type,
+            auto_issue_types=tuple(workspace.auto_select_issue_types or ["MAINBOARD"]),
         )
         if not selected:
             continue
