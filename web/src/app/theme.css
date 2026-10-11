@@ -210,7 +210,7 @@ input[type="checkbox"] { min-height: auto; accent-color: var(--accent); }
 .threshold-setting input { width: 125px; }
 .threshold-setting .auto-issue-types input { width: auto; }
 .auto-issue-types { border-color: var(--border-strong); }
-.ipo-list-toolbar input { border-color: var(--border-strong); background: var(--surface); color: var(--text); }
+.ipo-filter-row input { border-color: var(--border-strong); background: var(--surface); color: var(--text); }
 .gmp-trend { height: 42px; }
 .gmp-history { margin: 8px 0 0; padding-left: 18px; }
 .gmp-history li { border-color: var(--border); }

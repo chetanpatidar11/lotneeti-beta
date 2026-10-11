@@ -30,7 +30,7 @@ export default function ThresholdSetting({
         body: JSON.stringify({ auto_select_gmp_percent: value === "" ? null : value, auto_select_issue_types: issueTypes }),
       });
       if (!response.ok) throw new Error("Save failed");
-      setMessage("Automatic selection saved.");
+      setMessage("");
       router.refresh();
     } catch {
       setMessage("We could not save automatic selection. Please try again.");
@@ -41,7 +41,6 @@ export default function ThresholdSetting({
 
   return <section className="threshold-setting">
     <h2>Automatic IPO selection</h2>
-    <p>Choose which IPO types can be selected automatically when they meet the GMP threshold. Manual Apply and Skip choices still win.</p>
     {canEdit ? <form onSubmit={save}>
       <label>GMP threshold (%)
         <input type="number" step="0.01" value={value} onChange={(event) => setValue(event.target.value)} placeholder="Not set" />

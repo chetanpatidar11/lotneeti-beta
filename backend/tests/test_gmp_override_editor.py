@@ -23,7 +23,15 @@ def test_mfa_gmp_editor_corrects_source_with_expiry_and_public_projection():
     workspace = create_workspace(name="Synthetic workspace", owner=member)
     workspace.auto_select_gmp_percent = Decimal("20.00")
     workspace.save()
-    ipo = issue(publication_state=IPO.PublicationState.PUBLISHED)
+    today = timezone.localdate()
+    ipo = issue(
+        publication_state=IPO.PublicationState.PUBLISHED,
+        status=IPO.Status.OPEN,
+        open_date=today - timedelta(days=1),
+        close_date=today + timedelta(days=2),
+        allotment_date=today + timedelta(days=5),
+        listing_date=today + timedelta(days=7),
+    )
     ipo.save()
     observation = GMPObservation.objects.create(
         ipo=ipo,

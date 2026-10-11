@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## J01 IPO page simplification and open-first selection — 2026-10-11
+
+- Kept live issuer search and combinable filters, but placed Search, All, Open, Upcoming, Closed, Mainboard, SME, Selected and Skipped in one horizontally scrollable row. Removed the requested automatic-selection help/success text, IPO-choice success text, empty exchange badge, freshness/source-count badges and sentence under the IPO page title. The last stored GMP still shows as `Last GMP` with its observation time; it remains ineligible for automatic selection.
+- Automatic selection now considers open IPOs of the workspace's enabled issue types first. It may auto-select upcoming IPOs only if no such open IPO remains. The decision API and planner snapshot share this rule; manual Apply/Skip still outrank it, and expired IPOs cannot be auto-selected. Tests cover the open/upcoming fallback and mainboard/SME choices.
+- Full `scripts/check.sh` passed: 365 backend tests, 34 web tests, one Android package test, Planner matrix, Ruff, migrations/system checks, web lint/typecheck/build and Capacitor sync. Deployment is pending.
+
 ## J01/GMP automatic selection and IPO discovery — 2026-10-11
 
 - IPO list filters now combine status, Mainboard/SME type and selected/skipped choices. Users may pick multiple values within a group, combine groups, and clear all filters. Issuer search filters in the browser as each character is entered; no Search submit is needed.

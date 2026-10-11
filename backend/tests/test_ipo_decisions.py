@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
@@ -13,15 +13,17 @@ from ipos.selection import select_ipo
 
 
 def make_ipo():
+    today = timezone.localdate()
     return IPO.objects.create(
         issuer_name="Synthetic Industries",
         issue_type="MAINBOARD",
         lower_price=Decimal("100.00"),
         upper_price=Decimal("100.00"),
         lot_size=150,
-        open_date=date(2026, 10, 1),
-        close_date=date(2026, 10, 3),
-        allotment_date=date(2026, 10, 8),
+        open_date=today,
+        close_date=today + timedelta(days=3),
+        allotment_date=today + timedelta(days=7),
+        status=IPO.Status.OPEN,
         publication_state=IPO.PublicationState.PUBLISHED,
         source_key="synthetic-fixture",
         source_record_id="synthetic-001",

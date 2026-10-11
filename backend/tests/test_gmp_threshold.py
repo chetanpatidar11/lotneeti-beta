@@ -128,3 +128,52 @@ def test_automatic_issue_types_default_to_mainboard_and_manual_apply_still_wins(
             client.patch(url, {"auto_select_issue_types": invalid}, format="json").status_code
             == 400
         )
+
+
+@pytest.mark.django_db
+@override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="WARN")
+def test_upcoming_is_automatic_only_when_no_open_eligible_ipo_exists():
+    owner = User.objects.create_user(email="fallback@example.test")
+    workspace = create_workspace(name="Fallback", owner=owner)
+    workspace.auto_select_gmp_percent = Decimal("20.00")
+    workspace.save()
+    today = timezone.localdate()
+    issues = []
+    for status in (IPO.Status.OPEN, IPO.Status.UPCOMING):
+        ipo = IPO.objects.create(
+            issuer_name=f"Synthetic {status}",
+            issue_type=IPO.IssueType.MAINBOARD,
+            lower_price=Decimal("100.00"),
+            upper_price=Decimal("100.00"),
+            lot_size=100,
+            open_date=today if status == IPO.Status.OPEN else today + timedelta(days=1),
+            close_date=today + timedelta(days=4),
+            allotment_date=today + timedelta(days=8),
+            status=status,
+            publication_state=IPO.PublicationState.PUBLISHED,
+            source_key="synthetic-fixture",
+            source_record_id=status,
+        )
+        GMPObservation.objects.create(
+            ipo=ipo,
+            source_key="synthetic",
+            value_per_share=Decimal("30.00"),
+            observed_at=timezone.now() - timedelta(minutes=5),
+        )
+        issues.append(ipo)
+    client = APIClient()
+    client.force_authenticate(owner)
+    url = reverse("workspace-ipo-decision-list", args=[workspace.pk])
+
+    assert {row["ipo"]: row["selected"] for row in client.get(url).data} == {
+        str(issues[0].pk): True,
+        str(issues[1].pk): False,
+    }
+    assert {item.id for item in build_snapshot(workspace=workspace).ipos} == {str(issues[0].pk)}
+
+    issues[0].publication_state = IPO.PublicationState.ARCHIVED
+    issues[0].save(update_fields=["publication_state"])
+    assert {row["ipo"]: row["selected"] for row in client.get(url).data} == {
+        str(issues[1].pk): True,
+    }
+    assert {item.id for item in build_snapshot(workspace=workspace).ipos} == {str(issues[1].pk)}

@@ -132,11 +132,9 @@ button:disabled { opacity: .6; cursor: wait; }
 .auto-issue-types legend { font-weight: 700; }
 .auto-issue-types label { display: inline-flex; align-items: center; gap: .4rem; }
 .threshold-setting .auto-issue-types input { width: auto; }
-.ipo-list-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; margin: 1rem 0 .6rem; }
-.ipo-list-toolbar input { flex: 1 1 14rem; min-height: 44px; padding: .65rem .8rem; border: 1px solid #9bb1a2; border-radius: .5rem; font: inherit; }
-.ipo-filter-groups { display: grid; gap: .55rem; margin-bottom: 1rem; }
-.ipo-filter-group { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem; }
-.ipo-filter-group strong { min-width: 4.5rem; font-size: .8rem; }
+.ipo-filter-row { display: flex; align-items: center; gap: .45rem; overflow-x: auto; margin: 1rem 0; padding-bottom: .35rem; white-space: nowrap; }
+.ipo-filter-row input { flex: 0 0 10rem; width: 10rem; min-height: 44px; padding: .65rem .8rem; border: 1px solid #9bb1a2; border-radius: .5rem; font: inherit; }
+.ipo-filter-row .filter-chip, .ipo-filter-row .filter-count { flex: 0 0 auto; }
 .ipo-choice { margin: 1rem 0; }
 .ipo-choice-buttons { display: flex; gap: .5rem; }
 .ipo-choice-buttons button[aria-pressed="false"] { background: #e7efe8; color: #183228; }

@@ -14,7 +14,7 @@ from ipos.gmp_effective import latest_effective_gmp
 from ipos.models import IPOUserDecision
 from ipos.overrides import effective_ipo_values, published_ipos
 from ipos.public_serializers import gmp_percent
-from ipos.selection import select_ipo
+from ipos.selection import has_open_auto_ipo, select_ipo, selection_status
 from planner.cash import expected_release_at
 from planner.dto import (
     ApplicantInput,
@@ -50,9 +50,13 @@ def build_snapshot(
         str(item.ipo_id): item
         for item in IPOUserDecision.objects.filter(workspace=workspace).order_by("ipo_id")
     }
+    ipos = list(published_ipos().order_by("id"))
+    effective_values = {ipo.pk: effective_ipo_values(ipo) for ipo in ipos}
+    issue_types = tuple(workspace.auto_select_issue_types or ["MAINBOARD"])
+    has_open = has_open_auto_ipo(list(effective_values.values()), issue_types=issue_types, at=now)
     selected_ipos = []
-    for ipo in published_ipos().order_by("id"):
-        effective = effective_ipo_values(ipo)
+    for ipo in ipos:
+        effective = effective_values[ipo.pk]
         latest = latest_effective_gmp(ipo, at=now)
         current_gmp = (
             gmp_percent(latest.value_per_share, effective["upper_price"]) if latest else None
@@ -62,8 +66,10 @@ def build_snapshot(
             decision=decision.decision if decision else IPOUserDecision.Decision.DEFAULT,
             gmp_percent=current_gmp,
             threshold=workspace.auto_select_gmp_percent,
-            issue_type=ipo.issue_type,
-            auto_issue_types=tuple(workspace.auto_select_issue_types or ["MAINBOARD"]),
+            issue_type=effective["issue_type"],
+            auto_issue_types=issue_types,
+            status=selection_status(effective, at=now),
+            allow_upcoming=not has_open,
         )
         if not selected:
             continue

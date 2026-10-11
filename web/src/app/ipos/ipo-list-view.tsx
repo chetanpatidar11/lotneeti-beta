@@ -36,15 +36,13 @@ export default function IPOListView({ items, initialSearch = "", initialFilter =
     setSearch(""); setStatuses([]); setTypes([]); setChoices([]);
   }
   return <>
-    <div className="ipo-list-toolbar">
+    <div className="ipo-filter-row" aria-label="IPO filters">
       <input type="search" aria-label="Search IPO issuer" placeholder="Search IPOs" value={search} onChange={(event) => setSearch(event.target.value)} />
       <button type="button" className="filter-chip" aria-pressed={!search && !statuses.length && !types.length && !choices.length} onClick={reset}>All</button>
+      {statusOptions.map(([id, label]) => <button type="button" className="filter-chip" key={id} aria-label={`Status: ${label}`} aria-pressed={statuses.includes(id)} onClick={() => setStatuses((current) => toggle(current, id))}>{label}</button>)}
+      {typeOptions.map(([id, label]) => <button type="button" className="filter-chip" key={id} aria-label={`Type: ${label}`} aria-pressed={types.includes(id)} onClick={() => setTypes((current) => toggle(current, id))}>{label}</button>)}
+      {choiceOptions.map(([id, label]) => <button type="button" className="filter-chip" key={id} aria-label={`Choice: ${label}`} aria-pressed={choices.includes(id)} onClick={() => setChoices((current) => toggle(current, id))}>{label}</button>)}
       <span className="filter-count" role="status">{visible.length} of {items.length}</span>
-    </div>
-    <div className="ipo-filter-groups" aria-label="IPO filters">
-      <div className="ipo-filter-group"><strong>Status</strong>{statusOptions.map(([id, label]) => <button type="button" className="filter-chip" key={id} aria-pressed={statuses.includes(id)} onClick={() => setStatuses((current) => toggle(current, id))}>{label}</button>)}</div>
-      <div className="ipo-filter-group"><strong>Type</strong>{typeOptions.map(([id, label]) => <button type="button" className="filter-chip" key={id} aria-pressed={types.includes(id)} onClick={() => setTypes((current) => toggle(current, id))}>{label}</button>)}</div>
-      <div className="ipo-filter-group"><strong>Choice</strong>{choiceOptions.map(([id, label]) => <button type="button" className="filter-chip" key={id} aria-pressed={choices.includes(id)} onClick={() => setChoices((current) => toggle(current, id))}>{label}</button>)}</div>
     </div>
     {visible.length ? <div className="ipo-list">{visible.map((item) => <div key={item.id}>{item.card}</div>)}</div> : <EmptyState title={items.length ? "No IPOs match these filters." : "No IPOs are available yet."} detail={items.length ? "Try another search or filter." : "Open and upcoming issues will appear after a market data sync."} action={items.length ? <button type="button" onClick={reset}>Clear filters</button> : undefined} />}
   </>;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { StatusBadge } from "@/components/ui";
 
 export type IPOSelection = {
@@ -20,6 +21,7 @@ export default function IPOChoice({ workspaceId, ipoId, initial, canEdit }: {
   const [choice, setChoice] = useState<IPOSelection>(initial ?? { ipo: ipoId, decision: "DEFAULT", mode: "RETAIL_ONLY", selected: false, reason: "NO_AUTO_SELECTION" });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const router = useRouter();
 
   async function save(changes: Partial<Pick<IPOSelection, "decision" | "mode">>) {
     setBusy(true);
@@ -31,7 +33,8 @@ export default function IPOChoice({ workspaceId, ipoId, initial, canEdit }: {
       });
       if (!response.ok) throw new Error("Save failed");
       setChoice((await response.json()) as IPOSelection);
-      setMessage("IPO choice saved.");
+      setMessage("");
+      router.refresh();
     } catch {
       setMessage("We could not save this choice. Please try again.");
     } finally {

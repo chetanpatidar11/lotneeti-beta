@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -11,7 +12,7 @@ from ipos.gmp_effective import latest_effective_gmp
 from ipos.models import IPOUserDecision
 from ipos.overrides import effective_ipo_values, published_ipos
 from ipos.public_serializers import gmp_percent
-from ipos.selection import select_ipo
+from ipos.selection import has_open_auto_ipo, select_ipo, selection_status
 
 
 class ManualDecisionSerializer(serializers.Serializer):
@@ -35,10 +36,16 @@ class WorkspaceIPOListView(APIView):
             item.ipo_id: item for item in IPOUserDecision.objects.filter(workspace=workspace)
         }
         rows = []
-        ipos = published_ipos().order_by("open_date", "id")
+        ipos = list(published_ipos().order_by("open_date", "id"))
+        effective_values = {ipo.pk: effective_ipo_values(ipo) for ipo in ipos}
+        now = timezone.now()
+        issue_types = tuple(workspace.auto_select_issue_types or ["MAINBOARD"])
+        has_open = has_open_auto_ipo(
+            list(effective_values.values()), issue_types=issue_types, at=now
+        )
         for ipo in ipos:
             latest = latest_effective_gmp(ipo)
-            effective = effective_ipo_values(ipo)
+            effective = effective_values[ipo.pk]
             current_percent = (
                 gmp_percent(latest.value_per_share, effective["upper_price"]) if latest else None
             )
@@ -49,8 +56,10 @@ class WorkspaceIPOListView(APIView):
                 decision=decision,
                 gmp_percent=current_percent,
                 threshold=workspace.auto_select_gmp_percent,
-                issue_type=ipo.issue_type,
-                auto_issue_types=tuple(workspace.auto_select_issue_types or ["MAINBOARD"]),
+                issue_type=effective["issue_type"],
+                auto_issue_types=issue_types,
+                status=selection_status(effective, at=now),
+                allow_upcoming=not has_open,
             )
             rows.append(
                 {
@@ -95,14 +104,24 @@ class WorkspaceIPODecisionView(APIView):
                 },
             )
         latest = latest_effective_gmp(ipo)
-        upper = effective_ipo_values(ipo)["upper_price"]
+        effective = effective_ipo_values(ipo)
+        upper = effective["upper_price"]
         current_percent = gmp_percent(latest.value_per_share, upper) if latest else None
+        now = timezone.now()
+        issue_types = tuple(workspace.auto_select_issue_types or ["MAINBOARD"])
+        has_open = has_open_auto_ipo(
+            [effective_ipo_values(item) for item in published_ipos()],
+            issue_types=issue_types,
+            at=now,
+        )
         selected, reason = select_ipo(
             decision=decision.decision,
             gmp_percent=current_percent,
             threshold=workspace.auto_select_gmp_percent,
-            issue_type=ipo.issue_type,
-            auto_issue_types=tuple(workspace.auto_select_issue_types or ["MAINBOARD"]),
+            issue_type=effective["issue_type"],
+            auto_issue_types=issue_types,
+            status=selection_status(effective, at=now),
+            allow_upcoming=not has_open,
         )
         return Response(
             {
