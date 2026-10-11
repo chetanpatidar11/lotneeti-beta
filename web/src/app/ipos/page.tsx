@@ -52,7 +52,7 @@ function matchFilter(ipo: IPO, choice: IPOSelection | undefined, filter: Filter)
   return true;
 }
 
-export default async function IPOsPage({ searchParams }: { searchParams: Promise<{ filter?: string; q?: string }> }) {
+export default async function IPOsPage({ searchParams }: { searchParams: Promise<{ filter?: string; q?: string; view?: string }> }) {
   const cookieHeader = (await cookies()).toString();
   if (!cookieHeader.includes("sessionid=")) redirect("/sign-in");
   const [workspaceResponse, response, params] = await Promise.all([
@@ -69,19 +69,23 @@ export default async function IPOsPage({ searchParams }: { searchParams: Promise
     if (selectionResponse.ok) selections = (await selectionResponse.json()) as IPOSelection[];
   }
   const selectionMap = new Map(selections.map((selection) => [selection.ipo, selection]));
+  const view = params.view === "calendar" ? "calendar" : "list";
   const filter = filters.some((item) => item.id === params.filter) ? params.filter as Filter : "all";
   const q = (params.q ?? "").trim().toLocaleLowerCase("en-IN");
   const statusRank: Record<string, number> = { OPEN: 0, UPCOMING: 1, ALLOTMENT: 2, CLOSED: 3, LISTED: 4, CANCELLED: 5 };
   const visible = ipos.filter((ipo) => matchFilter(ipo, selectionMap.get(ipo.id), filter) && ipo.issuer_name.toLocaleLowerCase("en-IN").includes(q)).sort((a, b) => (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9) || a.close_date.localeCompare(b.close_date) || a.issuer_name.localeCompare(b.issuer_name));
-  const calendar = ipos.filter((ipo) => ["OPEN", "UPCOMING"].includes(ipo.status)).sort((a, b) => a.open_date.localeCompare(b.open_date)).slice(0, 8);
-  const histories = await Promise.all(visible.map(async (ipo) => {
+  const calendar = ipos.filter((ipo) => ["OPEN", "UPCOMING"].includes(ipo.status)).sort((a, b) => a.open_date.localeCompare(b.open_date));
+  const histories = await Promise.all((view === "list" ? visible : []).map(async (ipo) => {
     try { const result = await fetch(backendUrl(`ipos/${ipo.id}/gmp-history/`), { headers: { cookie: cookieHeader }, cache: "no-store" }); return result.ok ? await result.json() as Observation[] : []; }
     catch { return [] as Observation[]; }
   }));
   return <main className="page"><div className="shell settings-shell">
     <PageHeader eyebrow="Market watch" title="IPOs" description="Review issue facts, GMP observations and your selection. GMP is not a guarantee." action={<Link className="button-link" href="/plan">Review plan →</Link>} />
-    <div className="ipo-market-intro"><strong>InvestorGain market feed</strong><span>Issue dates and GMP can change. Review the latest details before applying.</span></div>
-    {calendar.length > 0 && <section className="ipo-calendar" aria-label="Upcoming IPO dates"><div className="section-heading"><div><h2>IPO calendar</h2><p>Next open and upcoming issues</p></div></div><ul>{calendar.map((ipo) => <li key={ipo.id}><span className="ipo-calendar-date">{dateLabel(ipo.open_date)}</span><strong>{ipo.issuer_name}</strong><span>{ipo.issue_type === "SME" ? "SME" : "Mainboard"} · closes {dateLabel(ipo.close_date)}</span><StatusBadge tone={ipo.status === "OPEN" ? "positive" : "info"}>{ipo.status}</StatusBadge></li>)}</ul></section>}
+    <nav className="ipo-view-tabs" aria-label="IPO views">
+      <Link href="/ipos" aria-current={view === "list" ? "page" : undefined}>IPOs</Link>
+      <Link href="/ipos?view=calendar" aria-current={view === "calendar" ? "page" : undefined}>Calendar</Link>
+    </nav>
+    {view === "calendar" ? <section className="ipo-calendar" aria-label="Upcoming IPO dates"><div className="section-heading"><div><h2>IPO calendar</h2><p>Open and upcoming issues</p></div></div>{calendar.length === 0 ? <EmptyState title="No IPO dates to show yet." detail="Open and upcoming issues will appear here after a market data sync." /> : <ul>{calendar.map((ipo) => <li key={ipo.id}><span className="ipo-calendar-date">{dateLabel(ipo.open_date)}</span><strong>{ipo.issuer_name}</strong><span>{ipo.issue_type === "SME" ? "SME" : "Mainboard"} · closes {dateLabel(ipo.close_date)}</span><StatusBadge tone={ipo.status === "OPEN" ? "positive" : "info"}>{ipo.status}</StatusBadge></li>)}</ul>}</section> : <>
     {workspace && <ThresholdSetting workspaceId={workspace.id} initialValue={workspace.auto_select_gmp_percent} canEdit={workspace.role === "OWNER"} />}
     <div className="filter-bar" role="group" aria-label="IPO filters">
       <form action="/ipos" method="get"><input type="search" name="q" aria-label="Search IPO issuer" placeholder="Search issuer" defaultValue={params.q ?? ""} /><input type="hidden" name="filter" value={filter} /><button type="submit" className="button-secondary">Search</button></form>
@@ -110,6 +114,7 @@ export default async function IPOsPage({ searchParams }: { searchParams: Promise
         </article>;
       })}
     </div>}
+    </>}
 
   </div></main>;
 }

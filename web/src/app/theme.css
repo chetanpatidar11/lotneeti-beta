@@ -538,8 +538,12 @@ input[type="checkbox"] { min-height: auto; accent-color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 
 /* Public market landing and live source status */
-.market-feed-status, .ipo-market-intro, .ipo-calendar { border-color: var(--border); background: var(--surface); color: var(--text); }
-.market-feed-status small, .ipo-market-intro span { color: var(--muted); }
+.market-feed-status, .ipo-calendar { border-color: var(--border); background: var(--surface); color: var(--text); }
+.market-feed-status small { color: var(--muted); }
+.ipo-view-tabs { border-color: var(--border); }
+.ipo-view-tabs a { color: var(--muted); }
+.ipo-view-tabs a:hover { background: var(--surface-raised); }
+.ipo-view-tabs a[aria-current="page"] { background: var(--accent-deep); color: var(--accent); }
 .live-sync-control span { color: var(--accent); }
 .ipo-calendar li { background: var(--surface-soft); }
 .ipo-calendar-date { color: var(--accent); }

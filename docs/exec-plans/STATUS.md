@@ -1,5 +1,10 @@
 # LotNeeti execution status
 
+## J01 IPO page tabs — 2026-10-11
+
+- Removed the InvestorGain feed notice requested by the founder. The signed-in IPO page now offers separate IPOs and Calendar views; the Calendar view shows open/upcoming issues without the IPO card list or selection controls underneath. It has an empty state when no dates are available. The list view keeps its existing search, filters and choices. Calendar navigation does not request per-IPO GMP histories.
+- Web lint, TypeScript check, 32 web tests and production build passed. Beta deployment and live smoke result are recorded after release.
+
 ## D03/J01 beta deployment and supplied-documents audit — 2026-10-10
 
 - Deployed the InvestorGain-only public market and dashboard Live sync work to the existing HTTPS beta after a fresh encrypted pre-release database backup. The final release archive SHA-256 is `3682b161970a2d062a9618b1c0e730a7b9bf5a17c67f97a4e9173d537fec6b0c`. The live API health and public market endpoints return HTTP 200; the saved market feed reports `OK`, 12 issues and last successful sync `2026-10-10T13:30:00.167503Z`. A source row with an expired close date now appears closed to customers. No live provider refresh was triggered for smoke testing.
