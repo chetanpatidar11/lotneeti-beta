@@ -289,6 +289,7 @@ input[type="checkbox"] { min-height: auto; accent-color: var(--accent); }
 .payment-buttons button { min-height: 28px; padding: 4px 7px; }
 .account-import { margin: 0; padding: 13px; background: var(--surface); }
 .account-import p { color: var(--muted); }
+.archived-bank-history { margin-top: 18px; }
 .account-import form > button { margin-top: 12px; }
 .import-bank-details { display: grid; gap: 7px; min-width: 170px; }
 .import-bank-details label { display: grid; gap: 3px; color: var(--muted); font-size: 11px; }

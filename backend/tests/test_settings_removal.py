@@ -9,7 +9,13 @@ from accounts.models import User, WorkspaceMembership
 from accounts.services import create_workspace
 from applications.models import Application
 from core.models import AuditEvent
-from funding.models import BalanceChange, BankAccount, RecurringDebit, UPIHandle
+from funding.models import (
+    ArchivedBalanceChange,
+    BalanceChange,
+    BankAccount,
+    RecurringDebit,
+    UPIHandle,
+)
 from investors.models import DematAccount, Investor
 from planner.persistence import create_plan_run
 
@@ -149,7 +155,7 @@ def test_settings_deactivate_activate_and_permanent_delete_are_distinct():
 
 
 @pytest.mark.django_db
-def test_permanent_delete_rejects_real_balance_history_atomically():
+def test_permanent_bank_delete_keeps_balance_history_and_is_workspace_scoped():
     owner = User.objects.create_user(email="owner@example.test")
     workspace = create_workspace(name="Synthetic", owner=owner)
     investor = create_investor(workspace, "First", "TESTX0001A")
@@ -163,6 +169,14 @@ def test_permanent_delete_rejects_real_balance_history_atomically():
         new_balance=10,
         actor=owner,
     )
+    BalanceChange.objects.create(
+        bank=second,
+        operation=BalanceChange.Operation.REMOVE,
+        old_balance=10,
+        delta=-10,
+        new_balance=0,
+        actor=owner,
+    )
     client = APIClient()
     client.force_authenticate(owner)
     response = client.post(
@@ -174,8 +188,52 @@ def test_permanent_delete_rejects_real_balance_history_atomically():
         },
         format="json",
     )
-    assert response.status_code == 400
-    assert BankAccount.objects.filter(pk__in=[first.pk, second.pk]).count() == 2
+    assert response.status_code == 200
+    assert BankAccount.objects.filter(pk__in=[first.pk, second.pk]).count() == 0
+    assert BalanceChange.objects.filter(bank_id=second.pk).count() == 0
+    assert (
+        ArchivedBalanceChange.objects.filter(workspace=workspace, bank_ref=second.pk).count() == 2
+    )
+    history = client.get(reverse("bank-balance-history", args=[workspace.pk, second.pk]))
+    assert history.status_code == 200
+    assert [row["operation"] for row in history.data] == ["REMOVE", "ADD"]
+    archive = client.get(reverse("archived-bank-history-list", args=[workspace.pk]))
+    assert archive.status_code == 200
+    assert archive.data[0]["account_masked"] == "••••0002"
+    outsider = User.objects.create_user(email="outsider@example.test")
+    client.force_authenticate(outsider)
+    assert (
+        client.get(reverse("bank-balance-history", args=[workspace.pk, second.pk])).status_code
+        == 403
+    )
+
+
+@pytest.mark.django_db
+def test_bank_with_recorded_nonzero_balance_can_be_deleted_without_losing_history():
+    owner = User.objects.create_user(email="owner@example.test")
+    workspace = create_workspace(name="Synthetic", owner=owner)
+    investor = create_investor(workspace, "First", "TESTX0001A")
+    bank = create_bank(workspace, investor, "DEMO-ACCOUNT-0003", Decimal("250.00"))
+    BalanceChange.objects.create(
+        bank=bank,
+        operation=BalanceChange.Operation.SET,
+        old_balance=0,
+        delta=250,
+        new_balance=250,
+        actor=owner,
+        note="Opening balance",
+    )
+    client = APIClient()
+    client.force_authenticate(owner)
+    deleted = client.post(
+        selection_url(workspace),
+        {"kind": "bank", "action": "delete", "ids": [str(bank.pk)]},
+        format="json",
+    )
+    assert deleted.status_code == 200
+    assert not BankAccount.objects.filter(pk=bank.pk).exists()
+    history = client.get(reverse("bank-balance-history", args=[workspace.pk, bank.pk]))
+    assert history.data[0]["balance"] == "250.00"
 
 
 @pytest.mark.django_db
@@ -243,6 +301,13 @@ def test_open_application_prevents_removal_of_its_investor_and_accounts():
         )
         assert response.status_code == 400
         assert "open applications" in str(response.data)
+    deleted_bank = client.post(
+        url,
+        {"kind": "bank", "action": "delete", "ids": [str(application.bank_id)]},
+        format="json",
+    )
+    assert deleted_bank.status_code == 400
+    assert BankAccount.objects.filter(pk=application.bank_id).exists()
 
 
 @pytest.mark.django_db

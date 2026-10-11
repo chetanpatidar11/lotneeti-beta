@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## B07 Deleted bank balance history — 2026-10-11
+
+- A bank with recorded balance changes can now be permanently deleted from Settings. Its balance entries are copied transactionally into immutable, workspace-scoped history with the bank name, masked account, amounts, notes, actor and original timestamps. The bank row and original linked entries are removed; Funds shows a Deleted bank history section even when no active banks remain. A recorded nonzero final balance is retained as history and no longer keeps the bank in current planning.
+- Actual applications and scheduled payment or policy records still prevent deletion because those records depend on the bank. Deleting an investor with linked financial history remains protected. Saved plan snapshots may retain the old bank reference as historical text, but no longer block deleting the bank row.
+- Full `scripts/check.sh` passed: 370 backend tests, 35 web tests, one Android package test, Planner matrix, Ruff, Django checks and migration drift, web lint/typecheck/build and Capacitor sync. Focused regressions cover Add/Remove and nonzero opening balance preservation, masked history listing, workspace isolation and application blockers. Beta deployment pending.
+
 ## B07/B08 Settings deletion and workbook completion — 2026-10-11
 
 - Settings now separates reversible Deactivate/Activate from permanent Delete for investors, demat accounts, banks and UPIs, including bulk actions and an explicit delete confirmation. Deactivation keeps the prior safe behavior. Permanent deletion removes unused master records and linked unused accounts; saved applications, plans, nonzero balances, payment/policy records and real balance history block deletion with a clear message. No live customer record was deleted by this release.

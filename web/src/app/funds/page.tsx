@@ -24,6 +24,7 @@ type Change = {
   created_at: string;
 };
 type CapitalLine = { balance: string; blocked: string; planned: string; available: string };
+type ArchivedBank = { id: string; bank_name: string; account_masked: string; last_changed: string };
 
 async function getData(path: string, cookieHeader: string) {
   return fetch(backendUrl(path), { headers: { cookie: cookieHeader }, cache: "no-store" });
@@ -38,15 +39,17 @@ export default async function FundsPage() {
   const workspace = await selectedWorkspace(workspaces);
   if (!workspace) redirect("/settings/investors");
 
-  const [banksResponse, investorsResponse, capitalResponse] = await Promise.all([
+  const [banksResponse, investorsResponse, capitalResponse, archiveResponse] = await Promise.all([
     getData(`workspaces/${workspace.id}/banks/`, cookieHeader),
     getData(`workspaces/${workspace.id}/investors/`, cookieHeader),
     getData(`workspaces/${workspace.id}/capital/`, cookieHeader),
+    getData(`workspaces/${workspace.id}/banks/archived-history/`, cookieHeader),
   ]);
   const allBanks = banksResponse.ok ? ((await banksResponse.json()) as Bank[]) : [];
   const investors = investorsResponse.ok ? ((await investorsResponse.json()) as Investor[]).filter((item) => item.active) : [];
   const banks = allBanks.filter((bank) => bank.active && investors.some((investor) => investor.id === bank.owner));
   const capital = capitalResponse.ok ? (await capitalResponse.json()) as { by_bank?: Record<string, CapitalLine> } : null;
+  const archivedBanks = archiveResponse.ok ? (await archiveResponse.json()) as ArchivedBank[] : [];
   let changes: Change[] = [];
   let payments: ScheduledPayment[] = [];
   if (banks[0]) {
@@ -58,5 +61,5 @@ export default async function FundsPage() {
     if (paymentsResponse.ok) payments = (await paymentsResponse.json()) as ScheduledPayment[];
   }
 
-  return <FundsScreen workspace={workspace} investors={investors} initialBanks={banks} initialChanges={changes} initialPayments={payments} capitalByBank={capital?.by_bank ?? {}} />;
+  return <FundsScreen workspace={workspace} investors={investors} initialBanks={banks} initialChanges={changes} initialPayments={payments} capitalByBank={capital?.by_bank ?? {}} archivedBanks={archivedBanks} />;
 }

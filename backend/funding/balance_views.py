@@ -1,12 +1,14 @@
 from decimal import Decimal
 
+from django.db.models import Max
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers, status
+from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.permissions import WorkspaceDataPermission
-from funding.models import BalanceChange, BankAccount
+from funding.models import ArchivedBalanceChange, BalanceChange, BankAccount
 from funding.services import add_money, remove_money, set_balance
 
 
@@ -67,12 +69,15 @@ class RecentBalanceChangesView(APIView):
     permission_classes = [WorkspaceDataPermission]
 
     def get(self, request, workspace_id, bank_id):
-        bank = get_object_or_404(
-            BankAccount.objects.filter(workspace__memberships__user=request.user),
-            workspace_id=workspace_id,
-            pk=bank_id,
-        )
-        changes = BalanceChange.objects.filter(bank=bank).order_by("-created_at", "-id")[:10]
+        bank = BankAccount.objects.filter(workspace_id=workspace_id, pk=bank_id).first()
+        if bank is not None:
+            changes = BalanceChange.objects.filter(bank=bank).order_by("-created_at", "-id")[:10]
+        else:
+            changes = ArchivedBalanceChange.objects.filter(
+                workspace_id=workspace_id, bank_ref=bank_id
+            ).order_by("-created_at", "-source_change_id")
+            if not changes.exists():
+                raise NotFound("Bank history was not found in this workspace.")
         return Response(
             [
                 {
@@ -88,5 +93,28 @@ class RecentBalanceChangesView(APIView):
                     "created_at": change.created_at.isoformat(),
                 }
                 for change in changes
+            ]
+        )
+
+
+class ArchivedBankHistoryListView(APIView):
+    permission_classes = [WorkspaceDataPermission]
+
+    def get(self, request, workspace_id):
+        banks = (
+            ArchivedBalanceChange.objects.filter(workspace_id=workspace_id)
+            .values("bank_ref", "bank_name", "account_masked")
+            .annotate(last_changed=Max("created_at"))
+            .order_by("-last_changed", "bank_ref")
+        )
+        return Response(
+            [
+                {
+                    "id": str(bank["bank_ref"]),
+                    "bank_name": bank["bank_name"],
+                    "account_masked": bank["account_masked"],
+                    "last_changed": bank["last_changed"].isoformat(),
+                }
+                for bank in banks
             ]
         )

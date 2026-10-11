@@ -2,6 +2,7 @@ from django.urls import path
 
 from funding.balance_views import (
     AddMoneyView,
+    ArchivedBankHistoryListView,
     RecentBalanceChangesView,
     RemoveMoneyView,
     SetBalanceView,
@@ -31,6 +32,11 @@ preference_detail = FundingPreferenceViewSet.as_view(
 )
 
 urlpatterns = [
+    path(
+        "workspaces/<uuid:workspace_id>/banks/archived-history/",
+        ArchivedBankHistoryListView.as_view(),
+        name="archived-bank-history-list",
+    ),
     path(
         "workspaces/<uuid:workspace_id>/investors/<uuid:investor_id>/funding-preferences/",
         preference_list,

@@ -13,7 +13,13 @@ from accounts.models import Workspace
 from accounts.permissions import WorkspaceDataPermission
 from applications.models import Application
 from core.audit import record_event
-from funding.models import BalanceChange, BankAccount, RecurringDebit, UPIHandle
+from funding.models import (
+    ArchivedBalanceChange,
+    BalanceChange,
+    BankAccount,
+    RecurringDebit,
+    UPIHandle,
+)
 from investors.models import DematAccount, Investor
 from planner.models import PlannerPolicy, PlanRow, PlanRun
 
@@ -146,7 +152,7 @@ def _check_permanent_delete(kind, ids, workspace):
         raise ValidationError(
             {"message": "This record is linked to an application. Deactivate it instead."}
         )
-    if (
+    if kind != "bank" and (
         PlanRow.objects.filter(plan_run__workspace=workspace)
         .filter(
             Q(applicant_ref__in=[str(pk) for pk in investors.values_list("pk", flat=True)])
@@ -164,7 +170,7 @@ def _check_permanent_delete(kind, ids, workspace):
         for queryset in (investors, demats, banks, upis)
         for pk in queryset.values_list("pk", flat=True)
     ]
-    if any(
+    if kind != "bank" and any(
         PlanRun.objects.filter(workspace=workspace, input_snapshot__contains=reference).exists()
         for reference in references
     ):
@@ -176,10 +182,16 @@ def _check_permanent_delete(kind, ids, workspace):
         or UPIHandle.objects.filter(holder__in=investors).exclude(bank__in=banks).exists()
     ):
         raise ValidationError({"message": "Remove linked funding rules and UPIs first."})
-    if banks.exclude(current_balance=0).exists():
+    if kind != "bank" and banks.exclude(current_balance=0).exists():
         raise ValidationError(
             {"message": "Set linked bank balances to ₹0 before permanent deletion."}
         )
+    if kind == "bank":
+        for bank in banks.exclude(current_balance=0):
+            if not BalanceChange.objects.filter(bank=bank).exists():
+                raise ValidationError(
+                    {"message": "This bank has a balance without history. Deactivate it instead."}
+                )
     if (
         RecurringDebit.objects.filter(bank__in=banks).exists()
         or PlannerPolicy.objects.filter(bank__in=banks).exists()
@@ -187,18 +199,19 @@ def _check_permanent_delete(kind, ids, workspace):
         raise ValidationError(
             {"message": "This bank has payment or policy history. Deactivate it instead."}
         )
-    for change in BalanceChange.objects.filter(bank__in=banks):
-        if not (
-            change.operation == BalanceChange.Operation.SET
-            and change.old_balance == 0
-            and change.delta == 0
-            and change.new_balance == 0
-            and change.note
-            in {"Opening balance", "Imported account; set the current Balance before planning."}
-        ):
-            raise ValidationError(
-                {"message": "This bank has balance history. Deactivate it instead."}
-            )
+    if kind != "bank":
+        for change in BalanceChange.objects.filter(bank__in=banks):
+            if not (
+                change.operation == BalanceChange.Operation.SET
+                and change.old_balance == 0
+                and change.delta == 0
+                and change.new_balance == 0
+                and change.note
+                in {"Opening balance", "Imported account; set the current Balance before planning."}
+            ):
+                raise ValidationError(
+                    {"message": "This bank has balance history. Deactivate it instead."}
+                )
 
 
 def _delete_item(item, kind, request, workspace):
@@ -208,6 +221,21 @@ def _delete_item(item, kind, request, workspace):
             BalanceChange.objects.filter(bank=bank).delete()
             bank.delete()
     elif kind == "bank":
+        for change in BalanceChange.objects.filter(bank=item).select_for_update():
+            ArchivedBalanceChange.objects.create(
+                workspace=workspace,
+                bank_ref=item.pk,
+                bank_name=item.bank_name,
+                account_masked=item.account_masked,
+                source_change_id=change.pk,
+                operation=change.operation,
+                old_balance=change.old_balance,
+                delta=change.delta,
+                new_balance=change.new_balance,
+                note=change.note,
+                actor_id=change.actor_id,
+                created_at=change.created_at,
+            )
         BalanceChange.objects.filter(bank=item).delete()
     record_event(action=f"{kind}.deleted", target=item, actor=request.user, workspace=workspace)
     item.delete()

@@ -12,15 +12,18 @@ type Investor = { id: string; name: string };
 type Bank = { id: string; owner: string; bank_name: string; account_masked: string; current_balance: string; active: boolean };
 type Change = { id: number; operation: "ADD" | "REMOVE" | "SET" | "ALLOTMENT"; amount: string; balance: string; note: string; created_at: string };
 type CapitalLine = { balance: string; blocked: string; planned: string; available: string };
+type ArchivedBank = { id: string; bank_name: string; account_masked: string; last_changed: string };
 type Action = "add" | "remove" | "set";
 
-export default function FundsScreen({ workspace, investors, initialBanks, initialChanges, initialPayments, capitalByBank }: {
+export default function FundsScreen({ workspace, investors, initialBanks, initialChanges, initialPayments, capitalByBank, archivedBanks }: {
   workspace: Workspace; investors: Investor[]; initialBanks: Bank[]; initialChanges: Change[];
-  initialPayments: ScheduledPayment[]; capitalByBank: Record<string, CapitalLine>;
+  initialPayments: ScheduledPayment[]; capitalByBank: Record<string, CapitalLine>; archivedBanks: ArchivedBank[];
 }) {
   const [banks, setBanks] = useState(initialBanks);
   const [selectedBankId, setSelectedBankId] = useState(initialBanks[0]?.id ?? "");
   const [changes, setChanges] = useState(initialChanges);
+  const [archivedBankId, setArchivedBankId] = useState("");
+  const [archivedChanges, setArchivedChanges] = useState<Change[]>([]);
   const [action, setAction] = useState<Action | null>(null);
   const [addBankOpen, setAddBankOpen] = useState(false);
   const [amount, setAmount] = useState("");
@@ -37,6 +40,12 @@ export default function FundsScreen({ workspace, investors, initialBanks, initia
     const response = await fetch(`/api/workspaces/${workspace.id}/banks/${bankId}/balance-changes`);
     if (response.ok) setChanges((await response.json()) as Change[]);
     else setMessage("Recent changes could not be loaded. Try selecting the bank again.");
+  }
+  async function loadArchivedHistory(bankId: string) {
+    setArchivedBankId(bankId);
+    const response = await fetch(`/api/workspaces/${workspace.id}/banks/${bankId}/balance-changes`);
+    if (response.ok) setArchivedChanges((await response.json()) as Change[]);
+    else setMessage("Deleted bank history could not be loaded. Try again.");
   }
   async function createBank(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setMessage("");
@@ -66,12 +75,16 @@ export default function FundsScreen({ workspace, investors, initialBanks, initia
   return <main className="page"><div className="shell settings-shell">
     <PageHeader eyebrow="Capital / Funds" title="Bank availability" description={workspace.name} action={canEdit && investors.length > 0 ? <button type="button" onClick={() => setAddBankOpen(true)}>+ Add bank</button> : undefined} />
     {message && <p className="plan-note" role="status">{message}</p>}
-    {banks.length === 0 ? <EmptyState title="No active bank accounts" detail={investors.length === 0 ? "Add or restore an investor, then link a bank." : "Add a bank or restore a deleted account in Settings."} action={<Link href="/settings/investors">Investor settings</Link>} /> : <>
+    {banks.length === 0 ? <EmptyState title="No active bank accounts" detail={investors.length === 0 ? "Add or activate an investor, then link a bank." : "Add a bank or activate an account in Settings."} action={<Link href="/settings/investors">Investor settings</Link>} /> : <>
       <div className="compact-table-wrap funds-table-wrap"><table className="compact-table funds-table"><thead><tr><th>Owner / bank</th><th>Balance</th><th>Blocked</th><th>Planned</th><th>Available</th><th>State</th></tr></thead><tbody>{banks.map((bank) => { const line = capitalByBank[bank.id]; return <tr key={bank.id} className={selectedBankId === bank.id ? "selected-row" : ""}><th scope="row"><button className="bank-row-button" type="button" onClick={() => { setSelectedBankId(bank.id); void loadHistory(bank.id); }}>{bank.bank_name}<small>{investors.find((item) => item.id === bank.owner)?.name ?? "Owner"} · {bank.account_masked}</small></button></th><td>{formatInr(bank.current_balance)}</td><td>{line ? formatInr(line.blocked) : "—"}</td><td>{line ? formatInr(line.planned) : "—"}</td><td className="positive-cell">{line ? formatInr(line.available) : "—"}</td><td><StatusBadge tone={bank.active ? "positive" : "neutral"}>{bank.active ? "Active" : "Paused"}</StatusBadge></td></tr>; })}</tbody></table></div>
       {selectedBank && <><div className="funds-detail-bar"><div><span className="detail-label">Selected account</span><strong>{selectedBank.bank_name} · {selectedBank.account_masked}</strong></div>{canEdit && <div className="balance-actions" role="group" aria-label="Balance actions">{(["add", "remove", "set"] as Action[]).map((item) => <button key={item} className={item === "add" ? "" : "button-secondary"} type="button" onClick={() => setAction(item)}>{balanceActionLabel(item.toUpperCase() as "ADD" | "REMOVE" | "SET")}</button>)}</div>}</div>
         <div className="funds-bottom-grid"><section className="section-panel"><SectionHeading title="Scheduled Payments / EMI" detail="Upcoming debits from this bank" /><ScheduledPayments key={selectedBank.id} workspaceId={workspace.id} bankId={selectedBank.id} canEdit={canEdit} initialPayments={selectedBank.id === initialBanks[0]?.id ? initialPayments : []} /></section><section className="section-panel"><SectionHeading title="Recent balance changes" detail="Latest recorded movements" />{changes.length === 0 ? <EmptyState title="No balance changes yet." /> : <ul className="change-list">{changes.slice(0, 10).map((change) => <li key={change.id}><span><strong>{balanceActionLabel(change.operation)}</strong><br /><small>{new Date(change.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" })}</small></span><span>{formatInr(change.amount)}<br /><small>Balance {formatInr(change.balance)}</small></span></li>)}</ul>}</section></div>
       </>}
     </>}
+    {archivedBanks.length > 0 && <section className="section-panel archived-bank-history" aria-label="Deleted bank history"><SectionHeading title="Deleted bank history" detail="Balance changes remain available after a bank is deleted." />
+      <div className="settings-funding-list">{archivedBanks.map((bank) => <button key={bank.id} type="button" className="settings-funding-row" aria-pressed={archivedBankId === bank.id} onClick={() => void loadArchivedHistory(bank.id)}><span><strong>{bank.bank_name}</strong><small>{bank.account_masked}</small></span><span>View history</span></button>)}</div>
+      {archivedBankId && <ul className="change-list">{archivedChanges.map((change) => <li key={change.id}><span><strong>{balanceActionLabel(change.operation)}</strong><br /><small>{new Date(change.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" })}</small></span><span>{formatInr(change.amount)}<br /><small>Balance {formatInr(change.balance)}</small></span></li>)}</ul>}
+    </section>}
     {action && selectedBank && <Drawer title={`${balanceActionLabel(action.toUpperCase() as "ADD" | "REMOVE" | "SET")} · ${selectedBank.bank_name}`} onClose={() => setAction(null)}><p className="intro">Current Balance: {formatInr(selectedBank.current_balance)}</p><form onSubmit={changeBalance} className="sign-in-form"><label htmlFor="balance-amount">Amount (₹)</label><input id="balance-amount" type="number" min={action === "set" ? "0" : "0.01"} step="0.01" required value={amount} onChange={(event) => setAmount(event.target.value)} /><button type="submit" disabled={busy}>{balanceActionLabel(action.toUpperCase() as "ADD" | "REMOVE" | "SET")}</button></form></Drawer>}
     {addBankOpen && <Drawer title="Add bank account" onClose={() => setAddBankOpen(false)}><form onSubmit={createBank} className="sign-in-form"><label htmlFor="bank-owner">Owner</label><select id="bank-owner" value={ownerId} onChange={(event) => setOwnerId(event.target.value)}>{investors.map((investor) => <option key={investor.id} value={investor.id}>{investor.name}</option>)}</select><label htmlFor="bank-name">Bank name</label><input id="bank-name" required value={name} onChange={(event) => setName(event.target.value)} /><label htmlFor="account-number">Account number</label><input id="account-number" required autoComplete="off" value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} /><label htmlFor="opening-balance">Opening Balance (₹)</label><input id="opening-balance" type="number" min="0" step="0.01" required value={openingBalance} onChange={(event) => setOpeningBalance(event.target.value)} /><button type="submit" disabled={busy}>Add bank</button></form></Drawer>}
   </div></main>;

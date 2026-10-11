@@ -92,6 +92,43 @@ class BalanceChange(models.Model):
         raise ValueError("Balance history cannot be deleted")
 
 
+class ArchivedBalanceChange(models.Model):
+    """Immutable balance history retained after an unused bank account is deleted."""
+
+    workspace = models.ForeignKey("accounts.Workspace", on_delete=models.PROTECT)
+    bank_ref = models.UUIDField()
+    bank_name = models.CharField(max_length=120)
+    account_masked = models.CharField(max_length=20)
+    source_change_id = models.PositiveBigIntegerField()
+    operation = models.CharField(max_length=9, choices=BalanceChange.Operation.choices)
+    old_balance = models.DecimalField(max_digits=14, decimal_places=2)
+    delta = models.DecimalField(max_digits=14, decimal_places=2)
+    new_balance = models.DecimalField(max_digits=14, decimal_places=2)
+    note = models.CharField(max_length=200, blank=True)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workspace", "source_change_id"],
+                name="unique_archived_balance_change",
+            )
+        ]
+        ordering = ["-created_at", "-source_change_id"]
+
+    def __str__(self):
+        return f"{self.operation} on deleted bank {self.bank_ref}"
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            raise ValueError("Archived balance history cannot be changed")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("Archived balance history cannot be deleted")
+
+
 def upi_hash_for_workspace(workspace_id, normalized_handle: str) -> str:
     return lookup_hash(f"{workspace_id}:{normalized_handle}", purpose="upi")
 
