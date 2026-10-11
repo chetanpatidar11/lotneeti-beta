@@ -3,7 +3,7 @@
 ## J01 IPO page tabs — 2026-10-11
 
 - Removed the InvestorGain feed notice requested by the founder. The signed-in IPO page now offers separate IPOs and Calendar views; the Calendar view shows open/upcoming issues without the IPO card list or selection controls underneath. It has an empty state when no dates are available. The list view keeps its existing search, filters and choices. Calendar navigation does not request per-IPO GMP histories.
-- Web lint, TypeScript check, 32 web tests and production build passed. Beta deployment and live smoke result are recorded after release.
+- Web lint, TypeScript check, 32 web tests and production build passed. A pre-release encrypted backup service run succeeded. Deployed release archive SHA-256 `2c43bad7cc8bf29170147db9f2bbbb4a85130e53c334a4b0358290ae30b4c27c` to the existing HTTPS beta. The live API health and sign-in page returned HTTP 200; API, web, worker and beat services are active. The deployed IPO page source contains the new tab navigation and no longer contains the removed feed notice. No database migration was needed.
 
 ## D03/J01 beta deployment and supplied-documents audit — 2026-10-10
 
