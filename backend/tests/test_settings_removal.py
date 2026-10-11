@@ -105,6 +105,80 @@ def test_bulk_investor_removal_archives_linked_accounts_and_can_be_restored():
 
 
 @pytest.mark.django_db
+def test_settings_deactivate_activate_and_permanent_delete_are_distinct():
+    owner = User.objects.create_user(email="owner@example.test")
+    workspace = create_workspace(name="Synthetic", owner=owner)
+    investor = create_investor(workspace, "First", "TESTX0001A")
+    demat = DematAccount(investor=investor, depository="CDSL")
+    demat.set_dp_id("")
+    demat.set_client_id("DEMO-CLIENT-0001")
+    demat.save()
+    bank = create_bank(workspace, investor, "DEMO-ACCOUNT-0001")
+    BalanceChange.objects.create(
+        bank=bank,
+        operation=BalanceChange.Operation.SET,
+        old_balance=0,
+        delta=0,
+        new_balance=0,
+        actor=owner,
+        note="Opening balance",
+    )
+    upi = UPIHandle(bank=bank, holder=investor)
+    upi.set_handle("synthetic@upi.test")
+    upi.save()
+    client = APIClient()
+    client.force_authenticate(owner)
+    url = selection_url(workspace)
+    for action, active in (("deactivate", False), ("activate", True)):
+        response = client.post(
+            url, {"kind": "investor", "action": action, "ids": [str(investor.pk)]}, format="json"
+        )
+        assert response.status_code == 200
+        investor.refresh_from_db()
+        assert investor.active is active
+    deleted = client.post(
+        url, {"kind": "investor", "action": "delete", "ids": [str(investor.pk)]}, format="json"
+    )
+    assert deleted.status_code == 200
+    assert not Investor.objects.filter(pk=investor.pk).exists()
+    assert not DematAccount.objects.filter(pk=demat.pk).exists()
+    assert not BankAccount.objects.filter(pk=bank.pk).exists()
+    assert not UPIHandle.objects.filter(pk=upi.pk).exists()
+    assert not BalanceChange.objects.filter(bank_id=bank.pk).exists()
+    assert AuditEvent.objects.filter(action="investor.deleted", workspace=workspace).exists()
+
+
+@pytest.mark.django_db
+def test_permanent_delete_rejects_real_balance_history_atomically():
+    owner = User.objects.create_user(email="owner@example.test")
+    workspace = create_workspace(name="Synthetic", owner=owner)
+    investor = create_investor(workspace, "First", "TESTX0001A")
+    first = create_bank(workspace, investor, "DEMO-ACCOUNT-0001")
+    second = create_bank(workspace, investor, "DEMO-ACCOUNT-0002")
+    BalanceChange.objects.create(
+        bank=second,
+        operation=BalanceChange.Operation.ADD,
+        old_balance=0,
+        delta=10,
+        new_balance=10,
+        actor=owner,
+    )
+    client = APIClient()
+    client.force_authenticate(owner)
+    response = client.post(
+        selection_url(workspace),
+        {
+            "kind": "bank",
+            "action": "delete",
+            "ids": [str(first.pk), str(second.pk)],
+        },
+        format="json",
+    )
+    assert response.status_code == 400
+    assert BankAccount.objects.filter(pk__in=[first.pk, second.pk]).count() == 2
+
+
+@pytest.mark.django_db
 def test_bank_bulk_removal_is_atomic_when_balance_or_payment_is_active():
     owner = User.objects.create_user(email="owner@example.test")
     workspace = create_workspace(name="Synthetic", owner=owner)

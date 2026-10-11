@@ -20,6 +20,12 @@ class AccountImportConfirmSerializer(serializers.Serializer):
     row_numbers = serializers.ListField(
         child=serializers.IntegerField(min_value=1), required=False, allow_empty=False
     )
+    bank_details = serializers.DictField(
+        child=serializers.DictField(
+            child=serializers.CharField(allow_blank=True, trim_whitespace=True)
+        ),
+        required=False,
+    )
 
 
 class AccountImportListView(APIView):
@@ -67,6 +73,7 @@ class AccountImportPreviewView(APIView):
                 batch=batch,
                 actor=request.user,
                 row_numbers=serializer.validated_data.get("row_numbers"),
+                bank_details=serializer.validated_data.get("bank_details", {}),
             )
         except AccountImportError as exc:
             payload = {"detail": str(exc)}

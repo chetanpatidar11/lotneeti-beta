@@ -50,21 +50,21 @@ function AccountTable({
   busy: boolean;
   onToggle: (kind: SettingsKind, id: string, checked: boolean) => void;
   onSelectAll: (kind: SettingsKind, ids: string[], checked: boolean) => void;
-  onAction: (kind: SettingsKind, ids: string[], action: "remove" | "restore") => void;
+  onAction: (kind: SettingsKind, ids: string[], action: "deactivate" | "activate" | "delete") => void;
   onAdd: () => void;
   addLabel: string;
   addDisabled: boolean;
 }) {
   const visible = rows.filter((row) => row.active !== showRemoved);
   return <section className="settings-account-group" aria-label={title}>
-    <SectionHeading title={title} action={canEdit && <div className="settings-section-actions">{!showRemoved && <button type="button" className="button-secondary" disabled={busy || addDisabled} onClick={onAdd}>+ {addLabel}</button>}{visible.length > 0 && <><button type="button" className="button-secondary" disabled={busy} onClick={() => onSelectAll(kind, visible.map((row) => row.id), !visible.every((row) => selected.includes(row.id)))}>{visible.every((row) => selected.includes(row.id)) ? "Clear selection" : "Select all"}</button>{selected.length > 0 && <button type="button" className={showRemoved ? "button-secondary" : "button-danger"} disabled={busy} onClick={() => onAction(kind, selected, showRemoved ? "restore" : "remove")}>{showRemoved ? `Restore selected (${selected.length})` : `Delete selected (${selected.length})`}</button>}</>}</div>} />
-    {visible.length === 0 ? <EmptyState title={showRemoved ? `No deleted ${title.toLowerCase()}` : `No ${title.toLowerCase()} yet`} /> : <div className="settings-table-wrap"><table className="settings-table"><thead><tr>
+    <SectionHeading title={title} action={canEdit && <div className="settings-section-actions">{!showRemoved && <button type="button" className="button-secondary" disabled={busy || addDisabled} onClick={onAdd}>+ {addLabel}</button>}{visible.length > 0 && <><button type="button" className="button-secondary" disabled={busy} onClick={() => onSelectAll(kind, visible.map((row) => row.id), !visible.every((row) => selected.includes(row.id)))}>{visible.every((row) => selected.includes(row.id)) ? "Clear selection" : "Select all"}</button>{selected.length > 0 && <><button type="button" className="button-secondary" disabled={busy} onClick={() => onAction(kind, selected, showRemoved ? "activate" : "deactivate")}>{showRemoved ? `Activate selected (${selected.length})` : `Deactivate selected (${selected.length})`}</button><button type="button" className="button-danger" disabled={busy} onClick={() => onAction(kind, selected, "delete")}>Delete selected ({selected.length})</button></>}</>}</div>} />
+    {visible.length === 0 ? <EmptyState title={showRemoved ? `No inactive ${title.toLowerCase()}` : `No ${title.toLowerCase()} yet`} /> : <div className="settings-table-wrap"><table className="settings-table"><thead><tr>
       {canEdit && <th scope="col" className="settings-select-cell"><label><input type="checkbox" aria-label={`Select all ${title.toLowerCase()}`} checked={visible.every((row) => selected.includes(row.id))} disabled={busy} onChange={(event) => onSelectAll(kind, visible.map((row) => row.id), event.target.checked)} /></label></th>}
       <th scope="col">Account</th><th scope="col">Investor</th><th scope="col">Details</th><th scope="col">Action</th>
     </tr></thead><tbody>{visible.map((row) => <tr key={row.id}>
       {canEdit && <td data-label="Select" className="settings-select-cell"><label><input type="checkbox" aria-label={`Select ${row.name}`} checked={selected.includes(row.id)} disabled={busy} onChange={(event) => onToggle(kind, row.id, event.target.checked)} /></label></td>}
       <th scope="row" data-label="Account">{row.name}</th><td data-label="Investor">{row.owner}</td><td data-label="Details">{row.detail}</td>
-      <td data-label="Action">{canEdit ? <button type="button" className={showRemoved ? "button-secondary" : "button-ghost-danger"} disabled={busy} onClick={() => onAction(kind, [row.id], showRemoved ? "restore" : "remove")}>{showRemoved ? "Restore" : "Delete"}</button> : "—"}</td>
+      <td data-label="Action">{canEdit ? <div className="settings-row-actions"><button type="button" className="button-secondary" disabled={busy} onClick={() => onAction(kind, [row.id], showRemoved ? "activate" : "deactivate")}>{showRemoved ? "Activate" : "Deactivate"}</button><button type="button" className="button-ghost-danger" disabled={busy} onClick={() => onAction(kind, [row.id], "delete")}>Delete</button></div> : "—"}</td>
     </tr>)}</tbody></table></div>}
   </section>;
 }
@@ -73,7 +73,7 @@ export default function PrioritySettings({
   workspace: initialWorkspace,
   investors: initialInvestors,
   banks: initialBanks,
-  preferences,
+  preferences: initialPreferences,
   linkedAccounts: initialLinkedAccounts,
   loadError,
 }: {
@@ -88,6 +88,7 @@ export default function PrioritySettings({
   const [investors, setInvestors] = useState(sortByPriority(initialInvestors));
   const [banks, setBanks] = useState(initialBanks);
   const [linkedAccounts, setLinkedAccounts] = useState(initialLinkedAccounts);
+  const [preferences, setPreferences] = useState(initialPreferences);
   const [tab, setTab] = useState<Tab>("investors");
   const [showRemoved, setShowRemoved] = useState(false);
   const [selected, setSelected] = useState<Selection>(emptySelection);
@@ -276,7 +277,7 @@ export default function PrioritySettings({
     } finally { setBusy(false); }
   }
 
-  async function updateItems(kind: SettingsKind, ids: string[], action: "remove" | "restore") {
+  async function updateItems(kind: SettingsKind, ids: string[], action: "deactivate" | "activate" | "delete") {
     if (!workspace || ids.length === 0) return;
     setBusy(true);
     try {
@@ -291,9 +292,15 @@ export default function PrioritySettings({
       setInvestors(next.investors);
       setBanks(next.banks);
       setLinkedAccounts(next.linkedAccounts);
-      setSelected((current) => ({ ...current, [kind]: [] }));
+      setSelected(emptySelection());
+      if (action === "delete") {
+        const deleted = new Set(ids);
+        setPreferences((current) => Object.fromEntries(Object.entries(current)
+          .filter(([investorId]) => kind !== "investor" || !deleted.has(investorId))
+          .map(([investorId, rows]) => [investorId, kind === "bank" ? rows.filter((row) => !deleted.has(row.bank)) : rows])));
+      }
       if (kind === "investor" && selectedInvestor && ids.includes(selectedInvestor)) setSelectedInvestor(null);
-      note(`${ids.length} ${labelForKind[kind]}${ids.length === 1 ? "" : "s"} ${action === "remove" ? "deleted from active planning" : "restored"}.`);
+      note(`${ids.length} ${labelForKind[kind]}${ids.length === 1 ? "" : "s"} ${action === "delete" ? "permanently deleted" : action === "activate" ? "activated" : "deactivated"}.`);
     } catch (error) {
       note(error instanceof Error ? error.message : "We could not change these items. Please try again.", true);
     } finally {
@@ -302,15 +309,15 @@ export default function PrioritySettings({
     }
   }
 
-  function itemAction(kind: SettingsKind, ids: string[], action: "remove" | "restore") {
-    if (action === "remove") setPendingRemoval({ kind, ids });
-    else void updateItems(kind, ids, "restore");
+  function itemAction(kind: SettingsKind, ids: string[], action: "deactivate" | "activate" | "delete") {
+    if (action === "delete") setPendingRemoval({ kind, ids });
+    else void updateItems(kind, ids, action);
   }
 
   const pendingCount = pendingRemoval?.ids.length ?? 0;
   const pendingName = pendingRemoval ? labelForKind[pendingRemoval.kind] : "item";
   const confirmationDetail = pendingRemoval?.kind === "investor" || pendingRemoval?.kind === "bank"
-    ? "Linked accounts will also be removed. Restore them separately if needed."
+    ? "Unused linked accounts will also be deleted."
     : "";
 
   return <main className="page settings-page"><div className="shell settings-shell">
@@ -323,15 +330,15 @@ export default function PrioritySettings({
       <nav className="settings-tabs" aria-label="Settings sections">
         {([["investors", "Investors"], ["funding", "Funding Preferences"], ["accounts", "Accounts"], ["import", "Import"]] as const).map(([key, label]) => <button key={key} type="button" className={tab === key ? "settings-tab active" : "settings-tab"} aria-current={tab === key ? "page" : undefined} onClick={() => changeTab(key)}>{label}</button>)}
       </nav>
-      {(tab === "investors" || tab === "accounts") && <div className="settings-view-controls"><p>Deleted items leave active planning. Saved applications and balance history stay available.</p><button type="button" className="button-secondary" aria-pressed={showRemoved} onClick={() => { setShowRemoved(!showRemoved); setSelected(emptySelection()); setSelectedInvestor(null); }}>{showRemoved ? "Show active" : "Show deleted"}</button></div>}
+      {(tab === "investors" || tab === "accounts") && <div className="settings-view-controls"><p>Deactivate to pause planning. Delete permanently removes unused records; saved financial history stays protected.</p><button type="button" className="button-secondary" aria-pressed={showRemoved} onClick={() => { setShowRemoved(!showRemoved); setSelected(emptySelection()); setSelectedInvestor(null); }}>{showRemoved ? "Show active" : "Show inactive"}</button></div>}
 
       {tab === "investors" && <section aria-label="Investors">
-        <SectionHeading title={showRemoved ? "Deleted investors" : "Investors"} detail={showRemoved ? "Restore an investor before restoring linked accounts." : "Priority decides who is planned first when funds or application limits are tight."} action={canEdit && <div className="settings-section-actions">
+        <SectionHeading title={showRemoved ? "Inactive investors" : "Investors"} detail={showRemoved ? "Activate an investor before activating linked accounts." : "Priority decides who is planned first when funds or application limits are tight."} action={canEdit && <div className="settings-section-actions">
           {visibleInvestors.length > 0 && <button type="button" className="button-secondary" disabled={busy} onClick={() => selectAll("investor", visibleInvestors.map((investor) => investor.id), !visibleInvestors.every((investor) => selected.investor.includes(investor.id)))}>{visibleInvestors.every((investor) => selected.investor.includes(investor.id)) ? "Clear selection" : "Select all"}</button>}
-          {selected.investor.length > 0 && <button type="button" className={showRemoved ? "button-secondary" : "button-danger"} disabled={busy} onClick={() => itemAction("investor", selected.investor, showRemoved ? "restore" : "remove")}>{showRemoved ? `Restore selected (${selected.investor.length})` : `Delete selected (${selected.investor.length})`}</button>}
+          {selected.investor.length > 0 && <><button type="button" className="button-secondary" disabled={busy} onClick={() => itemAction("investor", selected.investor, showRemoved ? "activate" : "deactivate")}>{showRemoved ? `Activate selected (${selected.investor.length})` : `Deactivate selected (${selected.investor.length})`}</button><button type="button" className="button-danger" disabled={busy} onClick={() => itemAction("investor", selected.investor, "delete")}>Delete selected ({selected.investor.length})</button></>}
           {!showRemoved && <><button type="button" className="button-secondary" disabled={busy || activeInvestors.length === 0} onClick={() => void savePriority()}>Save priority</button><button type="button" onClick={() => setShowAddInvestor(true)}>+ Add investor</button></>}
         </div>} />
-        {visibleInvestors.length === 0 ? <EmptyState title={showRemoved ? "No deleted investors" : "No investors yet"} detail={showRemoved ? "Deleted investors will appear here." : "Add an investor to begin planning IPO applications."} /> : <div className="settings-table-wrap"><table className="settings-table"><thead><tr>
+        {visibleInvestors.length === 0 ? <EmptyState title={showRemoved ? "No inactive investors" : "No investors yet"} detail={showRemoved ? "Deactivated investors will appear here." : "Add an investor to begin planning IPO applications."} /> : <div className="settings-table-wrap"><table className="settings-table"><thead><tr>
           {canEdit && <th scope="col" className="settings-select-cell"><label><input type="checkbox" aria-label="Select all investors" checked={visibleInvestors.every((investor) => selected.investor.includes(investor.id))} disabled={busy} onChange={(event) => selectAll("investor", visibleInvestors.map((investor) => investor.id), event.target.checked)} /></label></th>}
           <th scope="col">Investor</th><th scope="col">PAN</th><th scope="col">Priority</th><th scope="col">Demat</th><th scope="col">Banks</th><th scope="col">UPIs</th><th scope="col">Status</th><th scope="col">Actions</th>
         </tr></thead><tbody>{visibleInvestors.map((investor, index) => <tr key={investor.id}>
@@ -341,16 +348,16 @@ export default function PrioritySettings({
           <td data-label="Demat">{linkedAccounts[investor.id]?.demats.filter((item) => item.active).length ?? 0}</td>
           <td data-label="Banks">{banks.filter((bank) => bank.owner === investor.id && bank.active).length}</td>
           <td data-label="UPIs">{linkedAccounts[investor.id]?.upis.filter((item) => item.active).length ?? 0}</td>
-          <td data-label="Status"><StatusBadge tone={investor.active ? "positive" : "neutral"}>{investor.active ? "Active" : "Deleted"}</StatusBadge></td>
-          <td data-label="Actions" className="settings-row-actions"><button type="button" className="button-secondary" onClick={() => setSelectedInvestor(investor.id)}>View</button>{canEdit && <button type="button" className={showRemoved ? "button-secondary" : "button-ghost-danger"} disabled={busy} onClick={() => itemAction("investor", [investor.id], showRemoved ? "restore" : "remove")}>{showRemoved ? "Restore" : "Delete"}</button>}</td>
+          <td data-label="Status"><StatusBadge tone={investor.active ? "positive" : "neutral"}>{investor.active ? "Active" : "Inactive"}</StatusBadge></td>
+          <td data-label="Actions" className="settings-row-actions"><button type="button" className="button-secondary" onClick={() => setSelectedInvestor(investor.id)}>View</button>{canEdit && <><button type="button" className="button-secondary" disabled={busy} onClick={() => itemAction("investor", [investor.id], showRemoved ? "activate" : "deactivate")}>{showRemoved ? "Activate" : "Deactivate"}</button><button type="button" className="button-ghost-danger" disabled={busy} onClick={() => itemAction("investor", [investor.id], "delete")}>Delete</button></>}</td>
         </tr>)}</tbody></table></div>}
       </section>}
 
       {tab === "funding" && <section aria-label="Funding preferences"><SectionHeading title="Funding Preferences" detail="Choose an investor to review and order their preferred accounts." />
-        {activeInvestors.length === 0 ? <EmptyState title="No active investors" detail="Add or restore an investor before setting funding preferences." /> : <div className="settings-funding-list">{activeInvestors.map((investor) => <button type="button" key={investor.id} className="settings-funding-row" onClick={() => setSelectedInvestor(investor.id)}><span><strong>{investor.name}</strong><small>{investor.pan_masked}</small></span><span>{preferences[investor.id]?.filter((item) => item.enabled).length ?? 0} preferred · {banks.filter((bank) => bank.owner === investor.id && bank.active).length} own bank(s)</span><span aria-hidden="true">›</span></button>)}</div>}
+        {activeInvestors.length === 0 ? <EmptyState title="No active investors" detail="Add or activate an investor before setting funding preferences." /> : <div className="settings-funding-list">{activeInvestors.map((investor) => <button type="button" key={investor.id} className="settings-funding-row" onClick={() => setSelectedInvestor(investor.id)}><span><strong>{investor.name}</strong><small>{investor.pan_masked}</small></span><span>{preferences[investor.id]?.filter((item) => item.enabled).length ?? 0} preferred · {banks.filter((bank) => bank.owner === investor.id && bank.active).length} own bank(s)</span><span aria-hidden="true">›</span></button>)}</div>}
       </section>}
 
-      {tab === "accounts" && <section aria-label="Accounts"><SectionHeading title={showRemoved ? "Deleted accounts" : "Accounts"} detail="Add demat, bank, and UPI details for active investors; deleted accounts can be restored." />
+      {tab === "accounts" && <section aria-label="Accounts"><SectionHeading title={showRemoved ? "Inactive accounts" : "Accounts"} detail="Add demat, bank, and UPI details for active investors. Deactivated accounts can be activated again." />
         <AccountTable title="Demat Accounts" kind="demat" rows={dematRows} selected={selected.demat} showRemoved={showRemoved} canEdit={canEdit} busy={busy} onToggle={toggle} onSelectAll={selectAll} onAction={itemAction} onAdd={() => openAddAccount("demat")} addLabel="Add demat" addDisabled={activeInvestors.length === 0} />
         <AccountTable title="Bank Accounts" kind="bank" rows={bankRows} selected={selected.bank} showRemoved={showRemoved} canEdit={canEdit} busy={busy} onToggle={toggle} onSelectAll={selectAll} onAction={itemAction} onAdd={() => openAddAccount("bank")} addLabel="Add bank" addDisabled={activeInvestors.length === 0} />
         <AccountTable title="UPIs" kind="upi" rows={upiRows} selected={selected.upi} showRemoved={showRemoved} canEdit={canEdit} busy={busy} onToggle={toggle} onSelectAll={selectAll} onAction={itemAction} onAdd={() => openAddAccount("upi")} addLabel="Add UPI" addDisabled={activeInvestors.length === 0 || banks.every((bank) => !bank.active)} />
@@ -381,9 +388,9 @@ export default function PrioritySettings({
         <p className="form-note">New UPI IDs are unverified until verified separately.</p>
         <button type="submit" disabled={busy}>Add UPI</button>
       </form></Drawer>}
-      {focusedInvestor && <Drawer title={focusedInvestor.name} onClose={() => setSelectedInvestor(null)}><div className="settings-investor-detail"><p><strong>PAN</strong><span>{focusedInvestor.pan_masked}</span></p><p><strong>Status</strong><StatusBadge tone={focusedInvestor.active ? "positive" : "neutral"}>{focusedInvestor.active ? "Active" : "Deleted"}</StatusBadge></p></div><div className="settings-linked"><h3>Demat Accounts</h3>{linkedAccounts[focusedInvestor.id]?.demats.length ? linkedAccounts[focusedInvestor.id].demats.map((demat) => <p key={demat.id}>{demat.depository} · {demat.dp_id_masked} / {demat.client_id_masked} <small>{demat.broker} · {demat.active ? "Active" : "Deleted"}</small></p>) : <p>No demat accounts yet.</p>}<h3>Bank Accounts</h3>{banks.filter((bank) => bank.owner === focusedInvestor.id).map((bank) => <p key={bank.id}>{bank.bank_name} · {bank.account_masked} <small>{bank.active ? "Active" : "Deleted"}</small></p>)}<h3>UPIs</h3>{linkedAccounts[focusedInvestor.id]?.upis.length ? linkedAccounts[focusedInvestor.id].upis.map((upi) => <p key={upi.id}>{upi.handle_masked} <small>{upi.verified ? "Verified" : "Not verified"} · {upi.active ? "Active" : "Deleted"}</small></p>) : <p>No UPIs yet.</p>}</div>{focusedInvestor.active && <PreferredFunding key={focusedInvestor.id} workspaceId={workspace.id} investor={focusedInvestor} investors={activeInvestors} banks={banks.filter((bank) => bank.active)} initialPreferences={preferences[focusedInvestor.id] ?? []} canEdit={canEdit} />}</Drawer>}
+      {focusedInvestor && <Drawer title={focusedInvestor.name} onClose={() => setSelectedInvestor(null)}><div className="settings-investor-detail"><p><strong>PAN</strong><span>{focusedInvestor.pan_masked}</span></p><p><strong>Status</strong><StatusBadge tone={focusedInvestor.active ? "positive" : "neutral"}>{focusedInvestor.active ? "Active" : "Inactive"}</StatusBadge></p></div><div className="settings-linked"><h3>Demat Accounts</h3>{linkedAccounts[focusedInvestor.id]?.demats.length ? linkedAccounts[focusedInvestor.id].demats.map((demat) => <p key={demat.id}>{demat.depository} · {demat.dp_id_masked} / {demat.client_id_masked} <small>{demat.broker} · {demat.active ? "Active" : "Inactive"}</small></p>) : <p>No demat accounts yet.</p>}<h3>Bank Accounts</h3>{banks.filter((bank) => bank.owner === focusedInvestor.id).map((bank) => <p key={bank.id}>{bank.bank_name} · {bank.account_masked} <small>{bank.active ? "Active" : "Inactive"}</small></p>)}<h3>UPIs</h3>{linkedAccounts[focusedInvestor.id]?.upis.length ? linkedAccounts[focusedInvestor.id].upis.map((upi) => <p key={upi.id}>{upi.handle_masked} <small>{upi.verified ? "Verified" : "Not verified"} · {upi.active ? "Active" : "Inactive"}</small></p>) : <p>No UPIs yet.</p>}</div>{focusedInvestor.active && <PreferredFunding key={focusedInvestor.id} workspaceId={workspace.id} investor={focusedInvestor} investors={activeInvestors} banks={banks.filter((bank) => bank.active)} initialPreferences={preferences[focusedInvestor.id] ?? []} canEdit={canEdit} />}</Drawer>}
       {showAddInvestor && <Drawer title="Add investor" onClose={() => setShowAddInvestor(false)}><form onSubmit={addInvestor} className="sign-in-form"><label htmlFor="investor-name">Name</label><input id="investor-name" required value={name} onChange={(event) => setName(event.target.value)} /><label htmlFor="investor-pan">PAN</label><input id="investor-pan" required maxLength={10} autoComplete="off" value={pan} onChange={(event) => setPan(event.target.value)} /><button type="submit" disabled={busy}>Add investor</button></form></Drawer>}
-      {pendingRemoval && <ConfirmationDialog title={`Delete ${pendingCount} ${pendingName}${pendingCount === 1 ? "" : "s"}?`} description={`These items will leave active planning. Saved applications and balance history stay available. ${confirmationDetail}`} confirmLabel={`Delete ${pendingCount === 1 ? pendingName : "selected"}`} busy={busy} onCancel={() => setPendingRemoval(null)} onConfirm={() => void updateItems(pendingRemoval.kind, pendingRemoval.ids, "remove")} />}
+      {pendingRemoval && <ConfirmationDialog title={`Permanently delete ${pendingCount} ${pendingName}${pendingCount === 1 ? "" : "s"}?`} description={`These records cannot be restored. Records used by applications, plans or balance history cannot be deleted. ${confirmationDetail}`} confirmLabel={`Delete ${pendingCount === 1 ? pendingName : "selected"}`} busy={busy} onCancel={() => setPendingRemoval(null)} onConfirm={() => void updateItems(pendingRemoval.kind, pendingRemoval.ids, "delete")} />}
     </>}
   </div></main>;
 }

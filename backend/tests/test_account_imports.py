@@ -90,6 +90,22 @@ def distinct_rows_upload():
     return SimpleUploadedFile("DistinctAccounts.xlsx", output.getvalue())
 
 
+def missing_bank_upload():
+    source = distinct_rows_upload().read()
+    output = io.BytesIO()
+    with (
+        zipfile.ZipFile(io.BytesIO(source)) as source_zip,
+        zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as output_zip,
+    ):
+        for name in source_zip.namelist():
+            contents = source_zip.read(name)
+            if name == "xl/worksheets/sheet1.xml":
+                contents = contents.replace(b'<c r="G2"><v>123456789</v></c>', b"")
+                contents = contents.replace(b'<c r="H2" t="s"><v>11</v></c>', b"")
+            output_zip.writestr(name, contents)
+    return SimpleUploadedFile("MissingBank.xlsx", output.getvalue())
+
+
 @pytest.mark.django_db
 def test_sample_account_workbook_previews_masked_rows_and_confirms_only_selected_rows():
     owner = User.objects.create_user(email="owner@example.test")
@@ -124,6 +140,89 @@ def test_sample_account_workbook_previews_masked_rows_and_confirms_only_selected
     assert BankAccount.objects.count() == 1
     assert UPIHandle.objects.count() == 1
     assert AuditEvent.objects.filter(action="account_import.confirmed").exists()
+
+
+@pytest.mark.django_db
+def test_missing_bank_details_can_be_entered_for_a_selected_preview_row():
+    owner = User.objects.create_user(email="owner@example.test")
+    workspace = create_workspace(name="Family", owner=owner)
+    client = APIClient()
+    client.force_authenticate(owner)
+    preview = client.post(
+        reverse("account-import-list", args=[workspace.pk]),
+        {"file": missing_bank_upload()},
+        format="multipart",
+    )
+    assert preview.status_code == 201
+    assert preview.data["rows"][0]["errors"] == [
+        "Account Number is required.",
+        "Bank Name is required.",
+    ]
+    url = reverse("account-import-preview", args=[workspace.pk, preview.data["id"]])
+    assert client.post(url, {"row_numbers": [2]}, format="json").status_code == 400
+    completed = client.post(
+        url,
+        {
+            "row_numbers": [2],
+            "bank_details": {
+                "2": {
+                    "account_number": "9876543210",
+                    "bank_name": "Synthetic Bank",
+                }
+            },
+        },
+        format="json",
+    )
+    assert completed.status_code == 200
+    assert completed.data["imported_rows"] == 1
+    bank = BankAccount.objects.get()
+    assert bank.bank_name == "Synthetic Bank"
+    assert bank.account_masked == "••••3210"
+    assert "9876543210" not in str(client.get(url).data)
+
+
+@pytest.mark.django_db
+def test_import_bank_details_cannot_replace_workbook_values_or_bypass_other_errors():
+    owner = User.objects.create_user(email="owner@example.test")
+    workspace = create_workspace(name="Family", owner=owner)
+    client = APIClient()
+    client.force_authenticate(owner)
+    preview = client.post(
+        reverse("account-import-list", args=[workspace.pk]),
+        {"file": missing_bank_upload()},
+        format="multipart",
+    )
+    url = reverse("account-import-preview", args=[workspace.pk, preview.data["id"]])
+    replaced = client.post(
+        url,
+        {
+            "row_numbers": [3],
+            "bank_details": {
+                "3": {
+                    "account_number": "11111111",
+                    "bank_name": "Other",
+                }
+            },
+        },
+        format="json",
+    )
+    assert replaced.status_code == 400
+    assert Investor.objects.count() == 0
+    unknown = client.post(
+        url,
+        {
+            "row_numbers": [2],
+            "bank_details": {
+                "99": {
+                    "account_number": "11111111",
+                    "bank_name": "Other",
+                }
+            },
+        },
+        format="json",
+    )
+    assert unknown.status_code == 400
+    assert Investor.objects.count() == 0
 
 
 @pytest.mark.django_db

@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## B07/B08 Settings deletion and workbook completion — 2026-10-11
+
+- Settings now separates reversible Deactivate/Activate from permanent Delete for investors, demat accounts, banks and UPIs, including bulk actions and an explicit delete confirmation. Deactivation keeps the prior safe behavior. Permanent deletion removes unused master records and linked unused accounts; saved applications, plans, nonzero balances, payment/policy records and real balance history block deletion with a clear message. No live customer record was deleted by this release.
+- Workbook import now stops at a review screen. A user can enter missing Account Number and Bank Name per selected row, then explicitly import. Other validation errors, duplicate PANs, unknown rows and attempts to replace populated workbook bank values still block import. Entered bank details are validated server side, used transactionally and never returned unmasked in the preview API.
+- `scripts/check.sh` passed: 369 backend tests, 35 web tests, one Android package test, Planner matrix, Ruff, Django checks/migration drift, web lint/typecheck/build and Capacitor sync. Focused regressions cover permanent delete, balance-history protection, missing bank details and override rejection. Beta deployment is pending.
+
 ## J01 IPO cards, default discovery and draft GMP selection — 2026-10-11
 
 - The IPO list defaults to Open + Upcoming and Mainboard; All clears filters. Closed IPO cards retain issue facts and the last GMP but omit the entire GMP-history/selection action block. Active cards show the selection badge beside the IPO status, with a tighter action row.

@@ -2,6 +2,7 @@
 
 from django.db import transaction
 from django.db.models import Q
+from django.db.models.deletion import ProtectedError
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound, ValidationError
@@ -12,13 +13,16 @@ from accounts.models import Workspace
 from accounts.permissions import WorkspaceDataPermission
 from applications.models import Application
 from core.audit import record_event
-from funding.models import BankAccount, RecurringDebit, UPIHandle
+from funding.models import BalanceChange, BankAccount, RecurringDebit, UPIHandle
 from investors.models import DematAccount, Investor
+from planner.models import PlannerPolicy, PlanRow, PlanRun
 
 
 class SettingsSelectionSerializer(serializers.Serializer):
     kind = serializers.ChoiceField(choices=("investor", "demat", "bank", "upi"))
-    action = serializers.ChoiceField(choices=("remove", "restore"))
+    action = serializers.ChoiceField(
+        choices=("remove", "restore", "deactivate", "activate", "delete")
+    )
     ids = serializers.ListField(
         child=serializers.UUIDField(), allow_empty=False, min_length=1, max_length=100
     )
@@ -102,6 +106,113 @@ def _archive_related(queryset, kind, request, workspace):
         )
 
 
+def _check_permanent_delete(kind, ids, workspace):
+    """Prevent deletion of records used by applications, plans, or real money history."""
+    investors = (
+        Investor.objects.filter(workspace=workspace, pk__in=ids)
+        if kind == "investor"
+        else Investor.objects.none()
+    )
+    demats = (
+        DematAccount.objects.filter(investor__in=investors)
+        if kind == "investor"
+        else DematAccount.objects.filter(pk__in=ids)
+        if kind == "demat"
+        else DematAccount.objects.none()
+    )
+    banks = (
+        BankAccount.objects.filter(owner__in=investors)
+        if kind == "investor"
+        else BankAccount.objects.filter(pk__in=ids)
+        if kind == "bank"
+        else BankAccount.objects.none()
+    )
+    upis = (
+        UPIHandle.objects.filter(Q(bank__in=banks) | Q(holder__in=investors))
+        if kind == "investor"
+        else UPIHandle.objects.filter(bank__in=banks)
+        if kind == "bank"
+        else UPIHandle.objects.filter(pk__in=ids)
+        if kind == "upi"
+        else UPIHandle.objects.none()
+    )
+    if (
+        Application.objects.filter(workspace=workspace)
+        .filter(
+            Q(applicant__in=investors) | Q(demat__in=demats) | Q(bank__in=banks) | Q(upi__in=upis)
+        )
+        .exists()
+    ):
+        raise ValidationError(
+            {"message": "This record is linked to an application. Deactivate it instead."}
+        )
+    if (
+        PlanRow.objects.filter(plan_run__workspace=workspace)
+        .filter(
+            Q(applicant_ref__in=[str(pk) for pk in investors.values_list("pk", flat=True)])
+            | Q(demat_ref__in=[str(pk) for pk in demats.values_list("pk", flat=True)])
+            | Q(bank_ref__in=[str(pk) for pk in banks.values_list("pk", flat=True)])
+            | Q(upi_ref__in=[str(pk) for pk in upis.values_list("pk", flat=True)])
+        )
+        .exists()
+    ):
+        raise ValidationError(
+            {"message": "This record is linked to a saved plan. Deactivate it instead."}
+        )
+    references = [
+        str(pk)
+        for queryset in (investors, demats, banks, upis)
+        for pk in queryset.values_list("pk", flat=True)
+    ]
+    if any(
+        PlanRun.objects.filter(workspace=workspace, input_snapshot__contains=reference).exists()
+        for reference in references
+    ):
+        raise ValidationError(
+            {"message": "This record appears in a saved plan. Deactivate it instead."}
+        )
+    if kind == "investor" and (
+        BankAccount.objects.filter(restricted_investor__in=investors).exists()
+        or UPIHandle.objects.filter(holder__in=investors).exclude(bank__in=banks).exists()
+    ):
+        raise ValidationError({"message": "Remove linked funding rules and UPIs first."})
+    if banks.exclude(current_balance=0).exists():
+        raise ValidationError(
+            {"message": "Set linked bank balances to ₹0 before permanent deletion."}
+        )
+    if (
+        RecurringDebit.objects.filter(bank__in=banks).exists()
+        or PlannerPolicy.objects.filter(bank__in=banks).exists()
+    ):
+        raise ValidationError(
+            {"message": "This bank has payment or policy history. Deactivate it instead."}
+        )
+    for change in BalanceChange.objects.filter(bank__in=banks):
+        if not (
+            change.operation == BalanceChange.Operation.SET
+            and change.old_balance == 0
+            and change.delta == 0
+            and change.new_balance == 0
+            and change.note
+            in {"Opening balance", "Imported account; set the current Balance before planning."}
+        ):
+            raise ValidationError(
+                {"message": "This bank has balance history. Deactivate it instead."}
+            )
+
+
+def _delete_item(item, kind, request, workspace):
+    if kind == "investor":
+        banks = list(BankAccount.objects.filter(owner=item).select_for_update())
+        for bank in banks:
+            BalanceChange.objects.filter(bank=bank).delete()
+            bank.delete()
+    elif kind == "bank":
+        BalanceChange.objects.filter(bank=item).delete()
+    record_event(action=f"{kind}.deleted", target=item, actor=request.user, workspace=workspace)
+    item.delete()
+
+
 class SettingsItemsView(APIView):
     permission_classes = [WorkspaceDataPermission]
 
@@ -119,15 +230,25 @@ class SettingsItemsView(APIView):
             items = list(_queryset(kind, workspace).select_for_update().filter(pk__in=ids))
             if len(items) != len(ids):
                 raise NotFound("A selected item is no longer available in this workspace.")
-            if action == "remove":
+            if action in {"remove", "deactivate"}:
                 if kind == "investor":
                     # Balance actions lock bank rows; serialize them with this check.
                     list(BankAccount.objects.filter(owner_id__in=ids).select_for_update())
                 _check_removal(kind, ids, workspace)
-            else:
+            elif action in {"restore", "activate"}:
                 _check_restore(kind, ids)
+            else:
+                _check_permanent_delete(kind, ids, workspace)
+                try:
+                    for item in items:
+                        _delete_item(item, kind, request, workspace)
+                except ProtectedError as exc:
+                    raise ValidationError(
+                        {"message": "This record has saved history. Deactivate it instead."}
+                    ) from exc
+                return Response({"updated": len(items)})
 
-            active = action == "restore"
+            active = action in {"restore", "activate"}
             changed = []
             for item in items:
                 if item.active != active:
@@ -136,7 +257,7 @@ class SettingsItemsView(APIView):
                     changed.append(item)
 
             # An inactive parent must never leave usable child funding accounts behind.
-            if action == "remove" and kind == "investor":
+            if not active and kind == "investor":
                 _archive_related(
                     DematAccount.objects.filter(investor_id__in=ids),
                     "demat",
@@ -153,14 +274,14 @@ class SettingsItemsView(APIView):
                     workspace,
                 )
                 _archive_related(owned_banks, "bank", request, workspace)
-            elif action == "remove" and kind == "bank":
+            elif not active and kind == "bank":
                 _archive_related(
                     UPIHandle.objects.filter(bank_id__in=ids), "upi", request, workspace
                 )
 
             for item in changed:
                 record_event(
-                    action=f"{kind}.{action}d" if action == "restore" else f"{kind}.removed",
+                    action=f"{kind}.restored" if active else f"{kind}.removed",
                     target=item,
                     actor=request.user,
                     workspace=workspace,

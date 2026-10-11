@@ -297,17 +297,51 @@ def _find_or_create_demat(investor, row):
 
 
 @transaction.atomic
-def confirm_batch(*, batch: AccountImportBatch, actor, row_numbers: list[int] | None) -> dict:
+def confirm_batch(
+    *,
+    batch: AccountImportBatch,
+    actor,
+    row_numbers: list[int] | None,
+    bank_details: dict | None = None,
+) -> dict:
     batch = AccountImportBatch.objects.select_for_update().get(pk=batch.pk)
     if batch.status != AccountImportBatch.Status.PREVIEWED:
         raise AccountImportError("This import preview has already been confirmed.")
     rows = json.loads(decrypt_value(batch.rows_ciphertext, purpose="account-import"))
+    bank_details = bank_details or {}
     selected_numbers = {row["row_number"] for row in rows if not row["errors"]}
     if row_numbers is not None:
         selected_numbers = set(row_numbers)
         unknown = selected_numbers - {row["row_number"] for row in rows}
         if unknown:
             raise AccountImportError("Select only rows shown in this import preview.")
+    known_numbers = {str(row["row_number"]) for row in rows}
+    if set(bank_details) - known_numbers:
+        raise AccountImportError("Bank details may only be entered for rows in this preview.")
+    for row in rows:
+        details = bank_details.get(str(row["row_number"]), {})
+        if details and row["row_number"] not in selected_numbers:
+            raise AccountImportError("Bank details may only be entered for selected rows.")
+        if set(details) - {"account_number", "bank_name"}:
+            raise AccountImportError("Only missing bank details may be entered.")
+        for key, field in (("account_number", "Account Number"), ("bank_name", "Bank Name")):
+            value = details.get(key, "").strip()
+            if value and row[field]:
+                raise AccountImportError("Existing workbook bank details cannot be replaced here.")
+            if value:
+                if len(value) > (40 if key == "account_number" else 120):
+                    raise AccountImportError("An entered bank detail is too long.")
+                row[field] = value
+        if details:
+            row["errors"] = [
+                error
+                for error in row["errors"]
+                if error not in {"Account Number is required.", "Bank Name is required."}
+            ] + [
+                error
+                for error in _validate_row(row)
+                if error in {"Account Number is required.", "Bank Name is required."}
+            ]
     invalid = {
         str(row["row_number"]): row["errors"]
         for row in rows

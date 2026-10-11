@@ -48,3 +48,14 @@ test("removing a bank hides its UPI and restoring the bank leaves UPI selection 
   assert.equal(restored.banks[0].active, true);
   assert.equal(restored.linkedAccounts.one.upis[0].active, false);
 });
+
+test("permanent deletion removes selected records and linked accounts from Settings", () => {
+  const deleted = applySettingsAction(starting, "investor", ["one"], "delete");
+  assert.deepEqual(deleted.investors.map((item) => item.id), ["two"]);
+  assert.deepEqual(deleted.banks.map((item) => item.id), ["bank-two"]);
+  assert.equal(deleted.linkedAccounts.one, undefined);
+  assert.equal(deleted.linkedAccounts.two.upis.length, 1);
+  const deletedBank = applySettingsAction(starting, "bank", ["bank-one"], "delete");
+  assert.deepEqual(deletedBank.banks.map((item) => item.id), ["bank-two"]);
+  assert.equal(deletedBank.linkedAccounts.one.upis.length, 0);
+});

@@ -289,6 +289,10 @@ input[type="checkbox"] { min-height: auto; accent-color: var(--accent); }
 .payment-buttons button { min-height: 28px; padding: 4px 7px; }
 .account-import { margin: 0; padding: 13px; background: var(--surface); }
 .account-import p { color: var(--muted); }
+.account-import form > button { margin-top: 12px; }
+.import-bank-details { display: grid; gap: 7px; min-width: 170px; }
+.import-bank-details label { display: grid; gap: 3px; color: var(--muted); font-size: 11px; }
+.import-bank-details input { width: 100%; min-width: 0; padding: 7px 8px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface-soft); color: var(--text); }
 .investor-list { gap: 6px; }
 .investor-list li { padding: 9px 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); }
 .investor-list li > span:first-child { flex: 1 1 160px; }
