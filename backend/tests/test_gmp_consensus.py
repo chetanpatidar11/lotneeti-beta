@@ -191,7 +191,7 @@ def test_active_founder_correction_overrides_median_but_not_source_conflict():
 
 @pytest.mark.django_db
 @override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="WARN")
-def test_stale_gmp_does_not_auto_select_or_enter_planner_snapshot():
+def test_last_gmp_can_select_an_open_ipo_but_closing_it_excludes_new_plans():
     now = timezone.now()
     ipo = make_ipo()
     observe(ipo, "alpha", "40.00", now - timedelta(hours=25))
@@ -207,14 +207,15 @@ def test_stale_gmp_does_not_auto_select_or_enter_planner_snapshot():
     assert public.data["last_stale_gmp"] == "40.00"
     assert public.data["last_stale_gmp_percent"] == "40.00"
     assert public.data["last_stale_gmp_observed_at"] is not None
-    assert (
-        api.get(reverse("workspace-ipo-decision-list", args=[workspace.pk])).data[0]["selected"]
-        is False
-    )
-    assert (
-        api.get(reverse("workspace-ipo-decision-list", args=[workspace.pk])).data[0]["reason"]
-        == "GMP_TOO_OLD"
-    )
+    choice = api.get(reverse("workspace-ipo-decision-list", args=[workspace.pk])).data[0]
+    assert choice["selected"] is True
+    assert choice["reason"] == "GMP_THRESHOLD"
+    assert build_snapshot(workspace=workspace, as_of=now).ipos[0].gmp_percent == Decimal("40.00")
+    ipo.status = IPO.Status.CLOSED
+    ipo.save(update_fields=["status"])
+    closed_choice = api.get(reverse("workspace-ipo-decision-list", args=[workspace.pk])).data[0]
+    assert closed_choice["selected"] is False
+    assert closed_choice["reason"] == "IPO_NOT_OPEN"
     assert build_snapshot(workspace=workspace, as_of=now).ipos == ()
 
 

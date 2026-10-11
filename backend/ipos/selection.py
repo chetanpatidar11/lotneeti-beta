@@ -30,7 +30,6 @@ def select_ipo(
     auto_issue_types: tuple[str, ...] = ("MAINBOARD",),
     status: str | None = None,
     allow_upcoming: bool = True,
-    has_stale_gmp: bool = False,
 ) -> tuple[bool, str]:
     if decision == "APPLY":
         return True, "MANUAL_APPLY"
@@ -47,7 +46,7 @@ def select_ipo(
     if threshold is None:
         return False, "THRESHOLD_NOT_SET"
     if gmp_percent is None:
-        return False, "GMP_TOO_OLD" if has_stale_gmp else "GMP_UNAVAILABLE"
+        return False, "GMP_UNAVAILABLE"
     if gmp_percent < threshold:
         return False, "BELOW_GMP_THRESHOLD"
     return True, "GMP_THRESHOLD"

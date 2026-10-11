@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## J01 IPO cards, default discovery and draft GMP selection — 2026-10-11
+
+- The IPO list defaults to Open + Upcoming and Mainboard; All clears filters. Closed IPO cards retain issue facts and the last GMP but omit the entire GMP-history/selection action block. Active cards show the selection badge beside the IPO status, with a tighter action row.
+- Draft automatic selection and planner snapshots now use the last enabled recorded GMP when no fresh observation exists. The public quote continues to say `Last GMP` and shows its recorded time. The one-hour auto-select warning and API freshness reason were removed. The threshold, issue type and open-first rules still apply; closed issues remain excluded from new plans.
+- `scripts/check.sh` passed: 365 backend tests, 34 web tests, one Android package test, Planner matrix, Ruff, Django checks/migration drift, web lint/typecheck/build and Capacitor sync. A regression covers the same older GMP selecting an open IPO and exclusion after it closes. Beta deployment is pending.
+
 ## J01 selection control and GMP explanation — 2026-10-11
 
 - Renamed the IPO action from Apply to Select. A manually selected IPO now offers Unselect on the same control; Unselect records a skip so the IPO is actually excluded even if it would otherwise match the automatic rule. The Automatic control restores rule-based selection. Selection states use short labels without repeating “manually”.

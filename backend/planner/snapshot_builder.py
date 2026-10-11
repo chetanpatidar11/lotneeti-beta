@@ -10,7 +10,7 @@ from django.utils import timezone
 from applications.models import Application
 from funding.models import BankAccount, FundingPreference, RecurringDebit, UPIHandle
 from investors.models import DematAccount, Investor
-from ipos.gmp_effective import latest_effective_gmp
+from ipos.gmp_effective import latest_selection_gmp
 from ipos.models import IPOUserDecision
 from ipos.overrides import effective_ipo_values, published_ipos
 from ipos.public_serializers import gmp_percent
@@ -57,7 +57,7 @@ def build_snapshot(
     selected_ipos = []
     for ipo in ipos:
         effective = effective_values[ipo.pk]
-        latest = latest_effective_gmp(ipo, at=now)
+        latest = latest_selection_gmp(ipo, at=now)
         current_gmp = (
             gmp_percent(latest.value_per_share, effective["upper_price"]) if latest else None
         )

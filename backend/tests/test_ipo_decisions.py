@@ -47,9 +47,6 @@ def test_manual_choices_outrank_threshold_and_unset_values_are_not_selected():
         False,
         "GMP_UNAVAILABLE",
     )
-    assert select_ipo(
-        decision="DEFAULT", gmp_percent=None, threshold=Decimal("20"), has_stale_gmp=True
-    ) == (False, "GMP_TOO_OLD")
     assert select_ipo(decision="DEFAULT", gmp_percent=Decimal("10"), threshold=Decimal("20")) == (
         False,
         "BELOW_GMP_THRESHOLD",

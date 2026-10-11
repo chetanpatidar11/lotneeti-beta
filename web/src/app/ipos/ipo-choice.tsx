@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { StatusBadge } from "@/components/ui";
 
 export type IPOSelection = {
   ipo: string;
@@ -10,7 +9,6 @@ export type IPOSelection = {
   mode: "RETAIL_ONLY" | "RETAIL_PLUS_SHNI" | "SHNI_PREFERRED" | "CUSTOM";
   selected: boolean;
   reason: string;
-  gmp_freshness_hours?: number;
 };
 
 function autoSelectionReason(choice: IPOSelection) {
@@ -19,9 +17,8 @@ function autoSelectionReason(choice: IPOSelection) {
     case "OPEN_IPO_AVAILABLE": return "An IPO is open, so upcoming IPOs wait for automatic selection.";
     case "IPO_NOT_OPEN": return "This IPO is not open for automatic selection.";
     case "THRESHOLD_NOT_SET": return "Set a GMP threshold to turn on automatic selection.";
-    case "GMP_TOO_OLD": return `The last GMP is older than the ${choice.gmp_freshness_hours ?? 24}-hour auto-select limit.`;
-    case "GMP_UNAVAILABLE": return "No recent GMP is available for automatic selection.";
-    case "BELOW_GMP_THRESHOLD": return "The current GMP is below your threshold.";
+    case "GMP_UNAVAILABLE": return "No GMP is available for automatic selection.";
+    case "BELOW_GMP_THRESHOLD": return "The last GMP is below your threshold.";
     default: return "";
   }
 }
@@ -56,9 +53,8 @@ export default function IPOChoice({ workspaceId, ipoId, initial, canEdit }: {
     }
   }
 
-  const label = choice.decision === "APPLY" ? "Selected" : choice.decision === "SKIP" ? "Skipped" : choice.selected ? "Auto selected" : "Not selected";
   return <div className="ipo-choice">
-    <p><StatusBadge tone={choice.decision === "SKIP" ? "danger" : choice.selected ? "positive" : "neutral"}>{label}</StatusBadge>{choice.decision === "DEFAULT" && !choice.selected && <small className="selection-rule">{autoSelectionReason(choice)}</small>}</p>
+    {choice.decision === "DEFAULT" && !choice.selected && autoSelectionReason(choice) && <p className="selection-rule">{autoSelectionReason(choice)}</p>}
     {canEdit && <div className="ipo-choice-buttons">
       <button type="button" disabled={busy} aria-pressed={choice.decision === "DEFAULT"} onClick={() => save({ decision: "DEFAULT" })}>Automatic</button>
       <button type="button" disabled={busy} aria-pressed={choice.decision === "APPLY"} onClick={() => save({ decision: choice.decision === "APPLY" ? "SKIP" : "APPLY" })}>{choice.decision === "APPLY" ? "Unselect" : "Select"}</button>

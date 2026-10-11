@@ -161,3 +161,30 @@ def resolve_gmp(ipo, *, at=None) -> GMPResolution:
 
 def latest_effective_gmp(ipo, *, at=None):
     return resolve_gmp(ipo, at=at).effective
+
+
+def latest_selection_gmp(ipo, *, at=None):
+    """Use the current consensus or the last enabled observation for draft planning."""
+    now = at or timezone.now()
+    current = resolve_gmp(ipo, at=now).effective
+    if current is not None:
+        return current
+    disabled = set(
+        GMPProviderState.objects.filter(enabled=False).values_list("provider_key", flat=True)
+    )
+    observation = next(
+        (
+            item
+            for item in ipo.gmp_observations.all()
+            if item.source_key not in disabled and item.observed_at <= now
+        ),
+        None,
+    )
+    if observation is None:
+        return None
+    value = effective_observation_value(observation, at=now)
+    return EffectiveGMP(
+        observation=observation,
+        value_per_share=value,
+        corrected=value != observation.value_per_share,
+    )

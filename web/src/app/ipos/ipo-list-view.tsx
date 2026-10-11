@@ -28,8 +28,8 @@ export default function IPOListView({ items, initialSearch = "", initialFilter =
   initialFilter?: string;
 }) {
   const [search, setSearch] = useState(initialSearch);
-  const [statuses, setStatuses] = useState<string[]>(statusOptions.some(([id]) => id === initialFilter) ? [initialFilter] : []);
-  const [types, setTypes] = useState<string[]>(typeOptions.some(([id]) => id === initialFilter) ? [initialFilter] : []);
+  const [statuses, setStatuses] = useState<string[]>(statusOptions.some(([id]) => id === initialFilter) ? [initialFilter] : initialFilter === "all" ? ["open", "upcoming"] : []);
+  const [types, setTypes] = useState<string[]>(typeOptions.some(([id]) => id === initialFilter) ? [initialFilter] : initialFilter === "all" ? ["mainboard"] : []);
   const [choices, setChoices] = useState<string[]>(choiceOptions.some(([id]) => id === initialFilter) ? [initialFilter] : []);
   const visible = items.filter((item) => matchesIPOFilters(item, search, statuses, types, choices));
   function reset() {
