@@ -211,6 +211,10 @@ def test_stale_gmp_does_not_auto_select_or_enter_planner_snapshot():
         api.get(reverse("workspace-ipo-decision-list", args=[workspace.pk])).data[0]["selected"]
         is False
     )
+    assert (
+        api.get(reverse("workspace-ipo-decision-list", args=[workspace.pk])).data[0]["reason"]
+        == "GMP_TOO_OLD"
+    )
     assert build_snapshot(workspace=workspace, as_of=now).ipos == ()
 
 

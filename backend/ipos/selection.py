@@ -30,6 +30,7 @@ def select_ipo(
     auto_issue_types: tuple[str, ...] = ("MAINBOARD",),
     status: str | None = None,
     allow_upcoming: bool = True,
+    has_stale_gmp: bool = False,
 ) -> tuple[bool, str]:
     if decision == "APPLY":
         return True, "MANUAL_APPLY"
@@ -39,8 +40,14 @@ def select_ipo(
         raise ValueError(f"Unknown IPO decision: {decision}")
     if issue_type is not None and issue_type not in auto_issue_types:
         return False, "ISSUE_TYPE_EXCLUDED"
-    if status is not None and status != "OPEN" and not (status == "UPCOMING" and allow_upcoming):
-        return False, "NOT_OPEN_FOR_AUTO_SELECTION"
-    if threshold is None or gmp_percent is None:
-        return False, "NO_AUTO_SELECTION"
-    return gmp_percent >= threshold, "GMP_THRESHOLD"
+    if status == "UPCOMING" and not allow_upcoming:
+        return False, "OPEN_IPO_AVAILABLE"
+    if status is not None and status not in {"OPEN", "UPCOMING"}:
+        return False, "IPO_NOT_OPEN"
+    if threshold is None:
+        return False, "THRESHOLD_NOT_SET"
+    if gmp_percent is None:
+        return False, "GMP_TOO_OLD" if has_stale_gmp else "GMP_UNAVAILABLE"
+    if gmp_percent < threshold:
+        return False, "BELOW_GMP_THRESHOLD"
+    return True, "GMP_THRESHOLD"

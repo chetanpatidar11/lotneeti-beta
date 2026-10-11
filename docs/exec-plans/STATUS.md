@@ -1,5 +1,12 @@
 # LotNeeti execution status
 
+## J01 selection control and GMP explanation — 2026-10-11
+
+- Renamed the IPO action from Apply to Select. A manually selected IPO now offers Unselect on the same control; Unselect records a skip so the IPO is actually excluded even if it would otherwise match the automatic rule. The Automatic control restores rule-based selection. Selection states use short labels without repeating “manually”.
+- Replaced the generic “Does not match your auto-select rule” with the actual reason: type excluded, an open IPO taking precedence over upcoming, IPO closed, threshold not set, last GMP outside the configured freshness window, no GMP, or GMP below threshold. The decision API reports the configured freshness limit so the UI does not hardcode it.
+- A read-only live diagnosis of HD Fire Protect at 15:54 IST found its last GMP observation was ₹77 at 13:37 IST; the beta policy is currently one hour, the workspace threshold is 20%, the IPO is upcoming, and no eligible Mainboard IPO is open. The last GMP is outside that configured window, which alone explains why the 28.41% quote did not auto-select. The policy was changed from its 24-hour default to one hour on 2026-10-03; no production policy change is included in this code release while the founder chooses the intended window.
+- Focused backend and web tests pass; full gate and deployment to follow.
+
 ## J01 IPO page simplification and open-first selection — 2026-10-11
 
 - Kept live issuer search and combinable filters, but placed Search, All, Open, Upcoming, Closed, Mainboard, SME, Selected and Skipped in one horizontally scrollable row. Removed the requested automatic-selection help/success text, IPO-choice success text, empty exchange badge, freshness/source-count badges and sentence under the IPO page title. The last stored GMP still shows as `Last GMP` with its observation time; it remains ineligible for automatic selection.

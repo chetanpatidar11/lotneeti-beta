@@ -45,7 +45,14 @@ def test_manual_choices_outrank_threshold_and_unset_values_are_not_selected():
     )
     assert select_ipo(decision="DEFAULT", gmp_percent=None, threshold=Decimal("20")) == (
         False,
-        "NO_AUTO_SELECTION",
+        "GMP_UNAVAILABLE",
+    )
+    assert select_ipo(
+        decision="DEFAULT", gmp_percent=None, threshold=Decimal("20"), has_stale_gmp=True
+    ) == (False, "GMP_TOO_OLD")
+    assert select_ipo(decision="DEFAULT", gmp_percent=Decimal("10"), threshold=Decimal("20")) == (
+        False,
+        "BELOW_GMP_THRESHOLD",
     )
 
 
@@ -96,7 +103,7 @@ def test_ipo_manual_apply_skip_persists_and_overrides_workspace_threshold():
     reset = client.patch(detail_url, {"decision": "DEFAULT"})
     assert reset.status_code == 200
     assert reset.data["selected"] is False
-    assert reset.data["reason"] == "GMP_THRESHOLD"
+    assert reset.data["reason"] == "BELOW_GMP_THRESHOLD"
     assert client.get(list_url).data[0]["decision"] == "DEFAULT"
     workspace.auto_select_gmp_percent = Decimal("5.00")
     workspace.save()
