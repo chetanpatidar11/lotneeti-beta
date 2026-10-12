@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## UI contrast and compact import review — 2026-10-12
+
+- IPO filter selections keep dark, readable text on pale green, including hover. Plan selected-IPO cards and plan table rows use the light theme throughout. Funds tables, payment actions, balance history and deleted-bank labels now stay within their containing cards, with internal horizontal scrolling only where needed.
+- Workbook review keeps each account on one compact row. Missing Account Number and Bank Name fields sit side by side with wider inputs; other row errors expand on demand. The existing masked preview and validation rules are unchanged.
+- Web verification passed: 35 tests, lint, TypeScript and production build. Beta deployment pending.
+
 ## B07/UI Applicant deletion and product interface — 2026-10-11
 
 - Applicant deletion now archives each linked bank's balance history transactionally before removing the applicant and unused accounts. Saved plan references are retained as historical snapshots; applications and scheduled payments or policy records still protect their linked accounts.

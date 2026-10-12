@@ -88,14 +88,14 @@ export default function AccountImport({ workspaceId, canEdit }: { workspaceId: s
           const canSelect = repairable(row);
           return <tr key={row.row_number}>
             <td data-label="Import"><input type="checkbox" aria-label={`Import row ${row.row_number} for ${row.name}`} checked={checked} disabled={!canEdit || busy || !canSelect || preview.status === "CONFIRMED"} onChange={(event) => setSelected((current) => event.target.checked ? [...current, row.row_number] : current.filter((number) => number !== row.row_number))} /></td>
-            <td data-label="Name">{row.name}</td><td data-label="PAN">{row.pan_masked}</td>
-            <td data-label="Demat">{row.type} · {row.dpid_masked} · {row.client_id_masked}</td>
-            <td data-label="UPI">{row.upi_masked}</td>
+            <td data-label="Name" title={row.name}>{row.name}</td><td data-label="PAN">{row.pan_masked}</td>
+            <td data-label="Demat" title={`${row.type} · ${row.dpid_masked} · ${row.client_id_masked}`}>{row.type} · {row.dpid_masked} · {row.client_id_masked}</td>
+            <td data-label="UPI" title={row.upi_masked}>{row.upi_masked}</td>
             <td data-label="Bank details"><div className="import-bank-details">
-              {row.errors.includes(missingAccount) ? preview.status === "CONFIRMED" ? <span>{checked ? "Account number added" : "Not imported"}</span> : <label>Account number<input type="text" inputMode="numeric" autoComplete="off" maxLength={40} required={checked} disabled={!checked || busy} value={details[row.row_number]?.account_number ?? ""} onChange={(event) => updateDetail(row.row_number, "account_number", event.target.value)} /></label> : <span>{row.account_masked}</span>}
-              {row.errors.includes(missingBank) ? preview.status === "CONFIRMED" ? <span>{checked ? "Bank name added" : "Not imported"}</span> : <label>Bank name<input type="text" maxLength={120} required={checked} disabled={!checked || busy} value={details[row.row_number]?.bank_name ?? ""} onChange={(event) => updateDetail(row.row_number, "bank_name", event.target.value)} /></label> : <span>{row.bank_name}</span>}
+              {row.errors.includes(missingAccount) ? preview.status === "CONFIRMED" ? <span>{checked ? "Account number added" : "Not imported"}</span> : <label><span className="visually-hidden">Account number for {row.name}</span><input type="text" inputMode="numeric" autoComplete="off" maxLength={40} placeholder="Account number" required={checked} disabled={!checked || busy} value={details[row.row_number]?.account_number ?? ""} onChange={(event) => updateDetail(row.row_number, "account_number", event.target.value)} /></label> : <span title={row.account_masked}>{row.account_masked}</span>}
+              {row.errors.includes(missingBank) ? preview.status === "CONFIRMED" ? <span>{checked ? "Bank name added" : "Not imported"}</span> : <label><span className="visually-hidden">Bank name for {row.name}</span><input type="text" maxLength={120} placeholder="Bank name" required={checked} disabled={!checked || busy} value={details[row.row_number]?.bank_name ?? ""} onChange={(event) => updateDetail(row.row_number, "bank_name", event.target.value)} /></label> : <span title={row.bank_name}>{row.bank_name}</span>}
             </div></td>
-            <td data-label="Status">{preview.status === "CONFIRMED" && checked ? "Imported" : canSelect ? row.errors.length ? "Fill missing bank details" : "Ready" : <ul>{row.errors.map((error) => <li key={error}>{error}</li>)}</ul>}</td>
+            <td data-label="Status">{preview.status === "CONFIRMED" && checked ? "Imported" : canSelect ? row.errors.length ? "Complete details" : "Ready" : <details className="import-row-errors"><summary>{row.errors.length} {row.errors.length === 1 ? "issue" : "issues"}</summary><ul>{row.errors.map((error) => <li key={error}>{error}</li>)}</ul></details>}</td>
           </tr>;
         })}</tbody>
       </table></div>

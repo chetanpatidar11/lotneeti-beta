@@ -783,3 +783,66 @@ body > #main-content > .page .auth-actions .text-button { min-height: 36px; padd
   .settings-table tr { background: #fff; box-shadow: 0 5px 18px rgba(21, 47, 32, .04); }
   .settings-table tbody .settings-inactive-row { background: #f7faf7; }
 }
+
+/* Keep light-theme selections and dense data rows readable. */
+.filter-chip[aria-pressed="true"], .filter-chip[aria-current="true"],
+.filter-chip[aria-pressed="true"]:hover:not(:disabled), .filter-chip[aria-current="true"]:hover:not(:disabled) {
+  border-color: #91c9a9;
+  background: #dff2e9;
+  color: #14251f;
+}
+.plan-context-card .selected-ipo-strip li, .plan-breakdown-grid > div {
+  border-color: #d9e9df;
+  background: #f5faf6;
+  color: var(--text);
+}
+.selected-ipo-strip strong, .plan-breakdown-grid strong { color: var(--text); }
+.plan-table thead th { background: #eff5f0; color: #365748; }
+.plan-table tbody tr { background: #fff; color: var(--text); }
+.plan-table tbody tr:nth-child(2n) { background: #f7faf8; }
+.plan-table tbody tr:hover { background: #edf6ef; }
+.plan-table tbody tr.is-locked { background: #fff8e9; }
+.plan-table select, .plan-table input { border-color: #cadbd0; background: #fff; color: var(--text); }
+.plan-table select:disabled, .plan-table input:disabled { background: #f1f4f1; color: #64766c; }
+
+/* Funds content must shrink within its cards instead of pushing their borders. */
+.funds-table-wrap { max-width: 100%; overflow-x: auto; }
+.funds-table { min-width: 720px; }
+.funds-table tr.selected-row { background: #eaf6ee; }
+.funds-bottom-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+.funds-bottom-grid > .section-panel, .archived-bank-history { min-width: 0; }
+.funds-detail-bar { min-width: 0; flex-wrap: wrap; }
+.funds-detail-bar > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+.change-list li { min-width: 0; }
+.change-list li > span { min-width: 0; overflow-wrap: anywhere; }
+.payment-buttons { display: flex; flex-wrap: wrap; gap: 4px; max-width: 100%; }
+.archived-bank-history .settings-funding-row { grid-template-columns: minmax(0, 1fr) auto; }
+.archived-bank-history .settings-funding-row strong { overflow-wrap: anywhere; }
+
+/* The workbook review keeps one compact line per account. */
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.account-import .plan-table-wrap { width: 100%; max-height: min(72vh, 850px); overflow: auto; }
+.account-import-table { width: 100%; min-width: 1080px; table-layout: fixed; font-size: 11px; }
+.account-import-table th, .account-import-table td { padding: 6px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.account-import-table th:nth-child(1) { width: 5%; }
+.account-import-table th:nth-child(2) { width: 14%; }
+.account-import-table th:nth-child(3) { width: 9%; }
+.account-import-table th:nth-child(4) { width: 19%; }
+.account-import-table th:nth-child(5) { width: 10%; }
+.account-import-table th:nth-child(6) { width: 33%; }
+.account-import-table th:nth-child(7) { width: 10%; }
+.account-import-table td:nth-child(6), .account-import-table td:nth-child(7) { overflow: visible; }
+.import-bank-details { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 7px; min-width: 0; }
+.import-bank-details label { display: block; min-width: 0; }
+.import-bank-details input, .account-import-table .import-bank-details input[type="text"] { display: block; width: 100%; min-width: 0; max-width: none; min-height: 36px; padding: 6px 9px; border: 1px solid #b9d0c1; border-radius: 8px; background: #fff; color: var(--text); font-size: 12px; }
+.import-bank-details > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.import-row-errors { position: relative; white-space: normal; }
+.import-row-errors summary { width: fit-content; color: #aa4141; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.import-row-errors ul { width: max-content; max-width: 320px; margin: 4px 0 0; padding-left: 16px; white-space: normal; }
+@media (max-width: 1024px) { .funds-bottom-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 768px) {
+  .account-import-table { display: table; }
+  .account-import-table tbody { display: table-row-group; }
+  .account-import-table tr { display: table-row; width: auto; }
+  .account-import-table td { display: table-cell; width: auto; }
+}
