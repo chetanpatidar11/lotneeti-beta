@@ -1,6 +1,6 @@
 # LotNeeti founder beta handoff — draft, not release approval
 
-**Current beta address (2026-10-12):** `https://lotneeti.dpdns.org/`. The previous `44-192-105-250.sslip.io` address redirects to it. The new Let's Encrypt certificate expires 2027-01-10, and a renewal dry run passed. Users need to sign in once on the new hostname because browser session cookies are host-specific. Deployment history below retains the addresses and limitations recorded at the time.
+**Current beta address (2026-10-12):** `https://lotneeti.dpdns.org/`. The founder moved the EC2 instance to Elastic IP `54.208.70.218`; the previous `44-192-105-250.sslip.io` hostname no longer reaches it. The new Let's Encrypt certificate expires 2027-01-10. Users need to sign in once on the new hostname because browser session cookies are host-specific. Deployment history below retains the addresses and limitations recorded at the time.
 
 **Current local completion pass, 2026-09-29 — not deployed.** Open the local preview at `http://127.0.0.1:3000/` (Django `127.0.0.1:8000`, Next `127.0.0.1:3000`, isolated SQLite `/private/tmp/lotneeti-local-preview.sqlite3`). The newest NSE list, Issue Information details and official RHP/SEBI timetable extraction yield **11 READY current IPOs**: eight NSE Mainboard and three NSE EMERGE. All 11 were published only in the isolated preview; a second run was idempotent. GREENASIA, BMISL and HIMALAYAN are NSE EMERGE with BSE `NOT_APPLICABLE`, based on their official RHP covers. AONESTEELS is dual listed with BSE designated. MONEYVIEW lot 441 and AONESTEELS lot 37 came from NSE detail. BSE automatic discovery remains unavailable under the current permitted method (zero current BSE Mainboard/SME records), so cross-exchange verification has **not** been claimed. The Founder confirmed written permission for a one-daily InvestorGain GMP retrieval. The **09:00 IST** local run saved nine GMP values (A-One ₹28, AceVector ₹2, Bench Mark ₹29, German Green Steel ₹24.50, Moneyview ₹12.75, Orient ₹72, Runwal ₹14, Shah ₹14 and SRIT ₹33); GREENASIA and HIMALAYAN have no source GMP and remain unavailable rather than ₹0. The agreement remains private, outside Git. K02 median/freshness/conflict defaults are unchanged.
 
@@ -173,7 +173,7 @@ For a release APK, create a private keystore outside Git, configure Gradle signi
 
 ### Public URL and budget
 
-- URL: `https://lotneeti.dpdns.org/` (A record to public IPv4 `44.192.105.250`). The certificate expires 2027-01-10; Certbot renewal dry run passed and a renewal hook reloads Nginx. The previous sslip.io address redirects here. Check whether the EC2 address is an Elastic IP before treating this A record as permanent.
+- URL: `https://lotneeti.dpdns.org/` (A record to Elastic IP `54.208.70.218`). The certificate expires 2027-01-10; Certbot renewal dry run passed and a renewal hook reloads Nginx. The previous IP-based sslip.io hostname no longer reaches the instance.
 - AWS account `497502378741`, region `us-east-1`. The founder explicitly allowed the existing root CLI session for infrastructure setup in this student account. Application S3 access uses the one scoped EC2 role, with no AWS keys on the host. The already existing account-wide `lotneeti-staging-monthly` USD 80 monthly budget received an ACTUAL >25% (USD 20) email alert to `chetanpatidar1011@gmail.com` before chargeable resources were created; both notification and subscriber were read back from AWS.
 
 ### Exact AWS resources created
@@ -205,9 +205,9 @@ From the current workstation, keep the SSH private key and known-hosts file outs
 ```bash
 cd /Users/chetanpatidar/Projects/lotneeti-new
 bash scripts/check.sh
-LOTNEETI_KNOWN_HOSTS=/private/tmp/lotneeti-beta-known-hosts \
+LOTNEETI_KNOWN_HOSTS=/Users/chetanpatidar/Documents/Codex/lotneeti-eip-known-hosts \
   bash deploy/push-from-workstation.sh \
-  44.192.105.250 \
+  54.208.70.218 \
   /private/tmp/lotneeti-beta-keys/lotneeti-beta-20260927 \
   lotneeti.dpdns.org
 ```
