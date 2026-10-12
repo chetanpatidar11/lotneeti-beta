@@ -4,7 +4,7 @@
 
 - IPO filter selections keep dark, readable text on pale green, including hover. Plan selected-IPO cards and plan table rows use the light theme throughout. Funds tables, payment actions, balance history and deleted-bank labels now stay within their containing cards, with internal horizontal scrolling only where needed.
 - Workbook review keeps each account on one compact row. Missing Account Number and Bank Name fields sit side by side with wider inputs; other row errors expand on demand. The existing masked preview and validation rules are unchanged.
-- Web verification passed: 35 tests, lint, TypeScript and production build. Beta deployment pending.
+- Web verification passed: 35 tests, lint, TypeScript and production build. The pre-release backup succeeded. Deployed archive SHA-256 `3c360cbba552f5266118ed2beb5d02c22f35aa5e9d8811daafcb453c02c7ef8d` to the beta; no migration was needed. Home, sign-in and API health returned HTTP 200, API/web/worker/beat are active, and the new import styles are present on the host. Authenticated visual acceptance remains for the founder; no customer workbook was uploaded.
 
 ## B07/UI Applicant deletion and product interface — 2026-10-11
 
