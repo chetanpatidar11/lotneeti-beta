@@ -1,4 +1,5 @@
 {% extends "admin/base_site.html" %}
+{% load market_source %}
 
 {% block content %}
 <p><a href="{% url 'founder_admin:index' %}">Staff home</a></p>
@@ -14,7 +15,7 @@
     {% for ipo in ipos %}
       <tr>
         <th scope="row"><a href="{% url 'founder_admin:ipo-override-detail' ipo.pk %}">{{ ipo.issuer_name }}</a></th>
-        <td>{{ ipo.symbol|default:"—" }}</td><td>{{ ipo.source_key }}</td><td>{{ ipo.publication_state }}</td>
+        <td>{{ ipo.symbol|default:"—" }}</td><td>{{ ipo.source_key|market_source_label }}</td><td>{{ ipo.publication_state }}</td>
       </tr>
     {% empty %}
       <tr><td colspan="4">No IPOs found.</td></tr>

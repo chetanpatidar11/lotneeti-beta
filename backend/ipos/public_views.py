@@ -71,7 +71,7 @@ class InvestorGainSyncView(APIView):
     def _status(self, request):
         state = IPOProviderSyncState.objects.filter(source_key="investorgain").first()
         return {
-            "provider": "InvestorGain",
+            "provider": "Market feed",
             "founder": bool(request.user.is_staff and request.user.is_founder_admin),
             "can_sync": IsFounderAdmin().has_permission(request, self),
             "last_attempt_at": state.last_attempt_at if state else None,

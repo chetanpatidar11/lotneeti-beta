@@ -1,8 +1,9 @@
 {% extends "admin/base_site.html" %}
+{% load market_source %}
 
 {% block content %}
 <p><a href="{% url 'founder_admin:gmp-providers' %}">All providers</a></p>
-<h1>GMP provider: {{ state.provider_key }}</h1>
+<h1>GMP provider: {{ state.provider_key|market_source_label }}</h1>
 {% if error %}<p role="alert" class="errornote">{{ error }}</p>{% endif %}
 <dl>
   <dt>Status</dt><dd>{{ state.enabled|yesno:"Enabled,Disabled" }}</dd>

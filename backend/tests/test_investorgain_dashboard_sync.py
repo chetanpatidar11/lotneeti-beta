@@ -19,7 +19,9 @@ def test_dashboard_sync_requires_founder_mfa_and_coalesces_clicks():
     url = reverse("ipo-live-sync")
 
     client.force_login(owner)
-    assert client.get(url).json()["can_sync"] is False
+    status = client.get(url).json()
+    assert status["can_sync"] is False
+    assert status["provider"] == "Market feed"
     assert client.post(url, data={}, content_type="application/json").status_code == 403
 
     client.force_login(founder)

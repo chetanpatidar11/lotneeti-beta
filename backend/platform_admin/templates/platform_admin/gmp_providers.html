@@ -1,4 +1,5 @@
 {% extends "admin/base_site.html" %}
+{% load market_source %}
 
 {% block content %}
 <p><a href="{% url 'founder_admin:index' %}">Staff home</a></p>
@@ -9,7 +10,7 @@
   <tbody>
     {% for state in states %}
       <tr>
-        <th scope="row"><a href="{% url 'founder_admin:gmp-provider-detail' state.provider_key %}">{{ state.provider_key }}</a></th>
+        <th scope="row"><a href="{% url 'founder_admin:gmp-provider-detail' state.provider_key %}">{{ state.provider_key|market_source_label }}</a></th>
         <td>{{ state.enabled|yesno:"Yes,No" }}</td>
         <td>{{ state.last_success_at|default:"—" }}</td>
         <td>{{ state.last_error_at|default:"—" }}{% if state.last_error_type %} ({{ state.last_error_type }}){% endif %}</td>

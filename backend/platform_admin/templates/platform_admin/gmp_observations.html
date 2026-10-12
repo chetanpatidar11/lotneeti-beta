@@ -1,4 +1,5 @@
 {% extends "admin/base_site.html" %}
+{% load market_source %}
 
 {% block content %}
 <p><a href="{% url 'founder_admin:index' %}">Staff home</a></p>
@@ -14,7 +15,7 @@
     {% for observation in observations %}
       <tr>
         <th scope="row"><a href="{% url 'founder_admin:gmp-observation-detail' observation.pk %}">{{ observation.ipo.issuer_name }}</a></th>
-        <td>{{ observation.source_key }}</td><td>{{ observation.value_per_share }}</td><td>{{ observation.observed_at }}</td><td>{{ observation.fetched_at }}</td>
+        <td>{{ observation.source_key|market_source_label }}</td><td>{{ observation.value_per_share }}</td><td>{{ observation.observed_at }}</td><td>{{ observation.fetched_at }}</td>
       </tr>
     {% empty %}<tr><td colspan="5">No observations found.</td></tr>{% endfor %}
   </tbody>

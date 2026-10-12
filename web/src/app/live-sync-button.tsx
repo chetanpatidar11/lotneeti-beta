@@ -20,7 +20,7 @@ export default function LiveSyncButton() {
       });
       const data = await response.json();
       if (response.ok && data.result?.status === "OK") {
-        setMessage(`Updated from InvestorGain. ${data.result.imported ?? 0} new IPOs; ${data.result.created ?? 0} new GMP observations.`);
+        setMessage(`Market data updated. ${data.result.imported ?? 0} new IPOs; ${data.result.created ?? 0} new GMP observations.`);
         router.refresh();
       } else if (response.status === 429) {
         setMessage("A refresh just ran. Please wait five minutes before trying again.");

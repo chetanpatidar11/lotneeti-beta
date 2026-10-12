@@ -335,6 +335,16 @@ input[type="checkbox"] { min-height: auto; accent-color: var(--accent); }
 .settings-funding-row:hover:not(:disabled) { background: var(--surface-hover); }
 .settings-funding-row strong, .settings-funding-row small { display: block; }
 .settings-funding-row small, .settings-funding-row > span:nth-child(2) { color: var(--muted); font-size: 11px; }
+
+/* Pale list-row hover keeps ink dark, including the deleted-bank history rows. */
+html:not([data-theme="dark"]) .settings-funding-row:hover:not(:disabled),
+html:not([data-theme="dark"]) .bank-row-button:hover:not(:disabled) {
+  color: #14251f;
+}
+html:not([data-theme="dark"]) .settings-funding-row:hover:not(:disabled) small,
+html:not([data-theme="dark"]) .settings-funding-row:hover:not(:disabled) > span:nth-child(2) {
+  color: #365748;
+}
 .settings-account-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
 .settings-account-group + .settings-account-links { margin-top: 22px; }
 .settings-account-links a, .settings-account-links button { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; min-height: 56px; padding: 12px 15px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font-size: 13px; font-weight: 750; text-align: left; text-decoration: none; }

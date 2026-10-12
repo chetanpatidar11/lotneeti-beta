@@ -74,7 +74,7 @@ export default async function HomePage() {
 
   return <main className="page"><div className="shell home-shell">
     <PageHeader eyebrow="Overview" title="Operations dashboard" description={workspace.name} action={<Link className="button-link" href="/plan">Review plan <span aria-hidden="true">↗</span></Link>} />
-    <div className="market-feed-status"><div><strong>IPO market data · InvestorGain</strong><small>{feed?.last_success_at ? `Last synced ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(new Date(feed.last_success_at))} IST` : "Waiting for the first successful sync"}{feed?.status === "ERROR" ? " · Latest attempt failed" : ""}</small></div>{feed?.can_sync ? <LiveSyncButton /> : feed?.founder ? <a href="/admin/login/?next=/">Verify as founder to enable Live sync</a> : null}</div>
+    <div className="market-feed-status"><div><strong>IPO market data</strong><small>{feed?.last_success_at ? `Last synced ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(new Date(feed.last_success_at))} IST` : "Waiting for the first successful sync"}{feed?.status === "ERROR" ? " · Latest attempt failed" : ""}</small></div>{feed?.can_sync ? <LiveSyncButton /> : feed?.founder ? <a href="/admin/login/?next=/">Verify as founder to enable Live sync</a> : null}</div>
     {!capital || !operations ? <div className="plan-error" role="alert">Dashboard data is temporarily unavailable. <Link href="/">Retry</Link></div> : <>
       <section className="metric-grid" aria-label="Money overview">
         <MetricCard label="Total Balance" value={formatInr(capital.balance)} note="Across your banks" href="/funds" />

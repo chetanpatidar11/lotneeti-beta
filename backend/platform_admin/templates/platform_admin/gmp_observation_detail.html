@@ -1,11 +1,12 @@
 {% extends "admin/base_site.html" %}
+{% load market_source %}
 
 {% block content %}
 <p><a href="{% url 'founder_admin:gmp-observations' %}">All observations</a></p>
 <h1>{{ observation.ipo.issuer_name }} GMP observation</h1>
 {% if error %}<p role="alert" class="errornote">{{ error }}</p>{% endif %}
 <dl>
-  <dt>Provider</dt><dd>{{ observation.source_key }}</dd>
+  <dt>Provider</dt><dd>{{ observation.source_key|market_source_label }}</dd>
   <dt>Source value</dt><dd>{{ observation.value_per_share }}</dd>
   <dt>Effective value</dt><dd>{{ effective }}</dd>
   <dt>Observed at</dt><dd>{{ observation.observed_at }}</dd>
