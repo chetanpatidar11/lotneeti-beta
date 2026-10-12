@@ -3,7 +3,7 @@
 ## Market labels, hover contrast and 10-record smoke review — 2026-10-12
 
 - Removed InvestorGain branding from customer pages, sync feedback and Founder Admin source labels while retaining the source key and URL in stored audit/provenance records. The live-sync API now gives a neutral provider label.
-- Fixed Light-mode hover text on deleted-bank history and bank row controls. The same local row was visually and programmatically checked with dark text on a pale Light background and light text on a dark Dark background.
+- Fixed Light-mode hover text on deleted-bank history, bank row controls and Settings tabs. The deleted-bank row was visually and programmatically checked with dark text on a pale Light background and light text on a dark Dark background. A follow-up browser check identified the Settings tab's pale-background/white-text collision, which is covered by the same ink rule.
 - Added a deterministic, synthetic workspace smoke case with 10 investors, demats, banks and IPOs, 9 balance-history rows, planner preview, masking and core read API checks. A disposable local browser workspace with those 10 records showed all 10 banks and the expected 5 of 10 default-filtered IPOs. No synthetic record was added to production.
 - `bash scripts/check.sh` passed: 374 backend tests, 35 web tests, one Android package test, Planner matrix, Ruff, Django checks/migration drift, web lint/typecheck/build and Capacitor sync. A production-dependency `npm audit --omit=dev` reported zero vulnerabilities. No database migration is needed.
 

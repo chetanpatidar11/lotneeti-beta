@@ -338,7 +338,8 @@ input[type="checkbox"] { min-height: auto; accent-color: var(--accent); }
 
 /* Pale list-row hover keeps ink dark, including the deleted-bank history rows. */
 html:not([data-theme="dark"]) .settings-funding-row:hover:not(:disabled),
-html:not([data-theme="dark"]) .bank-row-button:hover:not(:disabled) {
+html:not([data-theme="dark"]) .bank-row-button:hover:not(:disabled),
+html:not([data-theme="dark"]) .settings-tab:hover:not(:disabled) {
   color: #14251f;
 }
 html:not([data-theme="dark"]) .settings-funding-row:hover:not(:disabled) small,
