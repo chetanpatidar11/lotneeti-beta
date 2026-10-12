@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## Stable address and SES production access — awaiting AWS account action, 2026-10-12
+
+- The founder authorized a stable public IP and an SES production-access request. The existing EC2 instance is `i-02def39354f6c2377` in `us-east-1`, currently reachable at `44.192.105.250`. The infrastructure template assigns an automatic public IP rather than creating an Elastic IP.
+- The local AWS CLI login cache is unavailable to this workspace because filesystem access was denied. Chrome computer use was also denied, and the in-app AWS console has no session. No Elastic IP has been allocated or associated and no SES request has been submitted. The founder chose to act from their own AWS login and provide the resulting IP/status.
+- AWS releases the present automatic public IP when an Elastic IP is associated. The DigitalPlat DNS A record must then be updated to the new address; the old `sslip.io` hostname will no longer reach this instance. After the founder's changes, verify DNS/HTTPS, SSH access, the SES account response, and update deployment instructions. SES currently sends only password-reset mail and remains sandboxed for unverified recipients.
+
 ## Custom domain cutover — deployed, 2026-10-12
 
 - DigitalPlat's authoritative nameservers and a public resolver now return `lotneeti.dpdns.org A 44.192.105.250` with TTL 300. The encrypted pre-change database backup succeeded; root-only copies of the previous app environment and Nginx site were retained on the host.
