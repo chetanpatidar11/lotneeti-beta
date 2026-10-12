@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { backendUrl } from "@/lib/backend";
 import { formatInr } from "@/lib/money";
+import ThemeToggle from "./theme-toggle";
 
 type MarketIPO = {
   issuer_name: string; issue_type: string; status: string;
@@ -15,6 +17,7 @@ function dateLabel(value: string) {
 }
 
 export default async function LandingPage() {
+  const theme = (await cookies()).get("lotneeti_theme")?.value === "dark" ? "dark" : "light";
   let issues: MarketIPO[] = [];
   let lastSuccess: string | null = null;
   let sourceStatus = "NEVER";
@@ -33,7 +36,7 @@ export default async function LandingPage() {
     .slice(0, 6);
 
   return <main className="landing-page">
-    <header className="landing-nav"><Link href="/" className="landing-brand">Lot<span>Neeti</span><small>IPO PLANNING</small></Link><nav aria-label="Public navigation"><a href="#market">IPOs</a><a href="#how-it-works">How it works</a><Link className="landing-sign-in" href="/sign-in">Sign in</Link></nav></header>
+    <header className="landing-nav"><Link href="/" className="landing-brand">Lot<span>Neeti</span><small>IPO PLANNING</small></Link><nav aria-label="Public navigation"><a href="#market">IPOs</a><a href="#how-it-works">How it works</a><ThemeToggle className="landing-theme-toggle" initialTheme={theme} /><Link className="landing-sign-in" href="/sign-in">Sign in</Link></nav></header>
     <section className="landing-hero"><div className="landing-hero-copy"><p className="landing-kicker">IPO planning for families and groups</p><h1>Every IPO decision, in one clear place.</h1><p>Explore current issues, plan across your family’s accounts, track applications and see what money is available.</p><div className="landing-actions"><Link className="button-link" href="/sign-in">Get started</Link><a href="#market">Explore IPOs ↓</a></div><p className="landing-trust">No broker login needed. You review every application before you submit it.</p></div><div className="landing-hero-card" aria-label="LotNeeti planning steps"><span>01 · Discover</span><strong>See the issue details that matter</strong><span>02 · Plan</span><strong>Match applicants with available funds</strong><span>03 · Track</span><strong>Follow mandates, allotments and profit</strong></div></section>
     <section className="landing-market" id="market"><div className="landing-section-heading"><div><p className="landing-kicker">Market watch</p><h2>Open and upcoming IPOs</h2><p>InvestorGain issue data. GMP is an unofficial observation, never a guaranteed return.</p><p className="landing-source-time">{lastSuccess ? `Last synced ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(new Date(lastSuccess))} IST` : "Awaiting first successful source sync"}{sourceStatus === "ERROR" ? " · Latest update failed" : ""}</p></div><Link href="/sign-in">Plan with your accounts →</Link></div>
       {featured.length === 0 ? <div className="landing-empty">There are no complete open or upcoming issues in the latest saved feed. Please check back after the next sync.</div> : <div className="landing-ipo-grid">{featured.map((ipo) => <article key={`${ipo.issuer_name}-${ipo.open_date}`} className="landing-ipo-card"><div className="landing-ipo-top"><span>{ipo.issue_type === "SME" ? "SME" : "Mainboard"}</span><span className={ipo.status === "OPEN" ? "open" : "upcoming"}>{ipo.status === "OPEN" ? "Open now" : "Upcoming"}</span></div><h3>{ipo.issuer_name}</h3><dl><div><dt>Price</dt><dd>{formatInr(ipo.lower_price)}–{formatInr(ipo.upper_price)}</dd></div><div><dt>Lot</dt><dd>{ipo.lot_size} shares</dd></div><div><dt>Open · close</dt><dd>{dateLabel(ipo.open_date)} · {dateLabel(ipo.close_date)}</dd></div><div><dt>GMP</dt><dd>{ipo.current_gmp === null ? "Unavailable" : `${formatInr(ipo.current_gmp)} (${ipo.current_gmp_percent}%)`}</dd></div></dl></article>)}</div>}

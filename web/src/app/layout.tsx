@@ -15,7 +15,9 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const cookieHeader = (await cookies()).toString();
+  const requestCookies = await cookies();
+  const cookieHeader = requestCookies.toString();
+  const theme = requestCookies.get("lotneeti_theme")?.value === "dark" ? "dark" : "light";
   const signedIn = cookieHeader.includes("sessionid=");
   const user = signedIn ? await getCurrentUser() : null;
   let workspaces: { id: string; name: string; role: string }[] = [];
@@ -33,11 +35,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   }
   const workspace = await selectedWorkspace(workspaces);
   return (
-    <html lang="en">
+    <html lang="en" data-theme={theme}>
       <head><meta name="referrer" content="no-referrer" /></head>
       <body>
         <a className="skip-link" href="#main-content">Skip to content</a>
-        {user ? <div className="app-layout"><SessionKeeper /><AppNav email={user.email} workspaces={workspaces} selectedId={workspace?.id} founderAdmin={founderAdmin} localPreview={localPreviewEnabled() && user.email === "local-preview@lotneeti.test"} /><div className="app-main" id="main-content" tabIndex={-1}>{children}</div></div> : <div id="main-content" tabIndex={-1}>{children}</div>}
+        {user ? <div className="app-layout"><SessionKeeper /><AppNav email={user.email} workspaces={workspaces} selectedId={workspace?.id} founderAdmin={founderAdmin} theme={theme} localPreview={localPreviewEnabled() && user.email === "local-preview@lotneeti.test"} /><div className="app-main" id="main-content" tabIndex={-1}>{children}</div></div> : <div id="main-content" tabIndex={-1}>{children}</div>}
       </body>
     </html>
   );

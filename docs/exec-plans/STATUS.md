@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## L05 light/dark themes and account entry layout — 2026-10-12
+
+- Light and Dark can now be selected on the landing page, unified account page and signed-in sidebar/mobile menu. A one-year same-site cookie persists the choice across navigation and reloads; the server applies it to the HTML root before the page renders. The account page uses a responsive two-column layout with LotNeeti-specific copy and the existing email/password/forgot-password actions.
+- Dark styling covers public pages, dashboard cards, IPO controls, planner tables, Funds, Settings tables/forms, drawers, loading states and error states. The sidebar workspace control stays legible in both themes. Local browser review covered light/dark account entry at desktop and mobile sizes, the public landing page, signed-in dashboard, Funds and Settings with synthetic data; the theme survived reload. No real account data was used.
+- Full `scripts/check.sh` passed: 373 backend tests, 35 web tests, one Android package test, Planner matrix, Ruff, Django checks/migration drift, web lint/typecheck/build and Capacitor sync. Web lint/typecheck/build passed again after the final mobile theme control. No migration is needed. The beta HTTPS sign-in returns 200 but SSH port 22 still times out, so the required pre-release backup and deployment remain pending; the local AWS session is still expired.
+
 ## A05/E01 account entry, CSV and layout — 2026-10-12
 
 - A single email/password form now signs in existing members or creates and signs in new members without verification mail. Existing members with a wrong password are rejected; founder admin accounts remain separate. The 30-day session is preserved. Forgot password returns the same answer for known and unknown addresses and is the only flow that initiates customer email. An old verification token cannot overwrite an account that now has a password. Email delivery failures keep the response generic and remove the unusable reset token.
