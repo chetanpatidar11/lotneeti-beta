@@ -1,5 +1,7 @@
 # LotNeeti founder beta handoff — draft, not release approval
 
+**Current beta address (2026-10-12):** `https://lotneeti.dpdns.org/`. The previous `44-192-105-250.sslip.io` address redirects to it. The new Let's Encrypt certificate expires 2027-01-10, and a renewal dry run passed. Users need to sign in once on the new hostname because browser session cookies are host-specific. Deployment history below retains the addresses and limitations recorded at the time.
+
 **Current local completion pass, 2026-09-29 — not deployed.** Open the local preview at `http://127.0.0.1:3000/` (Django `127.0.0.1:8000`, Next `127.0.0.1:3000`, isolated SQLite `/private/tmp/lotneeti-local-preview.sqlite3`). The newest NSE list, Issue Information details and official RHP/SEBI timetable extraction yield **11 READY current IPOs**: eight NSE Mainboard and three NSE EMERGE. All 11 were published only in the isolated preview; a second run was idempotent. GREENASIA, BMISL and HIMALAYAN are NSE EMERGE with BSE `NOT_APPLICABLE`, based on their official RHP covers. AONESTEELS is dual listed with BSE designated. MONEYVIEW lot 441 and AONESTEELS lot 37 came from NSE detail. BSE automatic discovery remains unavailable under the current permitted method (zero current BSE Mainboard/SME records), so cross-exchange verification has **not** been claimed. The Founder confirmed written permission for a one-daily InvestorGain GMP retrieval. The **09:00 IST** local run saved nine GMP values (A-One ₹28, AceVector ₹2, Bench Mark ₹29, German Green Steel ₹24.50, Moneyview ₹12.75, Orient ₹72, Runwal ₹14, Shah ₹14 and SRIT ₹33); GREENASIA and HIMALAYAN have no source GMP and remain unavailable rather than ₹0. The agreement remains private, outside Git. K02 median/freshness/conflict defaults are unchanged.
 
 The code schedules one coordinated IPO sync at **00:00 Asia/Kolkata** and the permissioned GMP check at **09:00 Asia/Kolkata**, with no provider-health polling job. The NSE job requires `LOTNEETI_NSE_SOURCE_RIGHTS_REFERENCE` and `LOTNEETI_IPO_SOURCE_CACHE_DIR` in the private process environment. BSE reports a source-access blocker independently, SEBI continues, and GMP exits without a request when no relevant IPO is published. Founder Admin and `manage.py sync_ipo_data` use the same coordinator. **`bash scripts/check.sh` passed after this update: 347 backend, 27 frontend, one Android test; Planner matrix 115/115 P0 and 5/5 P1; lint, typecheck, migrations and builds.** G03 still needs the approved broker workbook/mapping and M03 still needs founder-approved historical plans. The previous 8/3 and zero-plannable local notes below are retained only as historical state; the older AWS staging build is separate and was not accessed or changed in this pass.
@@ -131,7 +133,7 @@ Use only synthetic PANs such as `TESTX0001A`, fake account numbers and `person@e
 
 ## 5. Exact manual acceptance steps
 
-1. Open `https://44-192-105-250.sslip.io/` (or run the local setup above).
+1. Open `https://lotneeti.dpdns.org/` (or run the local setup above).
 2. Sign in with the verified founder inbox; check Gmail Spam if necessary, then verify sign-out and single-use link behavior. Other recipients require SES verification while sandboxed.
 3. Create two workspaces, add OWNER/OPERATOR/VIEWER members and verify cross-workspace reads/writes fail.
 4. Upload the sample workbook from Settings and verify both repeated-PAN rows show errors. Make a local copy with unique synthetic PAN, bank and UPI values in the same columns; review masked values, leave one valid row unchecked, confirm, set imported bank Balance and verify the UPI remains unverified.
@@ -154,7 +156,7 @@ cd /Users/chetanpatidar/Projects/lotneeti-new/mobile
 npm ci
 npm run test
 npm run typecheck
-VITE_LOTNEETI_WEB_URL=https://44-192-105-250.sslip.io npm run android:sync
+VITE_LOTNEETI_WEB_URL=https://lotneeti.dpdns.org npm run android:sync
 cd android
 ./gradlew assembleDebug
 ```
@@ -171,7 +173,7 @@ For a release APK, create a private keystore outside Git, configure Gradle signi
 
 ### Public URL and budget
 
-- URL: `https://44-192-105-250.sslip.io/` (temporary DNS tied to public IPv4 `44.192.105.250`). The certificate expires 2026-12-26; Certbot renewal dry run passed and a renewal hook reloads Nginx.
+- URL: `https://lotneeti.dpdns.org/` (A record to public IPv4 `44.192.105.250`). The certificate expires 2027-01-10; Certbot renewal dry run passed and a renewal hook reloads Nginx. The previous sslip.io address redirects here. Check whether the EC2 address is an Elastic IP before treating this A record as permanent.
 - AWS account `497502378741`, region `us-east-1`. The founder explicitly allowed the existing root CLI session for infrastructure setup in this student account. Application S3 access uses the one scoped EC2 role, with no AWS keys on the host. The already existing account-wide `lotneeti-staging-monthly` USD 80 monthly budget received an ACTUAL >25% (USD 20) email alert to `chetanpatidar1011@gmail.com` before chargeable resources were created; both notification and subscriber were read back from AWS.
 
 ### Exact AWS resources created
@@ -207,7 +209,7 @@ LOTNEETI_KNOWN_HOSTS=/private/tmp/lotneeti-beta-known-hosts \
   bash deploy/push-from-workstation.sh \
   44.192.105.250 \
   /private/tmp/lotneeti-beta-keys/lotneeti-beta-20260927 \
-  44-192-105-250.sslip.io
+  lotneeti.dpdns.org
 ```
 
 The tested script archives the current `backend/`, `web/` and `deploy/` worktree without secrets/build directories, syncs source to `/opt/lotneeti`, installs the reviewed Nginx/systemd/renewal assets, runs `nginx -t`, installs Python and Node dependencies, builds Next.js, runs Django production checks and migrations, collects static files, restarts the four app services and checks HTTPS health. Environment files stay under `/etc/lotneeti/` outside Git. Preserve a previous reviewed source checkout for rollback; the script does not reverse database migrations. If the instance public IP changes, the temporary DNS name, certificate, host environment URLs and SSH security-group CIDR must be updated before using this command.
