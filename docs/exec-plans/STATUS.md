@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## Settings tab and linked-account layout — 2026-10-12
+
+- The Settings tab hover now keeps its top border visible in Light and Dark. Selected and hovered tabs retain readable text and a defined outline.
+- Accounts shows one guided setup panel when there are no linked accounts. When accounts exist, the page shows a single total and compact empty notices beside the account tables; repeated Funds/Plan shortcuts were removed. Rows and the displayed total deduplicate identical account IDs, while inactive records remain visible.
+- A disposable local browser workspace confirmed the empty view, a populated view with one inactive bank and the active tab border. No sample record was added to production.
+
 ## Market labels, hover contrast and 10-record smoke review — 2026-10-12
 
 - Removed InvestorGain branding from customer pages, sync feedback and Founder Admin source labels while retaining the source key and URL in stored audit/provenance records. The live-sync API now gives a neutral provider label.

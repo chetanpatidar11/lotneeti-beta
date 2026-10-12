@@ -304,9 +304,9 @@ input[type="checkbox"] { min-height: auto; accent-color: var(--accent); }
 .add-investor-form { padding-top: 15px; border-color: var(--border); }
 .settings-shell select { width: auto; max-width: 100%; }
 .settings-create-workspace { width: min(100%, 380px); padding: 20px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
-.settings-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 0 0 11px; border-bottom: 1px solid var(--border); }
+.settings-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 4px 0 11px; border-bottom: 1px solid var(--border); }
 .settings-tab { flex: 0 0 auto; min-height: 39px; padding: 8px 12px; border-color: transparent; background: transparent; color: var(--muted); }
-.settings-tab:hover:not(:disabled) { background: var(--surface-raised); }
+.settings-tab:hover:not(:disabled) { border-color: var(--border-strong); background: var(--surface-raised); transform: none; }
 .settings-tab.active { border-color: #2b6e50; background: var(--accent-deep); color: var(--accent); }
 .settings-section-actions { display: flex; gap: 7px; flex-wrap: wrap; }
 .settings-view-controls { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 13px; }
@@ -732,9 +732,20 @@ input[type="file"] { background: #f8fbf9; }
 .threshold-setting { background: #fff; }
 .ipo-view-tabs a[aria-current="page"], .settings-tab.active { background: #e1f3e8; color: #086d4c; }
 .ipo-view-tabs a:hover, .settings-tab:hover:not(:disabled) { background: #eef6f0; }
+.settings-tab:hover:not(:disabled) { border-color: #6a9e7d; }
+.settings-tab.active:hover:not(:disabled) { border-color: #086d4c; background: #e1f3e8; color: #14251f; }
 .ipo-calendar li { background: #f6faf7; }
 .settings-tab { border-radius: 9px; }
 .settings-account-group { margin-top: 20px; }
+.settings-account-count { display: inline-block; padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 11px; font-weight: 750; }
+.settings-accounts-empty { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 18px; min-height: 218px; padding: clamp(25px, 3vw, 38px); border: 1px solid var(--border); border-radius: var(--radius); background: linear-gradient(135deg, #f1f9f4, #fff 70%); }
+.settings-accounts-empty-mark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: #dff2e6; color: #087950; font-size: 29px; line-height: 1; }
+.settings-accounts-empty-kicker { margin: 1px 0 8px; color: #087950; font-size: 10px; font-weight: 850; letter-spacing: .14em; }
+.settings-accounts-empty h3 { margin: 0; color: var(--text); font-size: clamp(20px, 2vw, 25px); letter-spacing: -.035em; }
+.settings-accounts-empty p:not(.settings-accounts-empty-kicker) { max-width: 550px; margin: 8px 0 20px; color: var(--muted); font-size: 13px; }
+.settings-accounts-empty-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.settings-accounts-empty-actions .text-button { min-height: 39px; padding: 8px 4px; }
+.settings-account-empty { padding: 16px 18px; border: 1px dashed var(--border); border-radius: var(--radius); background: #f8fbf9; color: var(--muted); font-size: 12px; }
 .settings-table-wrap { overflow-x: auto; }
 .settings-table th, .settings-table td { padding: 13px 15px; }
 .settings-table tbody .settings-inactive-row { background: #fafbf9; }
@@ -996,9 +1007,15 @@ html[data-theme="dark"] .plan-table tbody tr:nth-child(2n), html[data-theme="dar
 html[data-theme="dark"] .plan-table tbody tr.is-locked { background: #3a3224; }
 html[data-theme="dark"] .plan-table select, html[data-theme="dark"] .plan-table input { background: #101b18; color: var(--text); }
 html[data-theme="dark"] .filter-chip[aria-pressed="true"], html[data-theme="dark"] .filter-chip[aria-current="true"], html[data-theme="dark"] .filter-chip[aria-pressed="true"]:hover:not(:disabled), html[data-theme="dark"] .filter-chip[aria-current="true"]:hover:not(:disabled), html[data-theme="dark"] .ipo-view-tabs a[aria-current="page"], html[data-theme="dark"] .settings-tab.active { border-color: #387e59; background: #24533d; color: #e4f8e9; }
+html[data-theme="dark"] .settings-tab:hover:not(:disabled) { border-color: #69bf8d; background: var(--surface-hover); color: var(--text); }
+html[data-theme="dark"] .settings-tab.active:hover:not(:disabled) { border-color: #69bf8d; background: #24533d; color: #e4f8e9; }
 html[data-theme="dark"] .ipo-facts > div, html[data-theme="dark"] .ipo-calendar li, html[data-theme="dark"] .plan-context-card .selected-ipo-strip li, html[data-theme="dark"] .plan-breakdown-grid > div { border-color: var(--border); background: var(--surface-raised); color: var(--text); }
 html[data-theme="dark"] .funds-table tr.selected-row { background: #214333; }
 html[data-theme="dark"] .settings-funding-row:hover:not(:disabled), html[data-theme="dark"] .settings-table tbody .settings-inactive-row:hover { background: var(--surface-hover); }
+html[data-theme="dark"] .settings-accounts-empty { background: linear-gradient(135deg, #1d3428, var(--surface) 70%); }
+html[data-theme="dark"] .settings-accounts-empty-mark { background: #2b543b; color: #a2ebba; }
+html[data-theme="dark"] .settings-accounts-empty-kicker { color: var(--accent); }
+html[data-theme="dark"] .settings-account-empty { background: var(--surface-raised); }
 html[data-theme="dark"] .settings-inactive-row > th { color: var(--muted); }
 html[data-theme="dark"] .settings-message { color: var(--positive); }
 html[data-theme="dark"] .settings-message.error, html[data-theme="dark"] .import-row-errors summary { color: #f3a5a0; }

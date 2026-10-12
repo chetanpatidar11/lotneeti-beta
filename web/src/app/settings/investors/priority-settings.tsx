@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import Link from "next/link";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { Drawer } from "@/components/drawer";
 import { EmptyState, PageHeader, SectionHeading, StatusBadge } from "@/components/ui";
@@ -54,12 +53,12 @@ function AccountTable({
   addLabel: string;
   addDisabled: boolean;
 }) {
-  const visible = [...rows].sort((a, b) => Number(b.active) - Number(a.active));
+  const visible = [...new Map(rows.map((row) => [row.id, row])).values()].sort((a, b) => Number(b.active) - Number(a.active));
   const selectedActive = visible.filter((row) => row.active && selected.includes(row.id)).map((row) => row.id);
   const selectedInactive = visible.filter((row) => !row.active && selected.includes(row.id)).map((row) => row.id);
   return <section className="settings-account-group" aria-label={title}>
     <SectionHeading title={title} action={canEdit && <div className="settings-section-actions"><button type="button" className="button-secondary" disabled={busy || addDisabled} onClick={onAdd}>+ {addLabel}</button>{visible.length > 0 && <><button type="button" className="button-secondary" disabled={busy} onClick={() => onSelectAll(kind, visible.map((row) => row.id), !visible.every((row) => selected.includes(row.id)))}>{visible.every((row) => selected.includes(row.id)) ? "Clear selection" : "Select all"}</button>{selectedActive.length > 0 && <button type="button" className="button-secondary" disabled={busy} onClick={() => onAction(kind, selectedActive, "deactivate")}>Deactivate selected ({selectedActive.length})</button>}{selectedInactive.length > 0 && <button type="button" className="button-secondary" disabled={busy} onClick={() => onAction(kind, selectedInactive, "activate")}>Activate selected ({selectedInactive.length})</button>}{selected.length > 0 && <button type="button" className="button-danger" disabled={busy} onClick={() => onAction(kind, selected, "delete")}>Delete selected ({selected.length})</button>}</>}</div>} />
-    {visible.length === 0 ? <EmptyState title={`No ${title.toLowerCase()} yet`} /> : <div className="settings-table-wrap"><table className="settings-table"><thead><tr>
+    {visible.length === 0 ? <div className="settings-account-empty">No {kind === "upi" ? "UPI IDs" : title.toLowerCase()} added yet.</div> : <div className="settings-table-wrap"><table className="settings-table"><thead><tr>
       {canEdit && <th scope="col" className="settings-select-cell"><label><input type="checkbox" aria-label={`Select all ${title.toLowerCase()}`} checked={visible.every((row) => selected.includes(row.id))} disabled={busy} onChange={(event) => onSelectAll(kind, visible.map((row) => row.id), event.target.checked)} /></label></th>}
       <th scope="col">Account</th><th scope="col">Investor</th><th scope="col">Details</th><th scope="col">Status</th><th scope="col">Action</th>
     </tr></thead><tbody>{visible.map((row) => <tr key={row.id} className={row.active ? "" : "settings-inactive-row"}>
@@ -132,6 +131,7 @@ export default function PrioritySettings({
     detail: `${banks.find((bank) => bank.id === upi.bank_id)?.bank_name ?? "Bank"} · ${upi.verified ? "Verified" : "Not verified"}`,
     active: upi.active,
   })));
+  const accountCount = new Set(dematRows.map((row) => row.id)).size + new Set(bankRows.map((row) => row.id)).size + new Set(upiRows.map((row) => row.id)).size;
 
   function note(text: string, error = false) {
     setMessage(text);
@@ -359,11 +359,12 @@ export default function PrioritySettings({
         {activeInvestors.length === 0 ? <EmptyState title="No active investors" detail="Add or activate an investor before setting funding preferences." /> : <div className="settings-funding-list">{activeInvestors.map((investor) => <button type="button" key={investor.id} className="settings-funding-row" onClick={() => setSelectedInvestor(investor.id)}><span><strong>{investor.name}</strong><small>{investor.pan_masked}</small></span><span>{preferences[investor.id]?.filter((item) => item.enabled).length ?? 0} preferred · {banks.filter((bank) => bank.owner === investor.id && bank.active).length} own bank(s)</span><span aria-hidden="true">›</span></button>)}</div>}
       </section>}
 
-      {tab === "accounts" && <section aria-label="Accounts"><SectionHeading title="Accounts" detail="Active and inactive accounts stay together with their current status." />
-        <AccountTable title="Demat Accounts" kind="demat" rows={dematRows} selected={selected.demat} canEdit={canEdit} busy={busy} onToggle={toggle} onSelectAll={selectAll} onAction={itemAction} onAdd={() => openAddAccount("demat")} addLabel="Add demat" addDisabled={activeInvestors.length === 0} />
-        <AccountTable title="Bank Accounts" kind="bank" rows={bankRows} selected={selected.bank} canEdit={canEdit} busy={busy} onToggle={toggle} onSelectAll={selectAll} onAction={itemAction} onAdd={() => openAddAccount("bank")} addLabel="Add bank" addDisabled={activeInvestors.length === 0} />
-        <AccountTable title="UPIs" kind="upi" rows={upiRows} selected={selected.upi} canEdit={canEdit} busy={busy} onToggle={toggle} onSelectAll={selectAll} onAction={itemAction} onAdd={() => openAddAccount("upi")} addLabel="Add UPI" addDisabled={activeInvestors.length === 0 || banks.every((bank) => !bank.active)} />
-        <div className="settings-account-links"><Link href="/funds">Bank balances and scheduled payments <span>Open Funds →</span></Link><Link href="/plan">Planner preferences <span>Open Plan →</span></Link></div>
+      {tab === "accounts" && <section aria-label="Accounts"><SectionHeading title="Linked accounts" detail={accountCount > 0 ? "Demat, bank and UPI accounts for this workspace." : undefined} action={accountCount > 0 ? <span className="settings-account-count">{accountCount} total</span> : undefined} />
+        {accountCount === 0 ? <div className="settings-accounts-empty"><span className="settings-accounts-empty-mark" aria-hidden="true">+</span><div><p className="settings-accounts-empty-kicker">GET STARTED</p><h3>{activeInvestors.length > 0 ? "Connect your first account" : investors.length > 0 ? "Activate an investor to add accounts" : "Set up your investor accounts"}</h3><p>{activeInvestors.length > 0 ? "Add a demat and bank account for an investor. You can link a UPI ID after adding a bank." : investors.length > 0 ? "Your investors are inactive. Activate one before linking a demat, bank or UPI account." : "Add an investor, then link their demat, bank and UPI details for IPO planning."}</p><div className="settings-accounts-empty-actions">{canEdit && (activeInvestors.length > 0 ? <><button type="button" onClick={() => openAddAccount("demat")}>+ Add demat</button><button type="button" className="button-secondary" onClick={() => openAddAccount("bank")}>+ Add bank</button></> : investors.length > 0 ? <button type="button" onClick={() => changeTab("investors")}>View investors</button> : <button type="button" onClick={() => setShowAddInvestor(true)}>+ Add investor</button>)}{canEdit && <button type="button" className="text-button" onClick={() => changeTab("import")}>Import accounts →</button>}</div></div></div> : <>
+          <AccountTable title="Demat Accounts" kind="demat" rows={dematRows} selected={selected.demat} canEdit={canEdit} busy={busy} onToggle={toggle} onSelectAll={selectAll} onAction={itemAction} onAdd={() => openAddAccount("demat")} addLabel="Add demat" addDisabled={activeInvestors.length === 0} />
+          <AccountTable title="Bank Accounts" kind="bank" rows={bankRows} selected={selected.bank} canEdit={canEdit} busy={busy} onToggle={toggle} onSelectAll={selectAll} onAction={itemAction} onAdd={() => openAddAccount("bank")} addLabel="Add bank" addDisabled={activeInvestors.length === 0} />
+          <AccountTable title="UPIs" kind="upi" rows={upiRows} selected={selected.upi} canEdit={canEdit} busy={busy} onToggle={toggle} onSelectAll={selectAll} onAction={itemAction} onAdd={() => openAddAccount("upi")} addLabel="Add UPI" addDisabled={activeInvestors.length === 0 || banks.every((bank) => !bank.active)} />
+        </>}
       </section>}
 
       {tab === "import" && <AccountImport workspaceId={workspace.id} canEdit={canEdit} />}
