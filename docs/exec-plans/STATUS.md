@@ -1,5 +1,10 @@
 # LotNeeti execution status
 
+## Cloudflare DNS and SES domain verification — propagation, 2026-10-13
+
+- The founder moved `lotneeti.dpdns.org` DNS from DigitalPlat-hosted records to Cloudflare's `denver.ns.cloudflare.com` and `lady.ns.cloudflare.com`. All four DigitalPlat parent nameservers delegate to this pair. Both Cloudflare nameservers publish the correct DNS-only A record `54.208.70.218`, the three SES Easy DKIM CNAMEs with absolute `dkim.amazonses.com` targets, and `_dmarc` TXT `v=DMARC1; p=none;`. The existing EC2 Let's Encrypt certificate remains the HTTPS certificate; public `/`, `/sign-in` and API health each returned 200 with valid TLS when the resolver used the new delegation.
+- The transition briefly caused a DNS outage: DigitalPlat removed its old child zone before all parent delegations changed. Some recursive resolvers still cached the old `dns1`/`dns2.digitalplat.org` delegation with a 3600-second TTL and returned SERVFAIL because those servers now REFUSE the retired zone. Wait for cache expiry and verify common public resolvers before marking DNS propagation complete. SES domain identity was pending during this check; domain verification and SES production access are separate, and sandbox restrictions remain until production access is approved.
+
 ## Elastic IP cutover — deployed, 2026-10-12
 
 - The founder associated Elastic IP `54.208.70.218` for approximately one month with the existing `us-east-1` LotNeeti instance `i-02def39354f6c2377`. IMDS confirmed the instance and new public IPv4; the SSH host key matched the prior address, all five app/proxy services are active, and `https://lotneeti.dpdns.org/api/v1/health/` returned 200 with trusted TLS when resolved directly to the new IP.
