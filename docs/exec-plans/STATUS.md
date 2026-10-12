@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## Custom domain cutover — pending DNS, 2026-10-12
+
+- The founder chose `lotneeti.dpdns.org` for the existing EC2 beta. Its zone is delegated to DigitalPlat (`dns1.digitalplat.org`, `dns2.digitalplat.org`), but authoritative DNS currently has no apex A record. The required record is `@ A 44.192.105.250`, TTL 300; no AAAA record is needed.
+- A separate port-80 Nginx virtual host for `lotneeti.dpdns.org` now serves the Let's Encrypt HTTP challenge path and temporarily redirects normal traffic to the working sslip.io site. Nginx configuration passed validation and reloaded; the old HTTPS health endpoint still returns 200. No customer traffic or application origin was switched.
+- After the A record resolves publicly, issue a Let's Encrypt certificate for the new hostname, update the site's canonical Nginx host and production `DJANGO_ALLOWED_HOSTS`, `FRONTEND_BASE_URL`, and `API_BASE_URL`, retain an HTTPS redirect from the old hostname, restart affected services, and verify HTTPS, login, password reset links, health, and certificate renewal. The existing public IPv4 should be checked for long-term stability before relying on a fixed A record.
+
 ## Settings tab and linked-account layout — 2026-10-12
 
 - The Settings tab hover now keeps its top border visible in Light and Dark. Selected and hovered tabs retain readable text and a defined outline.
