@@ -5,6 +5,7 @@
 - The Settings tab hover now keeps its top border visible in Light and Dark. Selected and hovered tabs retain readable text and a defined outline.
 - Accounts shows one guided setup panel when there are no linked accounts. When accounts exist, the page shows a single total and compact empty notices beside the account tables; repeated Funds/Plan shortcuts were removed. Rows and the displayed total deduplicate identical account IDs, while inactive records remain visible.
 - A disposable local browser workspace confirmed the empty view, a populated view with one inactive bank and the active tab border. No sample record was added to production.
+- Web lint, typecheck, 35 tests and production build passed. Encrypted pre-release backup succeeded. Commit `0081b27` was deployed to the HTTPS beta with archive SHA-256 `f121a1dd12eb222133e0e0a478f2667acaca0f311c7eac41ad5fca9a7eee7b12`; no migration was needed. Home, sign-in and API health returned HTTP 200, and API/web/worker/beat/Nginx are active. The disposable preview database and servers were removed.
 
 ## Market labels, hover contrast and 10-record smoke review — 2026-10-12
 
