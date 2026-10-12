@@ -15,24 +15,17 @@ def _cell(value: object) -> str:
 
 class GenericCSVAdapter:
     format_id = "generic_csv"
-    version = "v1"
+    version = "v2"
     content_type = "text/csv; charset=utf-8"
     extension = "csv"
     columns = (
-        "IPO ID",
-        "IPO Name",
-        "Applicant ID",
-        "Applicant Name",
+        "Name",
         "PAN",
-        "Category",
-        "Lots",
-        "Amount INR",
         "Depository",
-        "DP ID",
+        "Priority",
         "Client ID",
-        "Bank",
-        "Bank Account",
-        "UPI ID",
+        "UPI ID for IPO",
+        "Bank account no.",
     )
 
     def render(self, rows: tuple[ExportRow, ...]) -> bytes:
@@ -43,20 +36,13 @@ class GenericCSVAdapter:
             writer.writerow(
                 _cell(value)
                 for value in (
-                    row.ipo_id,
-                    row.ipo_name,
-                    row.applicant_id,
                     row.applicant_name,
                     row.pan,
-                    row.category,
-                    row.lots,
-                    f"{row.amount:.2f}",
                     row.depository,
-                    row.dp_id,
+                    row.priority,
                     row.client_id,
-                    row.bank_name,
-                    row.bank_account_number,
                     row.upi_handle,
+                    row.bank_account_number,
                 )
             )
         return output.getvalue().encode("utf-8")

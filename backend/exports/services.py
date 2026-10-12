@@ -72,6 +72,7 @@ def export_saved_plan(
                 ipo_name=ipo.issuer_name,
                 applicant_id=row.applicant_ref,
                 applicant_name=applicant.name,
+                priority=applicant.planning_priority,
                 pan=decrypt_value(applicant.pan_ciphertext, purpose="pan"),
                 category=row.category,
                 lots=row.lots,

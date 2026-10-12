@@ -12,6 +12,7 @@ class ExportRow:
     ipo_name: str
     applicant_id: str
     applicant_name: str
+    priority: int
     pan: str
     category: str
     lots: int

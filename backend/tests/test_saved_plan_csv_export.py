@@ -21,11 +21,15 @@ def test_valid_saved_plan_exports_stable_csv_with_authorized_values():
     assert first.format_id == "generic_csv"
     parsed = list(csv.reader(StringIO(first.data.decode("utf-8"))))
     assert len(parsed) == 2
-    assert parsed[1][0] == snapshot.ipos[0].id
-    assert parsed[1][4] == "TESTX0001A"
-    assert parsed[1][7] == "15000.00"
-    assert parsed[1][12] == "DEMO-ACCOUNT-0001"
-    assert parsed[1][13] == "demo@upi.test"
+    assert parsed[1] == [
+        "Synthetic",
+        "TESTX0001A",
+        "CDSL",
+        "1",
+        "DEMO-CLIENT-001",
+        "demo@upi.test",
+        "DEMO-ACCOUNT-0001",
+    ]
 
 
 @pytest.mark.django_db

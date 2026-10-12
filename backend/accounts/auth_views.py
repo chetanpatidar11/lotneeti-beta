@@ -12,9 +12,8 @@ from rest_framework.views import APIView
 from accounts.auth import (
     complete_password_reset,
     consume_registration,
-    login_with_password,
+    login_or_create_with_password,
     request_password_reset,
-    request_registration,
 )
 from accounts.models import User, WorkspaceMembership
 from accounts.services import create_workspace
@@ -51,10 +50,8 @@ class RegisterView(APIView):
     def post(self, request):
         serializer = PasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        request_registration(**serializer.validated_data)
-        return Response(
-            {"message": "If this address can be registered, a verification email is on its way."}
-        )
+        user = login_or_create_with_password(request, **serializer.validated_data)
+        return Response({"id": user.pk, "email": user.email}, status=status.HTTP_200_OK)
 
 
 class RegisterVerifyView(APIView):
@@ -75,7 +72,7 @@ class PasswordLoginView(APIView):
     def post(self, request):
         serializer = PasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = login_with_password(request, **serializer.validated_data)
+        user = login_or_create_with_password(request, **serializer.validated_data)
         return Response({"id": user.pk, "email": user.email}, status=status.HTTP_200_OK)
 
 

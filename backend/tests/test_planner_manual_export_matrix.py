@@ -97,4 +97,4 @@ def test_ee006_two_edited_locked_rows_export_the_exact_reviewed_mappings(monkeyp
     data = next(iter(storage.objects.values())).decode()
     assert "TESTX0001A" in data and "TESTX0002B" in data
     assert "DEMO-ACCOUNT-ALT1" in data and "DEMO-ACCOUNT-0002" in data
-    assert "210000.00" in data and "15000.00" in data
+    assert "Second Synthetic" in data and "Synthetic" in data

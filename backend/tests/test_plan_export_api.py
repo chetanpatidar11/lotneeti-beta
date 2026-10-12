@@ -1,5 +1,7 @@
+import csv
 from datetime import timedelta
 from hashlib import sha256
+from io import StringIO
 
 import pytest
 from django.test import override_settings
@@ -43,6 +45,18 @@ def test_authorized_export_is_private_and_download_rechecks_membership(monkeypat
     record = PlanExport.objects.get(pk=created.data["id"])
     assert record.object_key.startswith(f"exports/{workspace.pk}/{run.pk}/")
     assert b"TESTX0001A" in storage.objects[record.object_key]
+    exported_rows = list(csv.reader(StringIO(storage.objects[record.object_key].decode("utf-8"))))
+    assert exported_rows[0] == [
+        "Name",
+        "PAN",
+        "Depository",
+        "Priority",
+        "Client ID",
+        "UPI ID for IPO",
+        "Bank account no.",
+    ]
+    assert len(exported_rows[1]) == 7
+    assert exported_rows[1][1] == "TESTX0001A"
     assert record.plan_output_hash == run.output_hash
     assert record.planner_version == run.planner_version
     assert record.settings_version == run.settings_version

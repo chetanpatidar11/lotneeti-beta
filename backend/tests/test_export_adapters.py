@@ -22,6 +22,7 @@ def sample_row(position: int) -> ExportRow:
         ipo_name="Synthetic Industries",
         applicant_id=f"synthetic-{position}",
         applicant_name="Synthetic Investor",
+        priority=1,
         pan="TESTX0001A",
         category="RETAIL",
         lots=1,

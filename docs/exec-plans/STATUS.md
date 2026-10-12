@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## A05/E01 account entry, CSV and layout — 2026-10-12
+
+- A single email/password form now signs in existing members or creates and signs in new members without verification mail. Existing members with a wrong password are rejected; founder admin accounts remain separate. The 30-day session is preserved. Forgot password returns the same answer for known and unknown addresses and is the only flow that initiates customer email. An old verification token cannot overwrite an account that now has a password. Email delivery failures keep the response generic and remove the unusable reset token.
+- Settings inputs retain dark text in normal, hover and focus states, including Safari's text fill. The Deleted bank history card has interior padding. Generic plan CSV v2 exports exactly Name, PAN, Depository, Priority, Client ID, UPI ID for IPO and Bank account no., in that order. It remains an authorized private export.
+- Full `scripts/check.sh` passed: 373 backend tests, 35 web tests, one Android package test, Ruff, Planner matrix, Django checks and migration drift, web lint/typecheck/build and Capacitor sync. No migration is needed. Beta deployment and live smoke checks are next. SES is still sandboxed, so password reset delivery to arbitrary new addresses still requires SES production access; the UI deliberately does not disclose delivery eligibility.
+
 ## UI contrast and compact import review — 2026-10-12
 
 - IPO filter selections keep dark, readable text on pale green, including hover. Plan selected-IPO cards and plan table rows use the light theme throughout. Funds tables, payment actions, balance history and deleted-bank labels now stay within their containing cards, with internal horizontal scrolling only where needed.
