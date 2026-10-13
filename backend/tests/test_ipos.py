@@ -94,3 +94,28 @@ def test_past_due_upcoming_source_row_is_displayed_as_closed():
 
     with patch("ipos.public_serializers.timezone.now", return_value=now):
         assert PublicIPOSerializer(ipo).data["status"] == IPO.Status.CLOSED
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("now", "expected_status"),
+    [
+        (datetime(2026, 10, 12, 23, 59, tzinfo=ZoneInfo("Asia/Kolkata")), IPO.Status.UPCOMING),
+        (datetime(2026, 10, 13, 0, 0, tzinfo=ZoneInfo("Asia/Kolkata")), IPO.Status.OPEN),
+        (datetime(2026, 10, 13, 12, 37, tzinfo=ZoneInfo("Asia/Kolkata")), IPO.Status.OPEN),
+        (datetime(2026, 10, 15, 17, 0, tzinfo=ZoneInfo("Asia/Kolkata")), IPO.Status.CLOSED),
+    ],
+)
+def test_upcoming_source_row_uses_issue_dates_in_ist(now, expected_status):
+    ipo = issue(
+        open_date=date(2026, 10, 13),
+        close_date=date(2026, 10, 15),
+        allotment_date=date(2026, 10, 16),
+        listing_date=date(2026, 10, 20),
+        status=IPO.Status.UPCOMING,
+        publication_state=IPO.PublicationState.PUBLISHED,
+    )
+    ipo.save()
+
+    with patch("ipos.public_serializers.timezone.now", return_value=now):
+        assert PublicIPOSerializer(ipo).data["status"] == expected_status

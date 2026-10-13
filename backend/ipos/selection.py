@@ -8,9 +8,13 @@ from zoneinfo import ZoneInfo
 def selection_status(values: dict, *, at: datetime) -> str:
     status = values["status"]
     if status in {"OPEN", "UPCOMING"}:
-        close_at = datetime.combine(values["close_date"], time(17), tzinfo=ZoneInfo("Asia/Kolkata"))
+        india = ZoneInfo("Asia/Kolkata")
+        close_at = datetime.combine(values["close_date"], time(17), tzinfo=india)
         if at >= close_at:
             return "CLOSED"
+        if at.astimezone(india).date() < values["open_date"]:
+            return "UPCOMING"
+        return "OPEN"
     return status
 
 

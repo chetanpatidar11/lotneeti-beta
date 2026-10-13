@@ -1,6 +1,5 @@
-from datetime import datetime, time, timedelta
+from datetime import timedelta
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 
 from django.utils import timezone
 from rest_framework import serializers
@@ -9,6 +8,7 @@ from ipos.content import published_summary
 from ipos.gmp_effective import effective_observation_value, resolve_gmp
 from ipos.models import IPO, GMPObservation
 from ipos.overrides import OVERRIDABLE_FIELDS, effective_ipo_resolution, effective_ipo_values
+from ipos.selection import selection_status
 
 
 def gmp_percent(value: Decimal, upper_price: Decimal) -> Decimal:
@@ -130,14 +130,7 @@ class PublicIPOSerializer(serializers.ModelSerializer):
         effective = self._ipo_resolution(instance).values
         for name in OVERRIDABLE_FIELDS.intersection(result):
             result[name] = self.fields[name].to_representation(effective[name])
-        close_at = datetime.combine(
-            effective["close_date"], time(17), tzinfo=ZoneInfo("Asia/Kolkata")
-        )
-        if (
-            effective["status"] in {IPO.Status.OPEN, IPO.Status.UPCOMING}
-            and timezone.now() >= close_at
-        ):
-            result["status"] = IPO.Status.CLOSED
+        result["status"] = selection_status(effective, at=timezone.now())
         return result
 
     def _ipo_resolution(self, obj):

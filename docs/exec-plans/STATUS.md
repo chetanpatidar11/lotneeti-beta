@@ -1,5 +1,9 @@
 # LotNeeti execution status
 
+## D01 opening-day IPO status correction — in progress, 2026-10-13
+
+- HD Fire Protect was still labelled Upcoming on its stated opening date (13 Oct 2026) because the public API retained the feed's cached status until the source changed it. Align the public card, workspace selection and planner with the issue's effective open/close dates in Asia/Kolkata: Upcoming before the open date, Open from the opening day, Closed at 17:00 IST on the close date. Verify boundaries and deploy to the beta after the existing gate passes.
+
 ## Cloudflare DNS and SES domain verification — complete, 2026-10-13
 
 - The founder moved `lotneeti.dpdns.org` DNS from DigitalPlat-hosted records to Cloudflare's `denver.ns.cloudflare.com` and `lady.ns.cloudflare.com`. All four DigitalPlat parent nameservers delegate to this pair. Both Cloudflare nameservers publish the correct DNS-only A record `54.208.70.218`, the three SES Easy DKIM CNAMEs with absolute `dkim.amazonses.com` targets, and `_dmarc` TXT `v=DMARC1; p=none;`. The existing EC2 Let's Encrypt certificate remains the HTTPS certificate; public `/`, `/sign-in` and API health each returned 200 with valid TLS when the resolver used the new delegation.
