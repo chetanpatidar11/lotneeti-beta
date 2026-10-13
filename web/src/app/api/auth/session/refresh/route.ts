@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { copyAuthCookies } from "@/lib/auth-cookies";
 import { backendUrl } from "@/lib/backend";
+import { trustedWorkspaceMutation } from "@/lib/proxy";
 
 export async function POST(request: NextRequest) {
+  if (!trustedWorkspaceMutation(request)) return new NextResponse(null, { status: 403 });
   if (!request.cookies.has("sessionid")) return new NextResponse(null, { status: 401 });
   try {
     const url = backendUrl("auth/session/refresh/");

@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { copyAuthCookies } from "@/lib/auth-cookies";
 import { backendUrl } from "@/lib/backend";
+import { trustedWorkspaceMutation } from "@/lib/proxy";
 
 export async function POST(request: NextRequest) {
+  if (!trustedWorkspaceMutation(request)) return new NextResponse(null, { status: 403 });
   const csrfToken = request.cookies.get("csrftoken")?.value;
   const url = backendUrl("auth/logout/");
   try {

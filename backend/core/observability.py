@@ -61,6 +61,8 @@ class RequestLogMiddleware:
             )
             raise
         response["X-Request-ID"] = request_id
+        if request.path.startswith("/api/v1/"):
+            response["Cache-Control"] = "private, no-store"
         self.logger.log(
             logging.ERROR if response.status_code >= 500 else logging.INFO,
             "request.completed",

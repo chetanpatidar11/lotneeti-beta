@@ -226,7 +226,11 @@ def _masked_upi(value: str) -> str:
 
 
 def preview_payload(batch: AccountImportBatch) -> dict:
-    rows = json.loads(decrypt_value(batch.rows_ciphertext, purpose="account-import"))
+    rows = (
+        json.loads(decrypt_value(batch.rows_ciphertext, purpose="account-import"))
+        if batch.status == AccountImportBatch.Status.PREVIEWED
+        else []
+    )
     return {
         "id": str(batch.pk),
         "status": batch.status,
@@ -438,7 +442,9 @@ def confirm_batch(
 
     batch.status = AccountImportBatch.Status.CONFIRMED
     batch.confirmed_at = timezone.now()
-    batch.save(update_fields=["status", "confirmed_at"])
+    # Keep the audit record, but not a second copy of imported financial identifiers.
+    batch.rows_ciphertext = ""
+    batch.save(update_fields=["status", "confirmed_at", "rows_ciphertext"])
     record_event(
         action="account_import.confirmed",
         target=batch,

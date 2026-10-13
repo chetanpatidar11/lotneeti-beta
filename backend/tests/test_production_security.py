@@ -27,6 +27,7 @@ def test_production_settings_require_https_and_secure_cookies(monkeypatch):
     assert prod.SESSION_COOKIE_SECURE is True
     assert prod.SESSION_COOKIE_HTTPONLY is True
     assert prod.CSRF_COOKIE_SECURE is True
+    assert prod.CSRF_COOKIE_HTTPONLY is True
     assert prod.SECURE_HSTS_SECONDS > 0
     assert prod.SECURE_CONTENT_TYPE_NOSNIFF is True
     assert prod.X_FRAME_OPTIONS == "DENY"
@@ -40,6 +41,7 @@ def test_production_settings_require_https_and_secure_cookies(monkeypatch):
         SESSION_COOKIE_SECURE=prod.SESSION_COOKIE_SECURE,
         SESSION_COOKIE_HTTPONLY=prod.SESSION_COOKIE_HTTPONLY,
         CSRF_COOKIE_SECURE=prod.CSRF_COOKIE_SECURE,
+        CSRF_COOKIE_HTTPONLY=prod.CSRF_COOKIE_HTTPONLY,
     ):
         client = Client()
         insecure = client.get(reverse("api-v1-health"))
@@ -50,5 +52,7 @@ def test_production_settings_require_https_and_secure_cookies(monkeypatch):
         assert secure["Strict-Transport-Security"].startswith("max-age=")
         assert secure["X-Content-Type-Options"] == "nosniff"
         assert secure["X-Frame-Options"] == "DENY"
+        assert secure["Cache-Control"] == "private, no-store"
         client.get(reverse("founder_admin:login"), secure=True)
         assert client.cookies["csrftoken"]["secure"] is True
+        assert client.cookies["csrftoken"]["httponly"] is True

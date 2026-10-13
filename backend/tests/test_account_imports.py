@@ -1,10 +1,12 @@
 import io
 import zipfile
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from accounts.models import User
@@ -12,6 +14,7 @@ from accounts.services import create_workspace
 from core.models import AuditEvent
 from funding.models import BankAccount, UPIHandle
 from investors.models import AccountImportBatch, DematAccount, Investor
+from investors.tasks import purge_expired_account_import_previews
 
 SAMPLE = Path(__file__).resolve().parents[2] / "docs" / "samples" / "AccountImportTemplate.xlsx"
 
@@ -140,6 +143,40 @@ def test_sample_account_workbook_previews_masked_rows_and_confirms_only_selected
     assert BankAccount.objects.count() == 1
     assert UPIHandle.objects.count() == 1
     assert AuditEvent.objects.filter(action="account_import.confirmed").exists()
+    batch.refresh_from_db()
+    assert batch.rows_ciphertext == ""
+
+
+@pytest.mark.django_db
+def test_old_import_previews_expire_and_legacy_confirmed_rows_are_scrubbed():
+    owner = User.objects.create_user(email="cleanup@example.test")
+    workspace = create_workspace(name="Family", owner=owner)
+    client = APIClient()
+    client.force_authenticate(owner)
+    first = client.post(
+        reverse("account-import-list", args=[workspace.pk]),
+        {"file": distinct_rows_upload()},
+        format="multipart",
+    )
+    old = AccountImportBatch.objects.get(pk=first.data["id"])
+    AccountImportBatch.objects.filter(pk=old.pk).update(
+        created_at=timezone.now() - timedelta(days=2)
+    )
+    second = client.post(
+        reverse("account-import-list", args=[workspace.pk]),
+        {"file": distinct_rows_upload()},
+        format="multipart",
+    )
+    legacy = AccountImportBatch.objects.get(pk=second.data["id"])
+    legacy.status = AccountImportBatch.Status.CONFIRMED
+    legacy.save(update_fields=["status"])
+
+    result = purge_expired_account_import_previews()
+
+    assert result == {"expired_previews": 1, "confirmed_scrubbed": 1}
+    assert not AccountImportBatch.objects.filter(pk=old.pk).exists()
+    legacy.refresh_from_db()
+    assert legacy.rows_ciphertext == ""
 
 
 @pytest.mark.django_db

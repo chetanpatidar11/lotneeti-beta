@@ -23,6 +23,7 @@ set +a
 export DJANGO_SETTINGS_MODULE=config.settings.prod
 
 runuser -u lotneeti -- python3 -m venv "$app_root/.venv"
+runuser -u lotneeti -- "$app_root/.venv/bin/python" -m pip install --no-cache-dir --upgrade 'pip>=26.2,<27'
 runuser -u lotneeti -- "$app_root/.venv/bin/python" -m pip install --no-cache-dir -e "$app_root/backend"
 runuser -u lotneeti -- npm ci --prefix "$app_root/web"
 runuser -u lotneeti -- npm --prefix "$app_root/web" run build

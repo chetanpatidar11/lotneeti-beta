@@ -1,11 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { backendUrl } from "./backend";
+import { backendUrl, frontendBaseUrl } from "./backend";
+
+export function trustedWorkspaceMutation(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  const fetchSite = request.headers.get("sec-fetch-site");
+  return (
+    (origin === new URL(frontendBaseUrl).origin || (origin === null && fetchSite === "same-origin")) &&
+    (fetchSite === null || ["same-origin", "none"].includes(fetchSite))
+  );
+}
 
 export async function proxyWorkspaceRequest(
   request: NextRequest,
   path: string,
   method: "GET" | "POST" | "PATCH" | "DELETE",
 ): Promise<NextResponse> {
+  if (method !== "GET" && !trustedWorkspaceMutation(request)) {
+    return NextResponse.json({ message: "Invalid request origin." }, { status: 403 });
+  }
   const url = backendUrl(path);
   const csrfToken = request.cookies.get("csrftoken")?.value;
   try {
@@ -20,10 +32,10 @@ export async function proxyWorkspaceRequest(
       ...(method === "GET" || method === "DELETE" ? {} : { body: await request.text() }),
       cache: "no-store",
     });
-    if (response.status === 204) return new NextResponse(null, { status: 204 });
+    if (response.status === 204) return new NextResponse(null, { status: 204, headers: { "cache-control": "no-store" } });
     return new NextResponse(await response.text(), {
       status: response.status,
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
     });
   } catch {
     return NextResponse.json({ message: "Service is temporarily unavailable." }, { status: 503 });
@@ -34,6 +46,9 @@ export async function proxyWorkspaceUpload(
   request: NextRequest,
   path: string,
 ): Promise<NextResponse> {
+  if (!trustedWorkspaceMutation(request)) {
+    return NextResponse.json({ message: "Invalid request origin." }, { status: 403 });
+  }
   const url = backendUrl(path);
   const csrfToken = request.cookies.get("csrftoken")?.value;
   try {
@@ -49,7 +64,7 @@ export async function proxyWorkspaceUpload(
     });
     return new NextResponse(await response.text(), {
       status: response.status,
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
     });
   } catch {
     return NextResponse.json({ message: "Import is temporarily unavailable." }, { status: 503 });

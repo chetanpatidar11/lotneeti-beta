@@ -1,5 +1,10 @@
 # LotNeeti execution status
 
+## E01 import display and bank-data security review — in progress, 2026-10-13
+
+- Founder requested a lighter import scroll surface and security checks before entering real bank accounts. The local review found that the Next workspace proxy automatically forwarded Django's CSRF cookie without checking the browser request origin; a cross-site mutation could reach it under permissive cookie circumstances. Add a same-origin mutation gate with regression tests. Confirmed import previews retained an extra encrypted copy of complete PAN, demat, UPI and account details; erase the row payload after confirmation. Mark the production CSRF cookie HttpOnly.
+- Production dependency audit found advisories in the installed cryptography and Django REST Framework releases; move to fixed versions and rerun the complete gate. The live HTTPS route currently enforces TLS redirect, HSTS, frame denial and nosniff, and anonymous workspace API access returns 403. A live backup/restore and host configuration review remain pending SSH access.
+
 ## D01 opening-day IPO status correction — in progress, 2026-10-13
 
 - HD Fire Protect was still labelled Upcoming on its stated opening date (13 Oct 2026) because the public API retained the feed's cached status until the source changed it. Align the public card, workspace selection and planner with the issue's effective open/close dates in Asia/Kolkata: Upcoming before the open date, Open from the opening day, Closed at 17:00 IST on the close date. Verify boundaries and deploy to the beta after the existing gate passes.

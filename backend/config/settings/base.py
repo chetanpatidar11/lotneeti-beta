@@ -122,6 +122,10 @@ RATE_LIMIT_RULES = {
     "planner": (30, 60),
 }
 CELERY_BEAT_SCHEDULE = {
+    "purge-expired-account-import-previews": {
+        "task": "investors.tasks.purge_expired_account_import_previews",
+        "schedule": crontab(hour=0, minute=10),
+    },
     "post-due-recurring-debits": {
         "task": "funding.tasks.run_due_recurring_debits",
         "schedule": crontab(hour=0, minute=5),
