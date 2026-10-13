@@ -3,6 +3,8 @@
 ## D01 opening-day IPO status correction — in progress, 2026-10-13
 
 - HD Fire Protect was still labelled Upcoming on its stated opening date (13 Oct 2026) because the public API retained the feed's cached status until the source changed it. Align the public card, workspace selection and planner with the issue's effective open/close dates in Asia/Kolkata: Upcoming before the open date, Open from the opening day, Closed at 17:00 IST on the close date. Verify boundaries and deploy to the beta after the existing gate passes.
+- The shared status rule and public serializer now derive the active status from those dates. Opening-day/closing-time regression tests and `bash scripts/check.sh` passed (378 backend tests, web and Android tests/build gates). Commit `cd7f698` was pushed to the existing work branch. The live anonymous market API still returned HD Fire Protect as Upcoming with a 13 Oct open date before deployment, confirming the observed mismatch.
+- Deployment awaits AWS sign-in: workstation SSH to the restricted EC2 port 22 timed out, and the local AWS CLI session has expired. The founder was asked to finish AWS sign-in in the opened tab. Afterward update the existing single-IP SSH rule, run the encrypted pre-release backup, deploy and verify the live market API.
 
 ## Cloudflare DNS and SES domain verification — complete, 2026-10-13
 
