@@ -11,6 +11,8 @@ PAN_PATTERN = re.compile(r"^[A-Z]{5}[0-9]{4}[A-Z]$")
 class InvestorSerializer(serializers.ModelSerializer):
     pan = serializers.CharField(write_only=True, required=False)
     pan_masked = serializers.CharField(read_only=True)
+    payment_hint_masked = serializers.CharField(read_only=True)
+    payment_ready = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Investor
@@ -19,6 +21,8 @@ class InvestorSerializer(serializers.ModelSerializer):
             "name",
             "pan",
             "pan_masked",
+            "payment_hint_masked",
+            "payment_ready",
             "planning_priority",
             "active",
             "created_at",

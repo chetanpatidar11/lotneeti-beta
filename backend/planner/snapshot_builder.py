@@ -96,8 +96,14 @@ def build_snapshot(
 
     investors = list(Investor.objects.filter(workspace=workspace).order_by("id"))
     demats = DematAccount.objects.filter(investor__workspace=workspace).order_by("id")
-    banks = BankAccount.objects.filter(workspace=workspace).order_by("id")
-    upis = UPIHandle.objects.filter(bank__workspace=workspace).order_by("id")
+    banks = list(BankAccount.objects.filter(workspace=workspace).order_by("id"))
+    upis = list(UPIHandle.objects.filter(bank__workspace=workspace).order_by("id"))
+    own_active_banks = {bank.pk: bank.owner_id for bank in banks if bank.active}
+    ready_payment_investors = {
+        upi.holder_id
+        for upi in upis
+        if upi.active and upi.verified and own_active_banks.get(upi.bank_id) == upi.holder_id
+    }
     preferences = FundingPreference.objects.filter(beneficiary__workspace=workspace).order_by("id")
     schedules = RecurringDebit.objects.filter(
         bank__workspace=workspace, active=True, archived_at__isnull=True
@@ -115,7 +121,13 @@ def build_snapshot(
         ),
         ipos=tuple(selected_ipos),
         applicants=tuple(
-            ApplicantInput(str(item.pk), item.planning_priority, item.active) for item in investors
+            ApplicantInput(
+                str(item.pk),
+                item.planning_priority,
+                item.active
+                and (not item.payment_setup_pending or item.pk in ready_payment_investors),
+            )
+            for item in investors
         ),
         demats=tuple(
             DematInput(str(item.pk), str(item.investor_id), item.active) for item in demats

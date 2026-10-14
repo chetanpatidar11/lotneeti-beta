@@ -12,6 +12,8 @@ type Investor = {
   pan_masked: string;
   planning_priority: number;
   active: boolean;
+  payment_ready: boolean;
+  payment_hint_masked: string;
 };
 type Demat = { id: string; depository: string; dp_id_masked: string; client_id_masked: string; broker: string; active: boolean };
 type Upi = { id: string; holder: string; bank_id: string; handle_masked: string; active: boolean; verified: boolean };

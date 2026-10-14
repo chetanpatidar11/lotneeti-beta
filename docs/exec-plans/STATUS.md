@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## B09 one-file import with shared UPI references — local, 2026-10-14
+
+- A single workbook can now import investors and demat accounts when bank number and bank name are both blank. The UPI prefix appears only as a masked payment reference; it is never stored as a bank account number. Repeated UPI handles across different PANs remain encrypted hints, not duplicate payment methods. Rows with incomplete or conflicting funding are counted as payment setup pending.
+- Pending investors remain visible in Settings as “Payment needed” and are excluded from IPO planning until they have their own active bank and verified UPI. Existing complete, non-conflicting rows still create bank/UPI records. Both bank fields must be supplied together when provided.
+- A synthetic 17-row workbook with six repeated UPIs imported all 17 investors/demats and created no fabricated bank/UPI records. The full `scripts/check.sh` gate passed: 381 backend tests, 37 web tests, migration checks, lint, typecheck and web/Android builds. No real workbook or account identifiers were copied into Git. Deployment awaits updating the existing single-IP SSH security-group rule; the AWS CLI login cache is expired.
+
 ## E01 import display and bank-data security review — deployed, 2026-10-13
 
 - Founder requested a consistent import scroll surface and security checks before entering real bank accounts. The import review/table now use the site's raised/soft surfaces; the app canvas fills the viewport in Light and Dark. The Next workspace proxy now rejects cross-origin and cross-site mutations before forwarding session/CSRF cookies. Auth refresh and logout apply the same origin check. Production CSRF cookies are HttpOnly and API responses carry `private, no-store`.

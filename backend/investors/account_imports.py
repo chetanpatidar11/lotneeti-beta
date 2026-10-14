@@ -189,10 +189,8 @@ def _validate_row(row: dict[str, str]) -> list[str]:
     if not UPI_PATTERN.fullmatch(upi):
         errors.append("UPI ID must look like name@provider.")
     row["UPI ID"] = upi
-    if not row["Account Number"]:
-        errors.append("Account Number is required.")
-    if not row["Bank Name"]:
-        errors.append("Bank Name is required.")
+    if bool(row["Account Number"]) != bool(row["Bank Name"]):
+        errors.append("Provide both bank fields or leave both blank.")
     return errors
 
 
@@ -248,6 +246,12 @@ def preview_payload(batch: AccountImportBatch) -> dict:
                 "upi_masked": _masked_upi(row["UPI ID"]),
                 "account_masked": _mask(row["Account Number"]),
                 "bank_name": row["Bank Name"],
+                "payment_reference": (
+                    "••••" + row["UPI ID"].split("@", 1)[0][-4:]
+                    if not row["Account Number"]
+                    else ""
+                ),
+                "payment_pending": not (row["Account Number"] and row["Bank Name"]),
                 "errors": row["errors"],
             }
             for row in rows
@@ -336,16 +340,17 @@ def confirm_batch(
                 if len(value) > (40 if key == "account_number" else 120):
                     raise AccountImportError("An entered bank detail is too long.")
                 row[field] = value
-        if details:
+        if row["Account Number"] and row["Bank Name"]:
             row["errors"] = [
                 error
                 for error in row["errors"]
-                if error not in {"Account Number is required.", "Bank Name is required."}
-            ] + [
-                error
-                for error in _validate_row(row)
-                if error in {"Account Number is required.", "Bank Name is required."}
+                if error != "Provide both bank fields or leave both blank."
             ]
+        if bool(row["Account Number"]) != bool(row["Bank Name"]):
+            raise AccountImportError(
+                "Provide both bank fields or leave both blank.",
+                errors={str(row["row_number"]): ["Incomplete bank details."]},
+            )
     invalid = {
         str(row["row_number"]): row["errors"]
         for row in rows
@@ -374,7 +379,7 @@ def confirm_batch(
                 errors={str(row["row_number"]): ["PAN already exists."]},
             )
 
-    created = {"investors": 0, "demats": 0, "banks": 0, "upis": 0}
+    created = {"investors": 0, "demats": 0, "banks": 0, "upis": 0, "payment_pending": 0}
     next_priority = (
         Investor.objects.filter(workspace=batch.workspace)
         .order_by("-planning_priority")
@@ -389,6 +394,7 @@ def confirm_batch(
             planning_priority=next_priority,
         )
         investor.set_pan(row["PAN"])
+        investor.set_payment_hint(row["UPI ID"])
         investor.save()
         next_priority += 1
         created["investors"] += 1
@@ -396,12 +402,29 @@ def confirm_batch(
         _demat, was_created = _find_or_create_demat(investor, row)
         created["demats"] += was_created
 
-        bank = BankAccount.objects.filter(
+        if not (row["Account Number"] and row["Bank Name"]):
+            investor.payment_setup_pending = True
+            investor.save(update_fields=["payment_setup_pending"])
+            created["payment_pending"] += 1
+            continue
+
+        upi_hash = upi_hash_for_workspace(batch.workspace_id, row["UPI ID"])
+        existing_upi = UPIHandle.objects.filter(handle_lookup_hash=upi_hash).first()
+        existing_bank = BankAccount.objects.filter(
             workspace=batch.workspace,
             account_lookup_hash=account_hash_for_workspace(
                 batch.workspace_id, row["Account Number"]
             ),
         ).first()
+        if (existing_upi and existing_upi.holder_id != investor.pk) or (
+            existing_bank and existing_bank.owner_id != investor.pk
+        ):
+            investor.payment_setup_pending = True
+            investor.save(update_fields=["payment_setup_pending"])
+            created["payment_pending"] += 1
+            continue
+
+        bank = existing_bank
         if bank is None:
             bank = BankAccount(
                 workspace=batch.workspace,
@@ -421,24 +444,16 @@ def confirm_batch(
                 note="Imported account; set the current Balance before planning.",
             )
             created["banks"] += 1
-        elif bank.owner_id != investor.pk:
-            raise AccountImportError(
-                "An account number is already linked to another investor.",
-                errors={str(row["row_number"]): ["Bank account owner conflict."]},
-            )
-
-        upi_hash = upi_hash_for_workspace(batch.workspace_id, row["UPI ID"])
-        upi = UPIHandle.objects.filter(handle_lookup_hash=upi_hash).first()
+        upi = existing_upi
         if upi is None:
             upi = UPIHandle(bank=bank, holder=investor, verified=False)
             upi.set_handle(row["UPI ID"])
             upi.save()
             created["upis"] += 1
-        elif upi.bank_id != bank.pk or upi.holder_id != investor.pk:
-            raise AccountImportError(
-                "A UPI ID is already linked to another account.",
-                errors={str(row["row_number"]): ["UPI ownership conflict."]},
-            )
+        elif upi.bank_id != bank.pk:
+            investor.payment_setup_pending = True
+            investor.save(update_fields=["payment_setup_pending"])
+            created["payment_pending"] += 1
 
     batch.status = AccountImportBatch.Status.CONFIRMED
     batch.confirmed_at = timezone.now()

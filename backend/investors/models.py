@@ -22,6 +22,8 @@ class Investor(models.Model):
         default=1, validators=[MinValueValidator(1)]
     )
     active = models.BooleanField(default=True)
+    payment_setup_pending = models.BooleanField(default=False)
+    payment_hint_ciphertext = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -44,6 +46,25 @@ class Investor(models.Model):
     def pan_masked(self) -> str:
         pan = decrypt_value(self.pan_ciphertext, purpose="pan")
         return f"******{pan[-4:]}"
+
+    def set_payment_hint(self, upi: str) -> None:
+        self.payment_hint_ciphertext = encrypt_value(upi, purpose="payment-hint")
+
+    @property
+    def payment_hint_masked(self) -> str:
+        if not self.payment_hint_ciphertext:
+            return ""
+        handle = decrypt_value(self.payment_hint_ciphertext, purpose="payment-hint")
+        prefix, provider = handle.rsplit("@", 1)
+        return f"••••{prefix[-4:]}@{provider}"
+
+    @property
+    def payment_ready(self) -> bool:
+        if not self.payment_setup_pending:
+            return True
+        return self.upis.filter(
+            active=True, verified=True, bank__active=True, bank__owner=self
+        ).exists()
 
 
 class DematAccount(models.Model):
