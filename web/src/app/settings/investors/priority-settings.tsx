@@ -140,16 +140,17 @@ export default function PrioritySettings({
     detail: demat.broker || "Broker not set", active: demat.active,
   })));
   const bankRows = banks.map((bank) => ({
-    id: bank.id, name: `${bank.is_placeholder ? "Bank details needed" : bank.bank_name} · ${bank.account_masked}`, owner: bank.is_placeholder ? "Choose holder" : investorName(bank.owner),
-    detail: bank.is_placeholder ? "UPI reference · add real bank details" : `Balance ${formatInr(bank.current_balance)}`, active: bank.active, isPlaceholder: bank.is_placeholder,
+    id: bank.id, name: `${bank.bank_name || "BANK"} · ${bank.account_reference || bank.account_masked}`, owner: bank.is_placeholder ? "Choose owner" : investorName(bank.owner),
+    detail: `Balance ${formatInr(bank.current_balance)}`, active: bank.active, isPlaceholder: bank.is_placeholder,
+    statusLabel: bank.is_placeholder ? "Choose owner" : undefined,
   }));
   const upiRows = Object.values(linkedAccounts).flatMap((accounts) => accounts.upis.map((upi) => {
     const bank = banks.find((item) => item.id === upi.bank_id);
     const holder = investors.find((item) => item.id === upi.holder);
     return {
       id: upi.id, name: upi.handle, owner: bank?.is_placeholder ? "Choose holder" : investorName(upi.holder),
-      detail: bank?.bank_name || "Bank details needed", active: upi.active,
-      statusLabel: upi.active ? (bank?.is_placeholder ? "Bank details needed" : !bank?.active ? "Bank inactive" : !holder?.active ? "Investor inactive" : undefined) : undefined,
+      detail: bank?.is_placeholder ? "BANK · choose owner" : bank?.bank_name || "BANK", active: upi.active,
+      statusLabel: upi.active ? (bank?.is_placeholder ? "Choose owner" : !bank?.active ? "Bank inactive" : !holder?.active ? "Investor inactive" : undefined) : undefined,
     };
   }));
 
@@ -254,9 +255,10 @@ export default function PrioritySettings({
       const response = await fetch(`/api/workspaces/${workspace.id}/banks/${id}`);
       if (!response.ok) throw new Error(await accountError(response, "Could not load the bank details."));
       const detail = await response.json() as BankOption & { account_number: string };
-      setEditBankOwner(detail.is_placeholder ? "" : detail.owner);
-      setEditBankName(detail.is_placeholder ? "" : detail.bank_name);
-      setEditAccountNumber(detail.is_placeholder ? "" : detail.account_number);
+      const matchingInvestors = investors.filter((investor) => investor.payment_hint === detail.account_reference);
+      setEditBankOwner(detail.is_placeholder ? matchingInvestors.length === 1 ? matchingInvestors[0].id : "" : detail.owner);
+      setEditBankName(detail.bank_name || "BANK");
+      setEditAccountNumber(detail.account_number);
       setEditBankId(id);
     } catch (error) { note(error instanceof Error ? error.message : "Could not load the bank details.", true); }
     finally { setBusy(false); }
@@ -327,7 +329,7 @@ export default function PrioritySettings({
     try {
       const response = await fetch(`/api/workspaces/${workspace.id}/banks/${editBankId}`, {
         method: "PATCH", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ owner: editBankOwner, bank_name: editBankName, account_number: editAccountNumber }),
+        body: JSON.stringify({ owner: editBankOwner, bank_name: editBankName, account_number: editAccountNumber, ...(banks.find((bank) => bank.id === editBankId)?.is_placeholder ? { active: true } : {}) }),
       });
       if (!response.ok) throw new Error(await accountError(response, "Check the bank details and try again."));
       const updated = await response.json() as BankOption;
@@ -540,11 +542,11 @@ export default function PrioritySettings({
         <label htmlFor="edit-broker">Broker</label><input id="edit-broker" value={editBroker} onChange={(event) => setEditBroker(event.target.value)} />
         <button type="submit" disabled={busy}>Save demat</button>
       </form></Drawer>}
-      {editBankId && <Drawer title={banks.find((bank) => bank.id === editBankId)?.is_placeholder ? "Complete bank details" : "Edit bank account"} onClose={() => setEditBankId(null)}><form className="sign-in-form" onSubmit={saveBank}>
-        {banks.find((bank) => bank.id === editBankId)?.is_placeholder && <p className="form-note">Enter the real bank details before using this account for planning.</p>}
+      {editBankId && <Drawer title={banks.find((bank) => bank.id === editBankId)?.is_placeholder ? "Choose bank account owner" : "Edit bank account"} onClose={() => setEditBankId(null)}><form className="sign-in-form" onSubmit={saveBank}>
+        {(banks.find((bank) => bank.id === editBankId)?.is_placeholder || banks.find((bank) => bank.id === editBankId)?.is_imported_reference) && <p className="form-note">This account uses the UPI ID as its account number. You can replace it with the real bank account number now or later.</p>}
         <label htmlFor="edit-bank-owner">Bank and UPI holder</label><select id="edit-bank-owner" value={editBankOwner} onChange={(event) => setEditBankOwner(event.target.value)} required><option value="">Choose holder</option>{investors.filter((investor) => investor.active || investor.id === editBankOwner).map((investor) => <option key={investor.id} value={investor.id}>{investor.name}{investor.active ? "" : " (inactive)"}</option>)}</select>
         <label htmlFor="edit-bank-name">Bank name</label><input id="edit-bank-name" required value={editBankName} onChange={(event) => setEditBankName(event.target.value)} />
-        <label htmlFor="edit-bank-number">Real account number</label><input id="edit-bank-number" required autoComplete="off" value={editAccountNumber} onChange={(event) => setEditAccountNumber(event.target.value)} />
+        <label htmlFor="edit-bank-number">Account number</label><input id="edit-bank-number" required autoComplete="off" value={editAccountNumber} onChange={(event) => setEditAccountNumber(event.target.value)} />
         <button type="submit" disabled={busy}>Save bank details</button>
       </form></Drawer>}
       {addAccountKind === "bank" && <Drawer title="Add bank account" onClose={() => setAddAccountKind(null)}><form className="sign-in-form" onSubmit={addBank}>
@@ -556,17 +558,17 @@ export default function PrioritySettings({
       </form></Drawer>}
       {addAccountKind === "upi" && <Drawer title="Add UPI" onClose={() => setAddAccountKind(null)}><form className="sign-in-form" onSubmit={addUpi}>
         <label htmlFor="upi-holder">Investor</label><select id="upi-holder" value={accountInvestorId} onChange={(event) => setAccountInvestorId(event.target.value)} required>{activeInvestors.map((investor) => <option key={investor.id} value={investor.id}>{investor.name}</option>)}</select>
-        <label htmlFor="upi-bank">Bank account</label><select id="upi-bank" value={upiBankId} onChange={(event) => setUpiBankId(event.target.value)} required>{banks.filter((bank) => bank.active).map((bank) => <option key={bank.id} value={bank.id}>{bank.bank_name} · {bank.account_masked}</option>)}</select>
+        <label htmlFor="upi-bank">Bank account</label><select id="upi-bank" value={upiBankId} onChange={(event) => setUpiBankId(event.target.value)} required>{banks.filter((bank) => bank.active).map((bank) => <option key={bank.id} value={bank.id}>{bank.bank_name} · {bank.account_reference || bank.account_masked}</option>)}</select>
         <label htmlFor="upi-handle">UPI ID</label><input id="upi-handle" required autoComplete="off" placeholder="name@provider" value={upiHandle} onChange={(event) => setUpiHandle(event.target.value)} />
         <button type="submit" disabled={busy}>Add UPI</button>
       </form></Drawer>}
       {editUpiId && <Drawer title="Edit UPI" onClose={() => setEditUpiId(null)}><form className="sign-in-form" onSubmit={saveUpi}>
         <label htmlFor="edit-upi-holder">Investor</label><select id="edit-upi-holder" value={editUpiHolder} onChange={(event) => setEditUpiHolder(event.target.value)} required>{investors.filter((investor) => investor.active || investor.id === editUpiHolder).map((investor) => <option key={investor.id} value={investor.id}>{investor.name}{investor.active ? "" : " (inactive)"}</option>)}</select>
-        <label htmlFor="edit-upi-bank">Bank account</label><select id="edit-upi-bank" value={editUpiBankId} onChange={(event) => setEditUpiBankId(event.target.value)} required>{banks.filter((bank) => bank.active || bank.id === editUpiBankId).map((bank) => <option key={bank.id} value={bank.id}>{bank.is_placeholder ? "Bank details needed" : bank.bank_name} · {bank.account_masked}</option>)}</select>
+        <label htmlFor="edit-upi-bank">Bank account</label><select id="edit-upi-bank" value={editUpiBankId} onChange={(event) => setEditUpiBankId(event.target.value)} required>{banks.filter((bank) => bank.active || bank.id === editUpiBankId).map((bank) => <option key={bank.id} value={bank.id}>{bank.bank_name || "BANK"} · {bank.account_reference || bank.account_masked}</option>)}</select>
         <label htmlFor="edit-upi-handle">UPI ID</label><input id="edit-upi-handle" required autoComplete="off" value={editUpiHandle} onChange={(event) => setEditUpiHandle(event.target.value)} />
         <button type="submit" disabled={busy}>Save UPI</button>
       </form></Drawer>}
-      {focusedInvestor && <Drawer title={focusedInvestor.name} onClose={() => setSelectedInvestor(null)}><div className="settings-investor-detail"><p><strong>PAN</strong><span>{focusedInvestor.pan_masked}</span></p><p><strong>Status</strong><StatusBadge tone={!focusedInvestor.active ? "neutral" : focusedInvestor.payment_ready ? "positive" : "warning"}>{!focusedInvestor.active ? "Inactive" : focusedInvestor.payment_ready ? "Active" : "Payment needed"}</StatusBadge></p>{!focusedInvestor.payment_ready && <p><strong>UPI reference</strong><span>{focusedInvestor.payment_hint} · Complete and activate the linked bank before planning.</span></p>}</div><div className="settings-linked"><h3>Demat Account</h3>{linkedAccounts[focusedInvestor.id]?.demats.length ? linkedAccounts[focusedInvestor.id].demats.map((demat) => <p key={demat.id}>{demat.depository} · {demat.dp_id_masked} / {demat.client_id_masked} <small>{demat.broker} · {demat.active ? "Active" : "Inactive"}</small></p>) : <p>No demat account yet.</p>}<h3>Bank Accounts</h3>{banks.filter((bank) => bank.owner === focusedInvestor.id).map((bank) => <p key={bank.id}>{bank.is_placeholder ? "Bank details needed" : bank.bank_name} · {bank.account_masked} <small>{bank.active ? "Active" : "Inactive"}</small></p>)}<h3>UPIs</h3>{linkedAccounts[focusedInvestor.id]?.upis.length ? linkedAccounts[focusedInvestor.id].upis.map((upi) => <p key={upi.id}>{upi.handle} <small>{upi.verified ? "Ready" : "Not ready"} · {upi.active ? "Active" : "Inactive"}</small></p>) : <p>No UPIs yet.</p>}</div>{focusedInvestor.active && <PreferredFunding key={focusedInvestor.id} workspaceId={workspace.id} investor={focusedInvestor} investors={activeInvestors} banks={banks.filter((bank) => bank.active)} initialPreferences={preferences[focusedInvestor.id] ?? []} canEdit={canEdit} />}</Drawer>}
+      {focusedInvestor && <Drawer title={focusedInvestor.name} onClose={() => setSelectedInvestor(null)}><div className="settings-investor-detail"><p><strong>PAN</strong><span>{focusedInvestor.pan_masked}</span></p><p><strong>Status</strong><StatusBadge tone={!focusedInvestor.active ? "neutral" : focusedInvestor.payment_ready ? "positive" : "warning"}>{!focusedInvestor.active ? "Inactive" : focusedInvestor.payment_ready ? "Active" : "Payment needed"}</StatusBadge></p>{!focusedInvestor.payment_ready && <p><strong>UPI reference</strong><span>{focusedInvestor.payment_hint} · Complete and activate the linked bank before planning.</span></p>}</div><div className="settings-linked"><h3>Demat Account</h3>{linkedAccounts[focusedInvestor.id]?.demats.length ? linkedAccounts[focusedInvestor.id].demats.map((demat) => <p key={demat.id}>{demat.depository} · {demat.dp_id_masked} / {demat.client_id_masked} <small>{demat.broker} · {demat.active ? "Active" : "Inactive"}</small></p>) : <p>No demat account yet.</p>}<h3>Bank Accounts</h3>{banks.filter((bank) => bank.owner === focusedInvestor.id).map((bank) => <p key={bank.id}>{bank.bank_name || "BANK"} · {bank.account_reference || bank.account_masked} <small>{bank.active ? "Active" : "Inactive"}</small></p>)}<h3>UPIs</h3>{linkedAccounts[focusedInvestor.id]?.upis.length ? linkedAccounts[focusedInvestor.id].upis.map((upi) => <p key={upi.id}>{upi.handle} <small>{upi.verified ? "Ready" : "Not ready"} · {upi.active ? "Active" : "Inactive"}</small></p>) : <p>No UPIs yet.</p>}</div>{focusedInvestor.active && <PreferredFunding key={focusedInvestor.id} workspaceId={workspace.id} investor={focusedInvestor} investors={activeInvestors} banks={banks.filter((bank) => bank.active)} initialPreferences={preferences[focusedInvestor.id] ?? []} canEdit={canEdit} />}</Drawer>}
       {showAddInvestor && <Drawer title="Add investor" onClose={() => setShowAddInvestor(false)}><form onSubmit={addInvestor} className="sign-in-form"><label htmlFor="investor-name">Name</label><input id="investor-name" required value={name} onChange={(event) => setName(event.target.value)} /><label htmlFor="investor-pan">PAN</label><input id="investor-pan" required maxLength={10} autoComplete="off" value={pan} onChange={(event) => setPan(event.target.value)} /><button type="submit" disabled={busy}>Add investor</button></form></Drawer>}
       {pendingRemoval && <ConfirmationDialog title={`Permanently delete ${pendingCount} ${pendingName}${pendingCount === 1 ? "" : "s"}?`} description={`These records cannot be restored. ${pendingRemoval.kind === "bank" || pendingRemoval.kind === "investor" ? "Bank balance history stays in Funds. Accounts linked to applications cannot be deleted." : "Records linked to applications cannot be deleted."} ${confirmationDetail}`} confirmLabel={`Delete ${pendingCount === 1 ? pendingName : "selected"}`} busy={busy} onCancel={() => setPendingRemoval(null)} onConfirm={() => void updateItems(pendingRemoval.kind, pendingRemoval.ids, "delete")} />}
     </>}

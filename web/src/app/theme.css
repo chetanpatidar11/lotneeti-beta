@@ -867,6 +867,11 @@ body > #main-content > .page .auth-actions .text-button { min-height: 36px; padd
 .account-import .plan-table-wrap { width: 100%; max-height: min(72vh, 850px); overflow: auto; }
 .account-import { background: var(--surface-raised); }
 .account-import .plan-table-wrap { background: var(--surface-soft); }
+.account-import-shared { display: grid; gap: 10px; margin: 14px 0; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-soft); }
+.account-import-shared h3, .account-import-shared p { margin: 0; }
+.account-import-shared label { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(220px, 2fr); align-items: center; gap: 12px; color: var(--text); font-weight: 700; overflow-wrap: anywhere; }
+.account-import-shared select { width: 100%; min-height: 40px; color: var(--text); background: var(--surface); }
+@media (max-width: 640px) { .account-import-shared label { grid-template-columns: 1fr; } }
 .account-import-table { width: 100%; min-width: 1080px; table-layout: fixed; font-size: 11px; }
 .account-import-table th, .account-import-table td { padding: 6px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .account-import-table th:nth-child(1) { width: 5%; }

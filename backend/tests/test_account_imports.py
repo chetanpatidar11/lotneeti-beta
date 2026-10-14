@@ -14,7 +14,7 @@ from rest_framework.test import APIClient
 from accounts.models import User
 from accounts.services import create_workspace
 from core.models import AuditEvent
-from funding.models import BankAccount, UPIHandle
+from funding.models import BalanceChange, BankAccount, UPIHandle
 from investors.models import AccountImportBatch, DematAccount, Investor
 from investors.tasks import purge_expired_account_import_previews
 
@@ -109,6 +109,23 @@ def missing_bank_upload():
                 contents = contents.replace(b'<c r="H2" t="s"><v>11</v></c>', b"")
             output_zip.writestr(name, contents)
     return SimpleUploadedFile("MissingBank.xlsx", output.getvalue())
+
+
+def partial_bank_upload(*, missing: str):
+    output = io.BytesIO()
+    with (
+        zipfile.ZipFile(io.BytesIO(distinct_rows_upload().read())) as source_zip,
+        zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as output_zip,
+    ):
+        for name in source_zip.namelist():
+            contents = source_zip.read(name)
+            if name == "xl/worksheets/sheet1.xml":
+                if missing == "account":
+                    contents = contents.replace(b'<c r="G2"><v>123456789</v></c>', b"")
+                else:
+                    contents = contents.replace(b'<c r="H2" t="s"><v>11</v></c>', b"")
+            output_zip.writestr(name, contents)
+    return SimpleUploadedFile("PartialBank.xlsx", output.getvalue())
 
 
 def shared_upi_without_banks_upload():
@@ -257,7 +274,7 @@ def test_missing_bank_details_can_be_entered_for_a_selected_preview_row():
     )
     assert preview.status_code == 201
     assert preview.data["rows"][0]["errors"] == []
-    assert preview.data["rows"][0]["payment_pending"] is True
+    assert preview.data["rows"][0]["payment_pending"] is False
     url = reverse("account-import-preview", args=[workspace.pk, preview.data["id"]])
     completed = client.post(
         url,
@@ -282,7 +299,7 @@ def test_missing_bank_details_can_be_entered_for_a_selected_preview_row():
 
 @pytest.mark.django_db
 @override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="WARN")
-def test_one_file_import_registers_one_inactive_bank_and_upi_for_shared_handle():
+def test_shared_upi_requires_owner_then_creates_active_bank_with_zero_balance():
     from planner.snapshot_builder import build_snapshot
 
     owner = User.objects.create_user(email="owner@example.test")
@@ -295,14 +312,17 @@ def test_one_file_import_registers_one_inactive_bank_and_upi_for_shared_handle()
         format="multipart",
     )
     assert preview.status_code == 201
-    assert preview.data["error_count"] == 0
-    assert all(row["payment_pending"] for row in preview.data["rows"])
-    assert all(row["payment_reference"] == "••••name" for row in preview.data["rows"])
-    assert all(row["upi_id"] == "somename@upi" for row in preview.data["rows"])
+    assert all(row["shared_upi"] for row in preview.data["rows"])
+    assert all(row["bank_name"] == "BANK" for row in preview.data["rows"])
+    assert all(row["account_masked"] == "somename@upi" for row in preview.data["rows"])
+    url = reverse("account-import-preview", args=[workspace.pk, preview.data["id"]])
+    missing_owner = client.post(url, {"row_numbers": [2, 3]}, format="json")
+    assert missing_owner.status_code == 400
+    assert Investor.objects.count() == 0
 
     result = client.post(
-        reverse("account-import-preview", args=[workspace.pk, preview.data["id"]]),
-        {"row_numbers": [2, 3]},
+        url,
+        {"row_numbers": [2, 3], "shared_upi_owners": {"somename@upi": 2}},
         format="json",
     )
     assert result.status_code == 200
@@ -311,68 +331,134 @@ def test_one_file_import_registers_one_inactive_bank_and_upi_for_shared_handle()
         "demats": 2,
         "banks": 1,
         "upis": 1,
-        "payment_pending": 2,
+        "payment_pending": 0,
     }
-    assert BankAccount.objects.count() == 1
-    assert UPIHandle.objects.count() == 1
-    placeholder = BankAccount.objects.get()
-    assert placeholder.is_placeholder is True
-    assert placeholder.active is False
-    assert placeholder.bank_name == ""
-    assert UPIHandle.objects.get().verified is True
-    balance_attempt = client.post(
-        reverse("bank-set-balance", args=[workspace.pk, placeholder.pk]),
-        {"amount": "1000.00"},
-        format="json",
-    )
-    assert balance_attempt.status_code == 400
-    assert all(investor.payment_setup_pending for investor in Investor.objects.all())
-    assert all(
-        investor.payment_hint_masked == "••••name@upi" for investor in Investor.objects.all()
-    )
-    assert all(not applicant.active for applicant in build_snapshot(workspace=workspace).applicants)
-
-    activation = client.post(
-        reverse("settings-items", args=[workspace.pk]),
-        {"kind": "bank", "action": "activate", "ids": [str(placeholder.pk)]},
-        format="json",
-    )
-    assert activation.status_code == 400
-    premature_activation = client.patch(
-        reverse("upi-detail", args=[workspace.pk, placeholder.pk, UPIHandle.objects.get().pk]),
-        {"active": True},
-        format="json",
-    )
-    assert premature_activation.status_code == 400
-    same_reference = client.patch(
-        reverse("bank-detail", args=[workspace.pk, placeholder.pk]),
-        {"bank_name": "Synthetic Bank", "account_number": "somename@upi"},
-        format="json",
-    )
-    assert same_reference.status_code == 400
-
-    real_holder = Investor.objects.order_by("planning_priority").last()
-    saved = client.patch(
-        reverse("bank-detail", args=[workspace.pk, placeholder.pk]),
-        {
-            "owner": str(real_holder.pk),
-            "bank_name": "Synthetic Bank",
-            "account_number": "123400001111",
-        },
-        format="json",
-    )
-    assert saved.status_code == 200
-    assert saved.data["is_placeholder"] is False
-    assert UPIHandle.objects.get().holder_id == real_holder.pk
-    activation = client.post(
-        reverse("settings-items", args=[workspace.pk]),
-        {"kind": "bank", "action": "activate", "ids": [str(placeholder.pk)]},
-        format="json",
-    )
-    assert activation.status_code == 200
+    bank = BankAccount.objects.get()
+    assert bank.bank_name == "BANK"
+    assert bank.active is True
+    assert bank.is_placeholder is False
+    assert bank.is_imported_reference is True
+    assert bank.current_balance == 0
+    bank_detail = client.get(reverse("bank-detail", args=[workspace.pk, bank.pk]))
+    assert bank_detail.data["account_number"] == "somename@upi"
+    assert bank_detail.data["account_reference"] == "somename@upi"
+    assert BalanceChange.objects.get(bank=bank).new_balance == 0
     assert UPIHandle.objects.get().verified is True
     assert all(investor.payment_ready for investor in Investor.objects.all())
     assert all(applicant.active for applicant in build_snapshot(workspace=workspace).applicants)
+    assert (
+        client.post(
+            reverse("bank-set-balance", args=[workspace.pk, bank.pk]),
+            {"amount": "1000.00"},
+            format="json",
+        ).status_code
+        == 201
+    )
+    changed = client.patch(
+        reverse("bank-detail", args=[workspace.pk, bank.pk]),
+        {"bank_name": "Synthetic Bank", "account_number": "123400001111"},
+        format="json",
+    )
+    assert changed.status_code == 200
+    assert changed.data["is_imported_reference"] is False
+    assert changed.data["account_reference"] == ""
+
+
+@pytest.mark.django_db
+def test_unique_upi_without_bank_fields_is_ready_after_import():
+    owner = User.objects.create_user(email="owner@example.test")
+    workspace = create_workspace(name="Family", owner=owner)
+    client = APIClient()
+    client.force_authenticate(owner)
+    preview = client.post(
+        reverse("account-import-list", args=[workspace.pk]),
+        {"file": missing_bank_upload()},
+        format="multipart",
+    )
+    assert preview.status_code == 201
+    assert preview.data["rows"][0]["payment_pending"] is False
+    result = client.post(
+        reverse("account-import-preview", args=[workspace.pk, preview.data["id"]]),
+        {"row_numbers": [2]},
+        format="json",
+    )
+    assert result.status_code == 200
+    assert result.data["created"]["payment_pending"] == 0
+    bank = BankAccount.objects.get()
+    assert bank.active and bank.is_imported_reference and bank.bank_name == "BANK"
+    assert bank.current_balance == 0
+    assert Investor.objects.get().payment_ready
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("missing", "expected_bank", "imported_reference"),
+    [("account", "HDFC Bank", True), ("name", "BANK", False)],
+)
+def test_partial_bank_fields_use_defaults(missing, expected_bank, imported_reference):
+    owner = User.objects.create_user(email="owner@example.test")
+    workspace = create_workspace(name="Family", owner=owner)
+    client = APIClient()
+    client.force_authenticate(owner)
+    preview = client.post(
+        reverse("account-import-list", args=[workspace.pk]),
+        {"file": partial_bank_upload(missing=missing)},
+        format="multipart",
+    )
+    assert preview.status_code == 201
+    assert preview.data["rows"][0]["errors"] == []
+    result = client.post(
+        reverse("account-import-preview", args=[workspace.pk, preview.data["id"]]),
+        {"row_numbers": [2]},
+        format="json",
+    )
+    assert result.status_code == 200
+    bank = BankAccount.objects.get()
+    assert bank.bank_name == expected_bank
+    assert bank.is_imported_reference is imported_reference
+    assert bank.active and bank.current_balance == 0
+    assert UPIHandle.objects.get().verified
+
+
+@pytest.mark.django_db
+def test_legacy_placeholder_can_be_activated_using_full_upi_reference():
+    owner = User.objects.create_user(email="owner@example.test")
+    workspace = create_workspace(name="Family", owner=owner)
+    client = APIClient()
+    client.force_authenticate(owner)
+    preview = client.post(
+        reverse("account-import-list", args=[workspace.pk]),
+        {"file": missing_bank_upload()},
+        format="multipart",
+    )
+    client.post(
+        reverse("account-import-preview", args=[workspace.pk, preview.data["id"]]),
+        {"row_numbers": [2]},
+        format="json",
+    )
+    bank = BankAccount.objects.get()
+    investor = Investor.objects.get()
+    bank.bank_name = ""
+    bank.active = False
+    bank.is_placeholder = True
+    bank.is_imported_reference = False
+    bank.save()
+    investor.payment_setup_pending = True
+    investor.save()
+    changed = client.patch(
+        reverse("bank-detail", args=[workspace.pk, bank.pk]),
+        {
+            "owner": str(investor.pk),
+            "bank_name": "BANK",
+            "account_number": "somename@upi",
+            "active": True,
+        },
+        format="json",
+    )
+    assert changed.status_code == 200
+    bank.refresh_from_db()
+    assert bank.active and not bank.is_placeholder and bank.is_imported_reference
+    assert investor.payment_ready
 
 
 @pytest.mark.django_db
@@ -391,7 +477,16 @@ def test_seventeen_demats_with_six_shared_upis_import_from_one_file():
     assert preview.data["error_count"] == 0
     response = client.post(
         reverse("account-import-preview", args=[workspace.pk, preview.data["id"]]),
-        {"row_numbers": list(range(2, 19))},
+        {
+            "row_numbers": list(range(2, 19)),
+            "shared_upi_owners": {
+                handle: next(
+                    row["row_number"] for row in preview.data["rows"] if row["upi_id"] == handle
+                )
+                for handle in {row["upi_id"] for row in preview.data["rows"]}
+                if sum(row["upi_id"] == handle for row in preview.data["rows"]) > 1
+            },
+        },
         format="json",
     )
     assert response.status_code == 200
@@ -400,10 +495,10 @@ def test_seventeen_demats_with_six_shared_upis_import_from_one_file():
         "demats": 17,
         "banks": 6,
         "upis": 6,
-        "payment_pending": 17,
+        "payment_pending": 0,
     }
     assert DematAccount.objects.count() == 17
-    assert BankAccount.objects.filter(active=False, is_placeholder=True).count() == 6
+    assert BankAccount.objects.filter(active=True, is_imported_reference=True).count() == 6
     assert UPIHandle.objects.count() == 6
     first_investor = Investor.objects.order_by("planning_priority").first()
     duplicate_demat = client.post(

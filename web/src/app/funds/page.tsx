@@ -12,6 +12,7 @@ type Bank = {
   owner: string;
   bank_name: string;
   account_masked: string;
+  account_reference: string;
   current_balance: string;
   active: boolean;
 };

@@ -7,7 +7,9 @@ export type BankOption = {
   owner: string;
   bank_name: string;
   account_masked: string;
+  account_reference: string;
   is_placeholder: boolean;
+  is_imported_reference: boolean;
   current_balance: string;
   active: boolean;
 };
@@ -51,7 +53,7 @@ export default function PreferredFunding({
   const available = banks.filter((bank) => bank.owner !== investor.id && bank.active && !preferences.some((item) => item.bank === bank.id));
 
   function bankLabel(bank: BankOption) {
-    return `${investors.find((person) => person.id === bank.owner)?.name ?? "Investor"} · ${bank.bank_name} ${bank.account_masked}`;
+    return `${investors.find((person) => person.id === bank.owner)?.name ?? "Investor"} · ${bank.bank_name || "BANK"} ${bank.account_reference || bank.account_masked}`;
   }
 
   function note(text: string, error = false) {

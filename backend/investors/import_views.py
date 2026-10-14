@@ -26,6 +26,9 @@ class AccountImportConfirmSerializer(serializers.Serializer):
         ),
         required=False,
     )
+    shared_upi_owners = serializers.DictField(
+        child=serializers.IntegerField(min_value=1), required=False
+    )
 
 
 class AccountImportListView(APIView):
@@ -74,6 +77,7 @@ class AccountImportPreviewView(APIView):
                 actor=request.user,
                 row_numbers=serializer.validated_data.get("row_numbers"),
                 bank_details=serializer.validated_data.get("bank_details", {}),
+                shared_upi_owners=serializer.validated_data.get("shared_upi_owners", {}),
             )
         except AccountImportError as exc:
             payload = {"detail": str(exc)}

@@ -21,8 +21,9 @@ class BankAccountSerializer(serializers.ModelSerializer):
     restricted_investor = serializers.PrimaryKeyRelatedField(
         queryset=Investor.objects.none(), required=False, allow_null=True
     )
-    account_number = serializers.CharField(write_only=True, required=False, max_length=40)
+    account_number = serializers.CharField(write_only=True, required=False, max_length=120)
     account_masked = serializers.CharField(read_only=True)
+    account_reference = serializers.SerializerMethodField()
     initial_balance = serializers.DecimalField(
         max_digits=14, decimal_places=2, write_only=True, required=False, default=Decimal("0.00")
     )
@@ -35,7 +36,9 @@ class BankAccountSerializer(serializers.ModelSerializer):
             "bank_name",
             "account_number",
             "account_masked",
+            "account_reference",
             "is_placeholder",
+            "is_imported_reference",
             "initial_balance",
             "current_balance",
             "cross_funding_policy",
@@ -47,7 +50,9 @@ class BankAccountSerializer(serializers.ModelSerializer):
         read_only_fields = (
             "id",
             "account_masked",
+            "account_reference",
             "is_placeholder",
+            "is_imported_reference",
             "current_balance",
             "created_at",
             "updated_at",
@@ -61,6 +66,11 @@ class BankAccountSerializer(serializers.ModelSerializer):
             fields["owner"].queryset = scoped_investors
             fields["restricted_investor"].queryset = scoped_investors
         return fields
+
+    def get_account_reference(self, instance):
+        if instance.is_placeholder or instance.is_imported_reference:
+            return decrypt_value(instance.account_ciphertext, purpose="bank-account")
+        return ""
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -89,7 +99,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
                 )
             if attrs.get("active") and not has_real_details:
                 raise serializers.ValidationError(
-                    {"active": "Enter the real bank name and account number before activating."}
+                    {"active": "Enter a bank name and account number before activating."}
                 )
         if "account_number" in attrs:
             number = attrs["account_number"].strip()
@@ -103,9 +113,14 @@ class BankAccountSerializer(serializers.ModelSerializer):
                     account_hash_for_workspace(self.context["workspace"].pk, number)
                     == self.instance.account_lookup_hash
                 )
+                and attrs.get("bank_name") != "BANK"
             ):
                 raise serializers.ValidationError(
-                    {"account_number": "Enter the real account number, not the UPI reference."}
+                    {
+                        "account_number": (
+                            "Use BANK with this UPI reference, or enter a real account number."
+                        )
+                    }
                 )
             existing = BankAccount.objects.filter(
                 workspace=self.context["workspace"],
@@ -144,12 +159,20 @@ class BankAccountSerializer(serializers.ModelSerializer):
         number = validated_data.pop("account_number", None)
         validated_data.pop("initial_balance", None)
         was_placeholder = instance.is_placeholder
+        number_changed = (
+            number is not None
+            and account_hash_for_workspace(instance.workspace_id, number)
+            != instance.account_lookup_hash
+        )
         for field, value in validated_data.items():
             setattr(instance, field, value)
         if number is not None:
             instance.set_account_number(number)
         if instance.is_placeholder and number is not None and instance.bank_name:
             instance.is_placeholder = False
+            instance.is_imported_reference = instance.bank_name == "BANK" and not number_changed
+        elif instance.is_imported_reference and number_changed:
+            instance.is_imported_reference = False
         instance.save()
         if was_placeholder and not instance.is_placeholder:
             instance.upis.update(holder=instance.owner)

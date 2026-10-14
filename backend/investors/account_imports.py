@@ -189,8 +189,6 @@ def _validate_row(row: dict[str, str]) -> list[str]:
     if not UPI_PATTERN.fullmatch(upi):
         errors.append("UPI ID must look like name@provider.")
     row["UPI ID"] = upi
-    if bool(row["Account Number"]) != bool(row["Bank Name"]):
-        errors.append("Provide both bank fields or leave both blank.")
     return errors
 
 
@@ -229,6 +227,9 @@ def preview_payload(batch: AccountImportBatch) -> dict:
         if batch.status == AccountImportBatch.Status.PREVIEWED
         else []
     )
+    upi_counts = {}
+    for row in rows:
+        upi_counts[row["UPI ID"]] = upi_counts.get(row["UPI ID"], 0) + 1
     return {
         "id": str(batch.pk),
         "status": batch.status,
@@ -245,14 +246,18 @@ def preview_payload(batch: AccountImportBatch) -> dict:
                 "client_id_masked": _mask(row["CLIENT ID"]),
                 "upi_masked": _masked_upi(row["UPI ID"]),
                 "upi_id": row["UPI ID"],
-                "account_masked": _mask(row["Account Number"]),
-                "bank_name": row["Bank Name"],
+                "account_masked": (
+                    _mask(row["Account Number"]) if row["Account Number"] else row["UPI ID"]
+                ),
+                "bank_name": row["Bank Name"] or "BANK",
                 "payment_reference": (
                     "••••" + row["UPI ID"].split("@", 1)[0][-4:]
                     if not row["Account Number"]
                     else ""
                 ),
-                "payment_pending": not (row["Account Number"] and row["Bank Name"]),
+                "payment_pending": upi_counts[row["UPI ID"]] > 1,
+                "shared_upi": upi_counts[row["UPI ID"]] > 1,
+                "using_upi_as_account": not bool(row["Account Number"]),
                 "errors": row["errors"],
             }
             for row in rows
@@ -312,12 +317,14 @@ def confirm_batch(
     actor,
     row_numbers: list[int] | None,
     bank_details: dict | None = None,
+    shared_upi_owners: dict | None = None,
 ) -> dict:
     batch = AccountImportBatch.objects.select_for_update().get(pk=batch.pk)
     if batch.status != AccountImportBatch.Status.PREVIEWED:
         raise AccountImportError("This import preview has already been confirmed.")
     rows = json.loads(decrypt_value(batch.rows_ciphertext, purpose="account-import"))
     bank_details = bank_details or {}
+    shared_upi_owners = shared_upi_owners or {}
     selected_numbers = {row["row_number"] for row in rows if not row["errors"]}
     if row_numbers is not None:
         selected_numbers = set(row_numbers)
@@ -341,17 +348,6 @@ def confirm_batch(
                 if len(value) > (40 if key == "account_number" else 120):
                     raise AccountImportError("An entered bank detail is too long.")
                 row[field] = value
-        if row["Account Number"] and row["Bank Name"]:
-            row["errors"] = [
-                error
-                for error in row["errors"]
-                if error != "Provide both bank fields or leave both blank."
-            ]
-        if bool(row["Account Number"]) != bool(row["Bank Name"]):
-            raise AccountImportError(
-                "Provide both bank fields or leave both blank.",
-                errors={str(row["row_number"]): ["Incomplete bank details."]},
-            )
     invalid = {
         str(row["row_number"]): row["errors"]
         for row in rows
@@ -380,6 +376,36 @@ def confirm_batch(
                 errors={str(row["row_number"]): ["PAN already exists."]},
             )
 
+    groups = {}
+    for row in selected:
+        groups.setdefault(row["UPI ID"], []).append(row)
+    shared_handles = {handle for handle, group in groups.items() if len(group) > 1}
+    if set(shared_upi_owners) - shared_handles:
+        raise AccountImportError("Choose holders only for shared UPI IDs in the selected rows.")
+    for handle, group in groups.items():
+        if len(group) > 1:
+            owner_row = shared_upi_owners.get(handle)
+            if owner_row not in {row["row_number"] for row in group}:
+                raise AccountImportError(
+                    "Choose one investor to own each shared UPI bank account.",
+                    errors={
+                        str(row["row_number"]): [
+                            "Choose the bank account owner for this shared UPI ID."
+                        ]
+                        for row in group
+                    },
+                )
+        account_numbers = {row["Account Number"] for row in group if row["Account Number"]}
+        bank_names = {row["Bank Name"] for row in group if row["Bank Name"]}
+        if len(account_numbers) > 1 or len(bank_names) > 1:
+            raise AccountImportError(
+                "This shared UPI ID has conflicting bank details. Correct the workbook.",
+                errors={
+                    str(row["row_number"]): ["Conflicting bank details for this UPI ID."]
+                    for row in group
+                },
+            )
+
     created = {"investors": 0, "demats": 0, "banks": 0, "upis": 0, "payment_pending": 0}
     next_priority = (
         Investor.objects.filter(workspace=batch.workspace)
@@ -388,7 +414,7 @@ def confirm_batch(
         .first()
         or 0
     ) + 1
-    staged = []
+    imported_investors = {}
     for row in selected:
         investor = Investor(
             workspace=batch.workspace,
@@ -398,94 +424,75 @@ def confirm_batch(
         investor.set_pan(row["PAN"])
         investor.set_payment_hint(row["UPI ID"])
         investor.save()
+        imported_investors[row["row_number"]] = investor
         next_priority += 1
         created["investors"] += 1
-
         _demat, was_created = _find_or_create_demat(investor, row)
         created["demats"] += was_created
 
-        staged.append((row, investor))
-
-    # A row with real bank details takes precedence over a UPI-only reference
-    # for the same handle, regardless of workbook order.
-    staged.sort(key=lambda pair: not bool(pair[0]["Account Number"]))
-    for row, investor in staged:
-        if not (row["Account Number"] and row["Bank Name"]):
-            # One payment method per distinct UPI. The imported bank is an inactive
-            # reference, not a bank account eligible for planning or export.
-            upi_hash = upi_hash_for_workspace(batch.workspace_id, row["UPI ID"])
-            if not UPIHandle.objects.filter(handle_lookup_hash=upi_hash).exists():
-                reference_hash = account_hash_for_workspace(batch.workspace_id, row["UPI ID"])
-                if not BankAccount.objects.filter(
-                    workspace=batch.workspace,
-                    account_lookup_hash=reference_hash,
-                ).exists():
-                    bank = BankAccount(
-                        workspace=batch.workspace,
-                        owner=investor,
-                        bank_name="",
-                        current_balance=0,
-                        active=False,
-                        is_placeholder=True,
-                    )
-                    bank.set_account_number(row["UPI ID"])
-                    bank.save()
-                    created["banks"] += 1
-                    upi = UPIHandle(bank=bank, holder=investor, verified=True)
-                    upi.set_handle(row["UPI ID"])
-                    upi.save()
-                    created["upis"] += 1
-            investor.payment_setup_pending = True
-            investor.save(update_fields=["payment_setup_pending"])
-            created["payment_pending"] += 1
-            continue
-
-        upi_hash = upi_hash_for_workspace(batch.workspace_id, row["UPI ID"])
-        existing_upi = UPIHandle.objects.filter(handle_lookup_hash=upi_hash).first()
-        existing_bank = BankAccount.objects.filter(
-            workspace=batch.workspace,
-            account_lookup_hash=account_hash_for_workspace(
-                batch.workspace_id, row["Account Number"]
-            ),
-        ).first()
-        if (existing_upi and existing_upi.holder_id != investor.pk) or (
-            existing_bank and existing_bank.owner_id != investor.pk
-        ):
-            investor.payment_setup_pending = True
-            investor.save(update_fields=["payment_setup_pending"])
-            created["payment_pending"] += 1
-            continue
-
-        bank = existing_bank
-        if bank is None:
-            bank = BankAccount(
+    for handle, group in groups.items():
+        owner_row = shared_upi_owners[handle] if len(group) > 1 else group[0]["row_number"]
+        owner = imported_investors[owner_row]
+        existing_upi = (
+            UPIHandle.objects.filter(
+                handle_lookup_hash=upi_hash_for_workspace(batch.workspace_id, handle)
+            )
+            .select_related("bank")
+            .first()
+        )
+        if existing_upi is not None:
+            usable = (
+                existing_upi.active
+                and existing_upi.verified
+                and existing_upi.bank.active
+                and not existing_upi.bank.is_placeholder
+            )
+        else:
+            account_numbers = {row["Account Number"] for row in group if row["Account Number"]}
+            bank_names = {row["Bank Name"] for row in group if row["Bank Name"]}
+            account_number = next(iter(account_numbers), handle)
+            bank_name = next(iter(bank_names), "BANK")
+            imported_reference = not account_numbers
+            bank = BankAccount.objects.filter(
                 workspace=batch.workspace,
-                owner=investor,
-                bank_name=row["Bank Name"],
-                current_balance=0,
+                account_lookup_hash=account_hash_for_workspace(batch.workspace_id, account_number),
+            ).first()
+            usable = bank is None or (
+                bank.owner_id == owner.pk and bank.active and not bank.is_placeholder
             )
-            bank.set_account_number(row["Account Number"])
-            bank.save()
-            BalanceChange.objects.create(
-                bank=bank,
-                operation=BalanceChange.Operation.SET,
-                old_balance=0,
-                delta=0,
-                new_balance=0,
-                actor=actor,
-                note="Imported account; set the current Balance before planning.",
-            )
-            created["banks"] += 1
-        upi = existing_upi
-        if upi is None:
-            upi = UPIHandle(bank=bank, holder=investor, verified=True)
-            upi.set_handle(row["UPI ID"])
-            upi.save()
-            created["upis"] += 1
-        elif upi.bank_id != bank.pk:
-            investor.payment_setup_pending = True
-            investor.save(update_fields=["payment_setup_pending"])
-            created["payment_pending"] += 1
+            if bank is None:
+                bank = BankAccount(
+                    workspace=batch.workspace,
+                    owner=owner,
+                    bank_name=bank_name,
+                    current_balance=0,
+                    active=True,
+                    is_imported_reference=imported_reference,
+                )
+                bank.set_account_number(account_number)
+                bank.save()
+                BalanceChange.objects.create(
+                    bank=bank,
+                    operation=BalanceChange.Operation.SET,
+                    old_balance=0,
+                    delta=0,
+                    new_balance=0,
+                    actor=actor,
+                    note="Imported account with opening Balance ₹0.",
+                )
+                created["banks"] += 1
+            if usable:
+                upi = UPIHandle(bank=bank, holder=owner, active=True, verified=True)
+                upi.set_handle(handle)
+                upi.save()
+                created["upis"] += 1
+
+        if not usable:
+            for row in group:
+                investor = imported_investors[row["row_number"]]
+                investor.payment_setup_pending = True
+                investor.save(update_fields=["payment_setup_pending"])
+                created["payment_pending"] += 1
 
     batch.status = AccountImportBatch.Status.CONFIRMED
     batch.confirmed_at = timezone.now()

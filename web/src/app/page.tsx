@@ -15,7 +15,7 @@ type Capital = CapitalLine & { by_bank?: Record<string, CapitalLine> };
 type Operations = { active_ipos: number; applications: number; pending_mandates: number; allotment_wins: number; realized_gains: string };
 type IPO = { id: string; issuer_name: string; issue_type: string; status: string; close_date: string; current_gmp_percent: string | null; current_gmp_observed_at: string | null };
 type Decision = { ipo: string; selected: boolean; mode: string };
-type Bank = { id: string; bank_name: string; account_masked: string; current_balance: string };
+type Bank = { id: string; bank_name: string; account_masked: string; account_reference: string; current_balance: string };
 type Application = { id: string; ipo_name: string; applicant_name: string; status: string };
 type Payment = { id: string; name: string; next_due_date: string; active: boolean; amount: string };
 type Workspace = { id: string; name: string };
@@ -100,7 +100,7 @@ export default async function HomePage() {
       </section>
     </div>
     <section className="home-panel" style={{ marginTop: 16 }}><SectionHeading title="Bank availability" detail="Money by account" action={<Link href="/funds">Manage funds →</Link>} />
-      {(banks ?? []).length === 0 ? <EmptyState title="No bank accounts yet." detail="Add a bank and set its Balance to start planning." action={<Link href="/funds">Add bank</Link>} /> : <div className="compact-table-wrap"><table className="compact-table"><thead><tr><th>Bank</th><th>Balance</th><th>Blocked</th><th>Planned</th><th>Available</th></tr></thead><tbody>{(banks ?? []).map((bank) => { const line = capital?.by_bank?.[bank.id]; return <tr key={bank.id}><th scope="row">{bank.bank_name}<small>{bank.account_masked}</small></th><td>{formatInr(line?.balance ?? bank.current_balance)}</td><td>{line ? formatInr(line.blocked) : "—"}</td><td>{line ? formatInr(line.planned) : "—"}</td><td className="positive-cell">{line ? formatInr(line.available) : "—"}</td></tr>; })}</tbody></table></div>}
+      {(banks ?? []).length === 0 ? <EmptyState title="No bank accounts yet." detail="Add a bank and set its Balance to start planning." action={<Link href="/funds">Add bank</Link>} /> : <div className="compact-table-wrap"><table className="compact-table"><thead><tr><th>Bank</th><th>Balance</th><th>Blocked</th><th>Planned</th><th>Available</th></tr></thead><tbody>{(banks ?? []).map((bank) => { const line = capital?.by_bank?.[bank.id]; return <tr key={bank.id}><th scope="row">{bank.bank_name}<small>{bank.account_reference || bank.account_masked}</small></th><td>{formatInr(line?.balance ?? bank.current_balance)}</td><td>{line ? formatInr(line.blocked) : "—"}</td><td>{line ? formatInr(line.planned) : "—"}</td><td className="positive-cell">{line ? formatInr(line.available) : "—"}</td></tr>; })}</tbody></table></div>}
     </section>
   </div></main>;
 }

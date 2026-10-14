@@ -41,6 +41,7 @@ class BankAccount(models.Model):
     )
     active = models.BooleanField(default=True)
     is_placeholder = models.BooleanField(default=False)
+    is_imported_reference = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

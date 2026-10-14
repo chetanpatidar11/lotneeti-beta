@@ -1,5 +1,10 @@
 # LotNeeti execution status
 
+## B11 one-file active payment import — in progress, 2026-10-14
+
+- Founder wants each valid workbook row to create an active investor and demat, and each distinct UPI to create an active UPI and bank account with ₹0 Balance. When bank fields are blank, use `BANK` and the full UPI ID as an editable account reference. A shared UPI needs one bank owner chosen in the import review.
+- Import and Settings display implemented. A missing bank name or account number defaults independently. Synthetic tests cover unique/shared UPIs, partially filled bank columns, editing provisional bank details, and converting legacy placeholders. Full `scripts/check.sh` passed: 386 backend tests, 37 web tests, lint, typecheck, migration checks, web and Android builds. Deployment pending.
+
 ## B11 Settings account tabs and editable details — deployed, 2026-10-14
 
 - Founder requested separate Demat Accounts, Bank Accounts and UPIs tabs, with funding preferences available from each investor view. Demat Details should show Broker, edit drawers should load the saved values, disabled Add demat should explain why, and full UPI IDs should be visible in the signed-in workspace.
