@@ -1,10 +1,11 @@
 # LotNeeti execution status
 
-## B09 one-file import with shared UPI references — local, 2026-10-14
+## B09 one-file import with shared UPI references — deployed, 2026-10-14
 
 - A single workbook can now import investors and demat accounts when bank number and bank name are both blank. The UPI prefix appears only as a masked payment reference; it is never stored as a bank account number. Repeated UPI handles across different PANs remain encrypted hints, not duplicate payment methods. Rows with incomplete or conflicting funding are counted as payment setup pending.
 - Pending investors remain visible in Settings as “Payment needed” and are excluded from IPO planning until they have their own active bank and verified UPI. Existing complete, non-conflicting rows still create bank/UPI records. Both bank fields must be supplied together when provided.
-- A synthetic 17-row workbook with six repeated UPIs imported all 17 investors/demats and created no fabricated bank/UPI records. The full `scripts/check.sh` gate passed: 381 backend tests, 37 web tests, migration checks, lint, typecheck and web/Android builds. No real workbook or account identifiers were copied into Git. Deployment awaits updating the existing single-IP SSH security-group rule; the AWS CLI login cache is expired.
+- A synthetic 17-row workbook with six repeated UPIs imported all 17 investors/demats and created no fabricated bank/UPI records. The full `scripts/check.sh` gate passed: 381 backend tests, 37 web tests, migration checks, lint, typecheck and web/Android builds. No real workbook or account identifiers were copied into Git.
+- AWS access was restored and the existing SSH security-group rule was changed from the prior operator IP to this workstation's current single-IP address. A fresh encrypted backup succeeded before deployment. Release archive SHA-256 `5b666279a8e8d46ca26978beb45c9cf11da565516328493c72552d7d1f10d264` deployed to `lotneeti.dpdns.org`; migration `investors.0004_investor_payment_hint_ciphertext_and_more` applied. Homepage and sign-in returned HTTPS 200 with valid TLS, API health returned OK, and API, web, worker, beat, Nginx, PostgreSQL, Redis and backup timer were active. Production `npm audit --omit=dev` found no known advisories. No production customer data was used for the import test.
 
 ## E01 import display and bank-data security review — deployed, 2026-10-13
 
