@@ -1,9 +1,11 @@
 # LotNeeti execution status
 
-## B11 Settings account tabs and editable details — in progress, 2026-10-14
+## B11 Settings account tabs and editable details — deployed, 2026-10-14
 
 - Founder requested separate Demat Accounts, Bank Accounts and UPIs tabs, with funding preferences available from each investor view. Demat Details should show Broker, edit drawers should load the saved values, disabled Add demat should explain why, and full UPI IDs should be visible in the signed-in workspace.
-- UPI records will be marked verified automatically by the application, including existing records after migration. A missing or inactive bank/investor still blocks use in planning and gives a specific error. Work is under test before deployment.
+- Settings now has Demat Accounts, Bank Accounts and UPIs tabs; Funding Preferences remains in each investor view. Demat Details shows the broker. Edit drawers preload complete saved details for an owner/operator, while normal lists and viewer detail responses keep bank/demat numbers masked. Add demat explains its disabled state. Full UPI IDs appear in signed-in Settings, import preview, planning and applications.
+- New and existing UPI records are automatically marked ready by the application; this is format validation and an internal readiness flag, not external bank ownership verification. Missing, incomplete or inactive linked bank/investor records still block planning and produce a specific error. A UPI can be moved to another active bank unless saved applications refer to it.
+- Full `scripts/check.sh` passed: 382 backend tests, 37 web tests, lint, typecheck, migration checks, web/Android builds. A fresh encrypted backup completed before each deployment. Commits `57027b1` and `6ef973f` were pushed to the existing work branch and deployed to `https://lotneeti.dpdns.org/`; migration `funding.0011_alter_upihandle_verified` applied and deployment health checks returned OK. No real bank details were used in tests.
 
 ## B10 one demat and shared UPI import — deployed, 2026-10-14
 
