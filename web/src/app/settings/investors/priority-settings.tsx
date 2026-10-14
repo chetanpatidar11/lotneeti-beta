@@ -139,7 +139,7 @@ export default function PrioritySettings({
   }));
   const upiRows = Object.values(linkedAccounts).flatMap((accounts) => accounts.upis.map((upi) => ({
     id: upi.id, name: upi.handle_masked, owner: banks.find((bank) => bank.id === upi.bank_id)?.is_placeholder ? "Choose holder" : investorName(upi.holder),
-    detail: `${banks.find((bank) => bank.id === upi.bank_id)?.bank_name ?? "Bank"} · ${upi.verified ? "Verified" : "Not verified"}`,
+    detail: `${banks.find((bank) => bank.id === upi.bank_id)?.bank_name || "Bank details needed"} · ${upi.verified ? "Verified" : "Not verified"}`,
     active: upi.active, verified: upi.verified,
   })));
   const accountCount = new Set(dematRows.map((row) => row.id)).size + new Set(bankRows.map((row) => row.id)).size + new Set(upiRows.map((row) => row.id)).size;
