@@ -52,3 +52,28 @@ def test_statement_combines_banks_and_filters_with_workspace_scope():
         client.get(reverse("workspace-balance-statement", args=[other_workspace.pk])).status_code
         == 403
     )
+
+
+@pytest.mark.django_db
+def test_statement_pages_through_more_than_fifty_changes():
+    owner, workspace, _ = setup_plan()
+    bank = BankAccount.objects.get(workspace=workspace)
+    for index in range(51):
+        BalanceChange.objects.create(
+            bank=bank,
+            operation=BalanceChange.Operation.ADD,
+            old_balance=Decimal(index),
+            delta=Decimal("1"),
+            new_balance=Decimal(index + 1),
+            actor=owner,
+        )
+    client = APIClient()
+    client.force_authenticate(owner)
+    url = reverse("workspace-balance-statement", args=[workspace.pk])
+    first_page = client.get(url)
+    second_page = client.get(url, {"page": "2"})
+    assert first_page.data["total"] == 51
+    assert len(first_page.data["results"]) == 50
+    assert first_page.data["next_page"] == 2
+    assert len(second_page.data["results"]) == 1
+    assert second_page.data["next_page"] is None

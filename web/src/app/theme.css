@@ -902,6 +902,7 @@ body > #main-content > .page .auth-actions .text-button { min-height: 36px; padd
 .funds-filter select { width: 100%; min-height: 42px; }
 .funds-statement-table { min-width: 750px; }
 .funds-statement-table td, .funds-statement-table th { text-align: left; }
+.archived-bank-history .settings-funding-row { grid-template-columns: minmax(0, 1fr) auto; }
 .draft-ipo-groups { display: grid; gap: 18px; margin-top: 15px; }
 .draft-ipo-group { overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
 .draft-ipo-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px; }
