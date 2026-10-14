@@ -1,9 +1,10 @@
 # LotNeeti execution status
 
-## B11 shared UPI owner choices — in progress, 2026-10-14
+## B11 shared UPI owner choices — deployed, 2026-10-14
 
 - Founder reports that a shared UPI can belong to an investor elsewhere in the workbook or already in the workspace; two different UPIs may have the same owner. Owner selectors now cover every selected workbook investor and active existing workspace investor, for every UPI. A unique UPI defaults to its row investor, while multiple UPIs may point to the same owner. Backend validates selected row, active status and workspace scope and rejects a conflicting existing UPI assignment.
-- Full `scripts/check.sh` passed: 388 backend tests, 37 web tests, lint, typecheck, migration checks, web and Android builds. Synthetic tests cover one investor owning six UPIs, an existing investor as owner, and rejection of inactive/cross-workspace owners. Deployment pending.
+- Full `scripts/check.sh` passed: 388 backend tests, 37 web tests, lint, typecheck, migration checks, web and Android builds. Synthetic tests cover one investor owning six UPIs, an existing investor as owner, and rejection of inactive/cross-workspace owners.
+- Encrypted backup completed before release. Commit `6415668` was pushed and archive SHA-256 `31c4bb6a67da12bca0faca65da77421491d0dde64336d84e699ef65e48b133f7` deployed to `https://lotneeti.dpdns.org/`. Home and sign-in returned HTTPS 200, API health returned OK, and app/infrastructure services are active. No live customer workbook was imported.
 
 ## B11 one-file active payment import — deployed, 2026-10-14
 
