@@ -26,9 +26,7 @@ class AccountImportConfirmSerializer(serializers.Serializer):
         ),
         required=False,
     )
-    shared_upi_owners = serializers.DictField(
-        child=serializers.IntegerField(min_value=1), required=False
-    )
+    shared_upi_owners = serializers.DictField(child=serializers.CharField(), required=False)
 
 
 class AccountImportListView(APIView):

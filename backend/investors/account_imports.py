@@ -2,6 +2,7 @@ import hashlib
 import io
 import json
 import re
+import uuid
 import zipfile
 from pathlib import PurePosixPath
 from xml.etree import ElementTree
@@ -379,22 +380,41 @@ def confirm_batch(
     groups = {}
     for row in selected:
         groups.setdefault(row["UPI ID"], []).append(row)
-    shared_handles = {handle for handle, group in groups.items() if len(group) > 1}
-    if set(shared_upi_owners) - shared_handles:
-        raise AccountImportError("Choose holders only for shared UPI IDs in the selected rows.")
+    if set(shared_upi_owners) - set(groups):
+        raise AccountImportError("Choose owners only for UPI IDs in the selected rows.")
+    owner_choices = {}
+    selected_row_numbers = {row["row_number"] for row in selected}
     for handle, group in groups.items():
-        if len(group) > 1:
-            owner_row = shared_upi_owners.get(handle)
-            if owner_row not in {row["row_number"] for row in group}:
-                raise AccountImportError(
-                    "Choose one investor to own each shared UPI bank account.",
-                    errors={
-                        str(row["row_number"]): [
-                            "Choose the bank account owner for this shared UPI ID."
-                        ]
-                        for row in group
-                    },
-                )
+        choice = shared_upi_owners.get(handle)
+        if choice is None and len(group) == 1:
+            choice = group[0]["row_number"]
+        reference = str(choice or "")
+        if reference.startswith("row:"):
+            reference = reference.removeprefix("row:")
+        if reference.isdecimal() and int(reference) in selected_row_numbers:
+            owner_choices[handle] = ("row", int(reference))
+        elif reference.startswith("investor:"):
+            try:
+                investor_id = uuid.UUID(reference.removeprefix("investor:"))
+            except ValueError:
+                investor_id = None
+            existing_owner = (
+                Investor.objects.filter(
+                    pk=investor_id, workspace=batch.workspace, active=True
+                ).first()
+                if investor_id
+                else None
+            )
+            if existing_owner:
+                owner_choices[handle] = ("existing", existing_owner)
+        if handle not in owner_choices:
+            raise AccountImportError(
+                "Choose an active bank account owner from the selected rows or workspace.",
+                errors={
+                    str(row["row_number"]): ["Choose the bank account owner for this UPI ID."]
+                    for row in group
+                },
+            )
         account_numbers = {row["Account Number"] for row in group if row["Account Number"]}
         bank_names = {row["Bank Name"] for row in group if row["Bank Name"]}
         if len(account_numbers) > 1 or len(bank_names) > 1:
@@ -431,8 +451,8 @@ def confirm_batch(
         created["demats"] += was_created
 
     for handle, group in groups.items():
-        owner_row = shared_upi_owners[handle] if len(group) > 1 else group[0]["row_number"]
-        owner = imported_investors[owner_row]
+        owner_kind, owner_choice = owner_choices[handle]
+        owner = imported_investors[owner_choice] if owner_kind == "row" else owner_choice
         existing_upi = (
             UPIHandle.objects.filter(
                 handle_lookup_hash=upi_hash_for_workspace(batch.workspace_id, handle)
@@ -441,6 +461,10 @@ def confirm_batch(
             .first()
         )
         if existing_upi is not None:
+            if existing_upi.bank.owner_id != owner.pk:
+                raise AccountImportError(
+                    "This UPI already belongs to a different bank owner in this workspace."
+                )
             usable = (
                 existing_upi.active
                 and existing_upi.verified

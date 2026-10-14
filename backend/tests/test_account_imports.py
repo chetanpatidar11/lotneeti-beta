@@ -519,6 +519,82 @@ def test_seventeen_demats_with_six_shared_upis_import_from_one_file():
 
 
 @pytest.mark.django_db
+def test_one_imported_investor_can_own_multiple_upis_outside_own_rows():
+    owner = User.objects.create_user(email="owner@example.test")
+    workspace = create_workspace(name="Family", owner=owner)
+    client = APIClient()
+    client.force_authenticate(owner)
+    preview = client.post(
+        reverse("account-import-list", args=[workspace.pk]),
+        {"file": seventeen_rows_six_upis_upload()},
+        format="multipart",
+    )
+    assert preview.status_code == 201
+    handles = {row["upi_id"] for row in preview.data["rows"]}
+    result = client.post(
+        reverse("account-import-preview", args=[workspace.pk, preview.data["id"]]),
+        {
+            "row_numbers": list(range(2, 19)),
+            "shared_upi_owners": {handle: "row:2" for handle in handles},
+        },
+        format="json",
+    )
+    assert result.status_code == 200
+    assert result.data["created"]["banks"] == 6
+    chosen_owner = Investor.objects.get(planning_priority=1)
+    assert BankAccount.objects.filter(owner=chosen_owner).count() == 6
+    assert UPIHandle.objects.filter(holder=chosen_owner).count() == 6
+    assert all(investor.payment_ready for investor in Investor.objects.all())
+
+
+@pytest.mark.django_db
+def test_existing_active_workspace_investor_can_own_imported_shared_upi():
+    owner = User.objects.create_user(email="owner@example.test")
+    workspace = create_workspace(name="Family", owner=owner)
+    existing = Investor(workspace=workspace, name="Existing Owner")
+    existing.set_pan("UVWXY1234Z")
+    existing.save()
+    inactive = Investor(workspace=workspace, name="Inactive Owner", active=False)
+    inactive.set_pan("PQRST1234U")
+    inactive.save()
+    other_workspace = create_workspace(name="Other Family", owner=owner)
+    outsider = Investor(workspace=other_workspace, name="Outside Owner")
+    outsider.set_pan("LMNOP5678Q")
+    outsider.save()
+    client = APIClient()
+    client.force_authenticate(owner)
+    preview = client.post(
+        reverse("account-import-list", args=[workspace.pk]),
+        {"file": shared_upi_without_banks_upload()},
+        format="multipart",
+    )
+    url = reverse("account-import-preview", args=[workspace.pk, preview.data["id"]])
+    for invalid_id in (outsider.pk, inactive.pk):
+        rejected = client.post(
+            url,
+            {
+                "row_numbers": [2, 3],
+                "shared_upi_owners": {"somename@upi": f"investor:{invalid_id}"},
+            },
+            format="json",
+        )
+        assert rejected.status_code == 400
+    assert Investor.objects.filter(workspace=workspace).count() == 2
+    imported = client.post(
+        url,
+        {
+            "row_numbers": [2, 3],
+            "shared_upi_owners": {"somename@upi": f"investor:{existing.pk}"},
+        },
+        format="json",
+    )
+    assert imported.status_code == 200
+    bank = BankAccount.objects.get(workspace=workspace)
+    assert bank.owner_id == existing.pk
+    assert UPIHandle.objects.get(bank=bank).holder_id == existing.pk
+
+
+@pytest.mark.django_db
 def test_import_bank_details_cannot_replace_workbook_values_or_bypass_other_errors():
     owner = User.objects.create_user(email="owner@example.test")
     workspace = create_workspace(name="Family", owner=owner)

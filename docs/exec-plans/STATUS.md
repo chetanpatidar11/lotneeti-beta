@@ -1,5 +1,10 @@
 # LotNeeti execution status
 
+## B11 shared UPI owner choices — in progress, 2026-10-14
+
+- Founder reports that a shared UPI can belong to an investor elsewhere in the workbook or already in the workspace; two different UPIs may have the same owner. Owner selectors now cover every selected workbook investor and active existing workspace investor, for every UPI. A unique UPI defaults to its row investor, while multiple UPIs may point to the same owner. Backend validates selected row, active status and workspace scope and rejects a conflicting existing UPI assignment.
+- Full `scripts/check.sh` passed: 388 backend tests, 37 web tests, lint, typecheck, migration checks, web and Android builds. Synthetic tests cover one investor owning six UPIs, an existing investor as owner, and rejection of inactive/cross-workspace owners. Deployment pending.
+
 ## B11 one-file active payment import — deployed, 2026-10-14
 
 - Founder wants each valid workbook row to create an active investor and demat, and each distinct UPI to create an active UPI and bank account with ₹0 Balance. When bank fields are blank, use `BANK` and the full UPI ID as an editable account reference. A shared UPI needs one bank owner chosen in the import review.

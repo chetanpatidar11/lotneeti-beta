@@ -12,19 +12,20 @@ type ImportPreview = {
   id: string; status: "PREVIEWED" | "CONFIRMED"; source_filename: string;
   row_count: number; error_count: number; rows: ImportRow[];
 };
+type ExistingInvestor = { id: string; name: string; pan_masked: string; active: boolean };
 const selectable = (row: ImportRow) => row.errors.length === 0;
 
-export default function AccountImport({ workspaceId, canEdit }: { workspaceId: string; canEdit: boolean }) {
+export default function AccountImport({ workspaceId, canEdit, investors }: { workspaceId: string; canEdit: boolean; investors: ExistingInvestor[] }) {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
-  const [sharedOwners, setSharedOwners] = useState<Record<string, number>>({});
+  const [upiOwners, setUpiOwners] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function upload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    setBusy(true); setMessage(""); setPreview(null); setSharedOwners({});
+    setBusy(true); setMessage(""); setPreview(null); setUpiOwners({});
     const body = new FormData(); body.append("file", file);
     try {
       const response = await fetch(`/api/workspaces/${workspaceId}/account-imports`, { method: "POST", body });
@@ -45,13 +46,13 @@ export default function AccountImport({ workspaceId, canEdit }: { workspaceId: s
     event.preventDefault();
     if (!preview || selected.length === 0) return;
     const grouped = Object.groupBy(preview.rows.filter((row) => selected.includes(row.row_number)), (row) => row.upi_id);
-    const missingOwner = Object.entries(grouped).some(([upi, rows]) => (rows?.length ?? 0) > 1 && !rows?.some((row) => row.row_number === sharedOwners[upi]));
-    if (missingOwner) { setMessage("Choose the bank account owner for each shared UPI ID."); return; }
+    const missingOwner = Object.entries(grouped).some(([upi, rows]) => !ownerChoice(upi, rows ?? []));
+    if (missingOwner) { setMessage("Choose the bank account owner for each UPI ID."); return; }
     setBusy(true); setMessage("");
     try {
       const response = await fetch(`/api/workspaces/${workspaceId}/account-imports/${preview.id}`, {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ row_numbers: selected, shared_upi_owners: Object.fromEntries(Object.entries(grouped).filter(([, rows]) => (rows?.length ?? 0) > 1).map(([upi]) => [upi, sharedOwners[upi]])) }),
+        body: JSON.stringify({ row_numbers: selected, shared_upi_owners: Object.fromEntries(Object.entries(grouped).map(([upi, rows]) => [upi, ownerChoice(upi, rows ?? [])])) }),
       });
       if (!response.ok) {
         const result = await response.json().catch(() => ({})) as { detail?: string; errors?: Record<string, string[]> };
@@ -67,7 +68,13 @@ export default function AccountImport({ workspaceId, canEdit }: { workspaceId: s
   }
 
   const selectedGroups = Object.groupBy(preview?.rows.filter((row) => selected.includes(row.row_number)) ?? [], (row) => row.upi_id);
-  const sharedGroups = Object.entries(selectedGroups).filter(([, rows]) => (rows?.length ?? 0) > 1);
+  const ownerGroups = Object.entries(selectedGroups);
+
+  function ownerChoice(upi: string, rows: ImportRow[]): string {
+    const chosen = upiOwners[upi];
+    if (chosen?.startsWith("row:") && !selected.includes(Number(chosen.slice(4)))) return "";
+    return chosen ?? (rows.length === 1 ? `row:${rows[0].row_number}` : "");
+  }
 
   return <section className="account-import" aria-labelledby="account-import-heading">
     <h2 id="account-import-heading">Import accounts</h2>
@@ -76,8 +83,8 @@ export default function AccountImport({ workspaceId, canEdit }: { workspaceId: s
       <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={busy} onChange={upload} />
     </label>}
     {preview && <form onSubmit={confirm}>
-      <p><strong>{preview.source_filename}</strong> · {preview.row_count} row(s), {preview.error_count} with errors{sharedGroups.length > 0 ? ` · ${sharedGroups.length} shared UPI ${sharedGroups.length === 1 ? "owner" : "owners"} to choose` : ""}</p>
-      {sharedGroups.length > 0 && <div className="account-import-shared"><h3>Choose owners for shared UPIs</h3><p>Each shared UPI has one bank account. Choose which investor owns it; the other investors can still use the same UPI in planning.</p>{sharedGroups.map(([upi, rows]) => <label key={upi} htmlFor={`shared-owner-${rows?.[0]?.row_number}`}>{upi}<select id={`shared-owner-${rows?.[0]?.row_number}`} value={sharedOwners[upi] ?? ""} disabled={!canEdit || busy || preview.status === "CONFIRMED"} onChange={(event) => setSharedOwners((current) => ({ ...current, [upi]: Number(event.target.value) }))} required><option value="">Choose bank account owner</option>{rows?.map((row) => <option key={row.row_number} value={row.row_number}>{row.name} · row {row.row_number}</option>)}</select></label>)}</div>}
+      <p><strong>{preview.source_filename}</strong> · {preview.row_count} row(s), {preview.error_count} with errors</p>
+      {ownerGroups.length > 0 && <div className="account-import-shared"><h3>Bank account owners</h3><p>Choose from any selected investor in this workbook or an active investor already in your workspace. The same person can own more than one UPI. A UPI used by one row defaults to that investor.</p>{ownerGroups.map(([upi, rows]) => <label key={upi} htmlFor={`upi-owner-${rows?.[0]?.row_number}`}>{upi}<select id={`upi-owner-${rows?.[0]?.row_number}`} value={ownerChoice(upi, rows ?? [])} disabled={!canEdit || busy || preview.status === "CONFIRMED"} onChange={(event) => setUpiOwners((current) => ({ ...current, [upi]: event.target.value }))} required><option value="">Choose bank account owner</option><optgroup label="Investors in this import">{preview.rows.filter((row) => selected.includes(row.row_number)).map((row) => <option key={row.row_number} value={`row:${row.row_number}`}>{row.name} · row {row.row_number}</option>)}</optgroup>{investors.some((investor) => investor.active) && <optgroup label="Already in this workspace">{investors.filter((investor) => investor.active).map((investor) => <option key={investor.id} value={`investor:${investor.id}`}>{investor.name} · {investor.pan_masked}</option>)}</optgroup>}</select></label>)}</div>}
       <div className="plan-table-wrap"><table className="plan-table account-import-table">
         <caption>Review import rows</caption>
         <thead><tr><th>Import</th><th>Name</th><th>PAN</th><th>Demat</th><th>UPI</th><th>Bank details</th><th>Status</th></tr></thead>
@@ -90,7 +97,7 @@ export default function AccountImport({ workspaceId, canEdit }: { workspaceId: s
             <td data-label="Demat" title={`${row.type} · ${row.dpid_masked} · ${row.client_id_masked}`}>{row.type} · {row.dpid_masked} · {row.client_id_masked}</td>
             <td data-label="UPI" title={row.upi_id}>{row.upi_id}</td>
             <td data-label="Bank details"><span>{row.bank_name} · {row.account_masked}</span></td>
-            <td data-label="Status">{preview.status === "CONFIRMED" && checked ? "Imported" : canSelect ? row.shared_upi && (selectedGroups[row.upi_id]?.length ?? 0) > 1 ? sharedOwners[row.upi_id] ? "Ready" : "Choose owner" : "Ready" : <details className="import-row-errors"><summary>{row.errors.length} {row.errors.length === 1 ? "issue" : "issues"}</summary><ul>{row.errors.map((error) => <li key={error}>{error}</li>)}</ul></details>}</td>
+            <td data-label="Status">{preview.status === "CONFIRMED" && checked ? "Imported" : canSelect ? checked && !ownerChoice(row.upi_id, selectedGroups[row.upi_id] ?? []) ? "Choose owner" : "Ready" : <details className="import-row-errors"><summary>{row.errors.length} {row.errors.length === 1 ? "issue" : "issues"}</summary><ul>{row.errors.map((error) => <li key={error}>{error}</li>)}</ul></details>}</td>
           </tr>;
         })}</tbody>
       </table></div>
