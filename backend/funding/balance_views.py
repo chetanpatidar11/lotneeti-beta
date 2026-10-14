@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.db.models import Max
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers, status
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -35,6 +35,8 @@ class BalanceActionView(APIView):
             workspace_id=workspace_id,
             pk=bank_id,
         )
+        if bank.is_placeholder:
+            raise ValidationError("Complete the real bank details before setting a balance.")
         change = self.apply_change(
             bank=bank,
             amount=serializer.validated_data["amount"],

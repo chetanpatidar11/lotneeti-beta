@@ -91,6 +91,10 @@ def _check_restore(kind, ids):
         raise ValidationError({"message": "Restore the investor first."})
     if kind == "bank" and BankAccount.objects.filter(pk__in=ids, owner__active=False).exists():
         raise ValidationError({"message": "Restore the investor first."})
+    if kind == "bank" and BankAccount.objects.filter(pk__in=ids, is_placeholder=True).exists():
+        raise ValidationError(
+            {"message": "Enter the real bank name and account number before activating."}
+        )
     if (
         kind == "upi"
         and UPIHandle.objects.filter(pk__in=ids)

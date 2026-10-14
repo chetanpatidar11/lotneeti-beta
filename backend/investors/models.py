@@ -62,8 +62,25 @@ class Investor(models.Model):
     def payment_ready(self) -> bool:
         if not self.payment_setup_pending:
             return True
-        return self.upis.filter(
-            active=True, verified=True, bank__active=True, bank__owner=self
+        if self.upis.filter(
+            active=True,
+            verified=True,
+            bank__active=True,
+            bank__is_placeholder=False,
+            bank__owner=self,
+        ).exists():
+            return True
+        if not self.payment_hint_ciphertext:
+            return False
+        from funding.models import UPIHandle, upi_hash_for_workspace
+
+        handle = decrypt_value(self.payment_hint_ciphertext, purpose="payment-hint")
+        return UPIHandle.objects.filter(
+            handle_lookup_hash=upi_hash_for_workspace(self.workspace_id, handle),
+            active=True,
+            verified=True,
+            bank__active=True,
+            bank__is_placeholder=False,
         ).exists()
 
 
@@ -81,6 +98,9 @@ class DematAccount(models.Model):
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["investor"], name="one_demat_per_investor")]
 
     def __str__(self):
         return f"{self.depository} demat for {self.investor.name}"

@@ -7,6 +7,7 @@ export type BankOption = {
   owner: string;
   bank_name: string;
   account_masked: string;
+  is_placeholder: boolean;
   current_balance: string;
   active: boolean;
 };

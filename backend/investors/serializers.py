@@ -104,6 +104,10 @@ class DematAccountSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         if self.instance is None:
+            if DematAccount.objects.filter(investor=self.context["investor"]).exists():
+                raise serializers.ValidationError(
+                    "This investor already has a demat account. Edit the existing account."
+                )
             depository = attrs.get("depository")
             missing = {}
             if "client_id" not in attrs:

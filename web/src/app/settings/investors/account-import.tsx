@@ -54,9 +54,9 @@ export default function AccountImport({ workspaceId, canEdit }: { workspaceId: s
         const rowErrors = Object.entries(result.errors ?? {}).map(([row, errors]) => `Row ${row}: ${errors.join(" ")}`).join(" ");
         throw new Error(rowErrors || result.detail || "The selected rows could not be imported.");
       }
-      const result = await response.json() as { imported_rows: number; created: { payment_pending: number } };
+      const result = await response.json() as { imported_rows: number; created: { banks: number; upis: number; payment_pending: number } };
       setPreview({ ...preview, status: "CONFIRMED" });
-      setMessage(`${result.imported_rows} row(s) imported. ${result.created.payment_pending} need their own payment details before IPO planning.`);
+      setMessage(`${result.imported_rows} investor(s) imported with one demat each. ${result.created.upis} UPI ID(s) and ${result.created.banks} bank reference(s) added. Complete real bank details and verify each UPI before planning.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The selected rows could not be imported.");
     } finally { setBusy(false); }
@@ -64,7 +64,7 @@ export default function AccountImport({ workspaceId, canEdit }: { workspaceId: s
 
   return <section className="account-import" aria-labelledby="account-import-heading">
     <h2 id="account-import-heading">Import accounts</h2>
-    <p>Upload one workbook to add investors and demats. Missing bank details can be added later; the UPI prefix is shown as a reference, never as a bank account number. Payment details must belong to the applicant before IPO planning.</p>
+    <p>Upload one workbook to add investors, one demat each, and distinct UPI IDs. When bank details are missing, the UPI ID is saved as an inactive bank reference. Complete the real bank details and verify the UPI before planning.</p>
     {canEdit && <label className="file-picker">Choose workbook
       <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={busy} onChange={upload} />
     </label>}
@@ -81,8 +81,8 @@ export default function AccountImport({ workspaceId, canEdit }: { workspaceId: s
             <td data-label="Name" title={row.name}>{row.name}</td><td data-label="PAN">{row.pan_masked}</td>
             <td data-label="Demat" title={`${row.type} · ${row.dpid_masked} · ${row.client_id_masked}`}>{row.type} · {row.dpid_masked} · {row.client_id_masked}</td>
             <td data-label="UPI" title={row.upi_masked}>{row.upi_masked}</td>
-            <td data-label="Bank details">{row.payment_pending ? <span>Bank to add later · UPI ref {row.payment_reference}</span> : <span>{row.bank_name} · {row.account_masked}</span>}</td>
-            <td data-label="Status">{preview.status === "CONFIRMED" && checked ? "Imported" : canSelect ? row.payment_pending ? "Payment pending" : "Ready" : <details className="import-row-errors"><summary>{row.errors.length} {row.errors.length === 1 ? "issue" : "issues"}</summary><ul>{row.errors.map((error) => <li key={error}>{error}</li>)}</ul></details>}</td>
+            <td data-label="Bank details">{row.payment_pending ? <span>UPI reference {row.payment_reference} · bank details needed</span> : <span>{row.bank_name} · {row.account_masked}</span>}</td>
+            <td data-label="Status">{preview.status === "CONFIRMED" && checked ? "Imported" : canSelect ? row.payment_pending ? "Importable · payment setup needed" : "Ready" : <details className="import-row-errors"><summary>{row.errors.length} {row.errors.length === 1 ? "issue" : "issues"}</summary><ul>{row.errors.map((error) => <li key={error}>{error}</li>)}</ul></details>}</td>
           </tr>;
         })}</tbody>
       </table></div>

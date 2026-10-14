@@ -40,6 +40,7 @@ class BankAccount(models.Model):
         related_name="restricted_banks",
     )
     active = models.BooleanField(default=True)
+    is_placeholder = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

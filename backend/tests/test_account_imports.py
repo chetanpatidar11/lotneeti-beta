@@ -282,7 +282,7 @@ def test_missing_bank_details_can_be_entered_for_a_selected_preview_row():
 
 @pytest.mark.django_db
 @override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="WARN")
-def test_one_file_import_keeps_shared_upi_as_hint_without_fabricated_banks():
+def test_one_file_import_registers_one_inactive_bank_and_upi_for_shared_handle():
     from planner.snapshot_builder import build_snapshot
 
     owner = User.objects.create_user(email="owner@example.test")
@@ -309,31 +309,76 @@ def test_one_file_import_keeps_shared_upi_as_hint_without_fabricated_banks():
     assert result.data["created"] == {
         "investors": 2,
         "demats": 2,
-        "banks": 0,
-        "upis": 0,
+        "banks": 1,
+        "upis": 1,
         "payment_pending": 2,
     }
-    assert BankAccount.objects.count() == 0
-    assert UPIHandle.objects.count() == 0
+    assert BankAccount.objects.count() == 1
+    assert UPIHandle.objects.count() == 1
+    placeholder = BankAccount.objects.get()
+    assert placeholder.is_placeholder is True
+    assert placeholder.active is False
+    assert placeholder.bank_name == ""
+    assert UPIHandle.objects.get().verified is False
+    balance_attempt = client.post(
+        reverse("bank-set-balance", args=[workspace.pk, placeholder.pk]),
+        {"amount": "1000.00"},
+        format="json",
+    )
+    assert balance_attempt.status_code == 400
     assert all(investor.payment_setup_pending for investor in Investor.objects.all())
     assert all(
         investor.payment_hint_masked == "••••name@upi" for investor in Investor.objects.all()
     )
     assert all(not applicant.active for applicant in build_snapshot(workspace=workspace).applicants)
 
-    funded = Investor.objects.order_by("id").first()
-    bank = BankAccount(workspace=workspace, owner=funded, bank_name="Synthetic Bank")
-    bank.set_account_number("123400001111")
-    bank.save()
-    upi = UPIHandle(bank=bank, holder=funded, verified=True)
-    upi.set_handle("owner@upi")
-    upi.save()
-    applicant_state = {
-        applicant.id: applicant.active
-        for applicant in build_snapshot(workspace=workspace).applicants
-    }
-    assert applicant_state[str(funded.pk)] is True
-    assert sum(applicant_state.values()) == 1
+    activation = client.post(
+        reverse("settings-items", args=[workspace.pk]),
+        {"kind": "bank", "action": "activate", "ids": [str(placeholder.pk)]},
+        format="json",
+    )
+    assert activation.status_code == 400
+    premature_verification = client.patch(
+        reverse("upi-detail", args=[workspace.pk, placeholder.pk, UPIHandle.objects.get().pk]),
+        {"verified": True},
+        format="json",
+    )
+    assert premature_verification.status_code == 400
+    same_reference = client.patch(
+        reverse("bank-detail", args=[workspace.pk, placeholder.pk]),
+        {"bank_name": "Synthetic Bank", "account_number": "somename@upi"},
+        format="json",
+    )
+    assert same_reference.status_code == 400
+
+    real_holder = Investor.objects.order_by("planning_priority").last()
+    saved = client.patch(
+        reverse("bank-detail", args=[workspace.pk, placeholder.pk]),
+        {
+            "owner": str(real_holder.pk),
+            "bank_name": "Synthetic Bank",
+            "account_number": "123400001111",
+        },
+        format="json",
+    )
+    assert saved.status_code == 200
+    assert saved.data["is_placeholder"] is False
+    assert UPIHandle.objects.get().holder_id == real_holder.pk
+    activation = client.post(
+        reverse("settings-items", args=[workspace.pk]),
+        {"kind": "bank", "action": "activate", "ids": [str(placeholder.pk)]},
+        format="json",
+    )
+    assert activation.status_code == 200
+    upi = UPIHandle.objects.get()
+    verification = client.patch(
+        reverse("upi-detail", args=[workspace.pk, placeholder.pk, upi.pk]),
+        {"verified": True},
+        format="json",
+    )
+    assert verification.status_code == 200
+    assert all(investor.payment_ready for investor in Investor.objects.all())
+    assert all(applicant.active for applicant in build_snapshot(workspace=workspace).applicants)
 
 
 @pytest.mark.django_db
@@ -359,10 +404,29 @@ def test_seventeen_demats_with_six_shared_upis_import_from_one_file():
     assert response.data["created"] == {
         "investors": 17,
         "demats": 17,
-        "banks": 0,
-        "upis": 0,
+        "banks": 6,
+        "upis": 6,
         "payment_pending": 17,
     }
+    assert DematAccount.objects.count() == 17
+    assert BankAccount.objects.filter(active=False, is_placeholder=True).count() == 6
+    assert UPIHandle.objects.count() == 6
+    first_investor = Investor.objects.order_by("planning_priority").first()
+    duplicate_demat = client.post(
+        reverse("demat-list", args=[workspace.pk, first_investor.pk]),
+        {"depository": "CDSL", "client_id": "87654321"},
+        format="json",
+    )
+    assert duplicate_demat.status_code == 400
+    assert first_investor.demats.count() == 1
+    existing_demat = first_investor.demats.get()
+    edited_demat = client.patch(
+        reverse("demat-detail", args=[workspace.pk, first_investor.pk, existing_demat.pk]),
+        {"client_id": "87654321"},
+        format="json",
+    )
+    assert edited_demat.status_code == 200
+    assert first_investor.demats.count() == 1
 
 
 @pytest.mark.django_db

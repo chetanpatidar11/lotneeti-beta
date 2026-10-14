@@ -34,6 +34,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
             "bank_name",
             "account_number",
             "account_masked",
+            "is_placeholder",
             "initial_balance",
             "current_balance",
             "cross_funding_policy",
@@ -42,7 +43,14 @@ class BankAccountSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("id", "account_masked", "current_balance", "created_at", "updated_at")
+        read_only_fields = (
+            "id",
+            "account_masked",
+            "is_placeholder",
+            "current_balance",
+            "created_at",
+            "updated_at",
+        )
 
     def get_fields(self):
         fields = super().get_fields()
@@ -60,11 +68,32 @@ class BankAccountSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"initial_balance": "Use a balance action to change this amount."}
             )
+        if self.instance is not None and self.instance.is_placeholder:
+            has_real_details = bool(attrs.get("bank_name")) and bool(attrs.get("account_number"))
+            if has_real_details and "owner" not in attrs:
+                raise serializers.ValidationError(
+                    {"owner": "Choose the holder of this bank and UPI ID."}
+                )
+            if attrs.get("active") and not has_real_details:
+                raise serializers.ValidationError(
+                    {"active": "Enter the real bank name and account number before activating."}
+                )
         if "account_number" in attrs:
             number = attrs["account_number"].strip()
             if not number:
                 raise serializers.ValidationError({"account_number": "Account number is required."})
             attrs["account_number"] = number
+            if (
+                self.instance is not None
+                and self.instance.is_placeholder
+                and (
+                    account_hash_for_workspace(self.context["workspace"].pk, number)
+                    == self.instance.account_lookup_hash
+                )
+            ):
+                raise serializers.ValidationError(
+                    {"account_number": "Enter the real account number, not the UPI reference."}
+                )
             existing = BankAccount.objects.filter(
                 workspace=self.context["workspace"],
                 account_lookup_hash=account_hash_for_workspace(
@@ -101,11 +130,16 @@ class BankAccountSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         number = validated_data.pop("account_number", None)
         validated_data.pop("initial_balance", None)
+        was_placeholder = instance.is_placeholder
         for field, value in validated_data.items():
             setattr(instance, field, value)
         if number is not None:
             instance.set_account_number(number)
+        if instance.is_placeholder and number is not None and instance.bank_name:
+            instance.is_placeholder = False
         instance.save()
+        if was_placeholder and not instance.is_placeholder:
+            instance.upis.filter(verified=False).update(holder=instance.owner)
         return instance
 
 
@@ -157,6 +191,12 @@ class UPIHandleSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         if self.instance is None and "handle" not in attrs:
             raise serializers.ValidationError({"handle": "UPI ID is required."})
+        if attrs.get("verified") and (
+            self.context["bank"].is_placeholder or not self.context["bank"].active
+        ):
+            raise serializers.ValidationError(
+                {"verified": "Complete and activate the bank account first."}
+            )
         return attrs
 
     def create(self, validated_data):

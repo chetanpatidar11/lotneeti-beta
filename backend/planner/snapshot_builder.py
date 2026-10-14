@@ -8,7 +8,14 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from applications.models import Application
-from funding.models import BankAccount, FundingPreference, RecurringDebit, UPIHandle
+from core.crypto import decrypt_value
+from funding.models import (
+    BankAccount,
+    FundingPreference,
+    RecurringDebit,
+    UPIHandle,
+    upi_hash_for_workspace,
+)
 from investors.models import DematAccount, Investor
 from ipos.gmp_effective import latest_selection_gmp
 from ipos.models import IPOUserDecision
@@ -98,12 +105,29 @@ def build_snapshot(
     demats = DematAccount.objects.filter(investor__workspace=workspace).order_by("id")
     banks = list(BankAccount.objects.filter(workspace=workspace).order_by("id"))
     upis = list(UPIHandle.objects.filter(bank__workspace=workspace).order_by("id"))
-    own_active_banks = {bank.pk: bank.owner_id for bank in banks if bank.active}
+    own_active_banks = {
+        bank.pk: bank.owner_id for bank in banks if bank.active and not bank.is_placeholder
+    }
+    usable_upis = {
+        upi.handle_lookup_hash
+        for upi in upis
+        if upi.active and upi.verified and upi.bank_id in own_active_banks
+    }
     ready_payment_investors = {
         upi.holder_id
         for upi in upis
         if upi.active and upi.verified and own_active_banks.get(upi.bank_id) == upi.holder_id
     }
+    ready_payment_investors.update(
+        investor.pk
+        for investor in investors
+        if investor.payment_hint_ciphertext
+        and upi_hash_for_workspace(
+            workspace.pk,
+            decrypt_value(investor.payment_hint_ciphertext, purpose="payment-hint"),
+        )
+        in usable_upis
+    )
     preferences = FundingPreference.objects.filter(beneficiary__workspace=workspace).order_by("id")
     schedules = RecurringDebit.objects.filter(
         bank__workspace=workspace, active=True, archived_at__isnull=True
@@ -137,7 +161,7 @@ def build_snapshot(
                 id=str(item.pk),
                 owner_id=str(item.owner_id),
                 balance=item.current_balance,
-                active=item.active,
+                active=item.active and not item.is_placeholder,
                 cross_funding_policy=bank_policy(item, at=now),
                 restricted_applicant_id=(
                     str(item.restricted_investor_id) if item.restricted_investor_id else None

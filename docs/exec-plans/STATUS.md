@@ -1,5 +1,10 @@
 # LotNeeti execution status
 
+## B10 one demat and shared UPI import — in progress, 2026-10-14
+
+- Founder requests exactly one demat per investor and automatic creation of payment records from a single workbook, including rows where 17 investors share six UPI IDs. Existing production data has no investors with multiple demats.
+- Import will create one inactive bank reference and one unverified UPI per distinct UPI ID when bank fields are absent. The full UPI is encrypted as the temporary account reference; bank name stays empty. It cannot be used for balance changes or planning until the real bank account/holder is entered, the bank is activated and the UPI is verified. This avoids treating an identifier from the workbook as a verified bank account.
+
 ## B09 one-file import with shared UPI references — deployed, 2026-10-14
 
 - A single workbook can now import investors and demat accounts when bank number and bank name are both blank. The UPI prefix appears only as a masked payment reference; it is never stored as a bank account number. Repeated UPI handles across different PANs remain encrypted hints, not duplicate payment methods. Rows with incomplete or conflicting funding are counted as payment setup pending.

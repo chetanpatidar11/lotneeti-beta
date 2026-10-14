@@ -387,6 +387,7 @@ def confirm_batch(
         .first()
         or 0
     ) + 1
+    staged = []
     for row in selected:
         investor = Investor(
             workspace=batch.workspace,
@@ -402,7 +403,37 @@ def confirm_batch(
         _demat, was_created = _find_or_create_demat(investor, row)
         created["demats"] += was_created
 
+        staged.append((row, investor))
+
+    # A row with real bank details takes precedence over a UPI-only reference
+    # for the same handle, regardless of workbook order.
+    staged.sort(key=lambda pair: not bool(pair[0]["Account Number"]))
+    for row, investor in staged:
         if not (row["Account Number"] and row["Bank Name"]):
+            # One payment method per distinct UPI. The imported bank is an inactive
+            # reference, not a bank account eligible for planning or export.
+            upi_hash = upi_hash_for_workspace(batch.workspace_id, row["UPI ID"])
+            if not UPIHandle.objects.filter(handle_lookup_hash=upi_hash).exists():
+                reference_hash = account_hash_for_workspace(batch.workspace_id, row["UPI ID"])
+                if not BankAccount.objects.filter(
+                    workspace=batch.workspace,
+                    account_lookup_hash=reference_hash,
+                ).exists():
+                    bank = BankAccount(
+                        workspace=batch.workspace,
+                        owner=investor,
+                        bank_name="",
+                        current_balance=0,
+                        active=False,
+                        is_placeholder=True,
+                    )
+                    bank.set_account_number(row["UPI ID"])
+                    bank.save()
+                    created["banks"] += 1
+                    upi = UPIHandle(bank=bank, holder=investor, verified=False)
+                    upi.set_handle(row["UPI ID"])
+                    upi.save()
+                    created["upis"] += 1
             investor.payment_setup_pending = True
             investor.save(update_fields=["payment_setup_pending"])
             created["payment_pending"] += 1
