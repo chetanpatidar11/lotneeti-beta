@@ -1,9 +1,10 @@
 # LotNeeti execution status
 
-## B11 one-file active payment import — in progress, 2026-10-14
+## B11 one-file active payment import — deployed, 2026-10-14
 
 - Founder wants each valid workbook row to create an active investor and demat, and each distinct UPI to create an active UPI and bank account with ₹0 Balance. When bank fields are blank, use `BANK` and the full UPI ID as an editable account reference. A shared UPI needs one bank owner chosen in the import review.
-- Import and Settings display implemented. A missing bank name or account number defaults independently. Synthetic tests cover unique/shared UPIs, partially filled bank columns, editing provisional bank details, and converting legacy placeholders. Full `scripts/check.sh` passed: 386 backend tests, 37 web tests, lint, typecheck, migration checks, web and Android builds. Deployment pending.
+- Import and Settings display implemented. A missing bank name or account number defaults independently. Synthetic tests cover unique/shared UPIs, partially filled bank columns, editing provisional bank details, and converting legacy placeholders. Full `scripts/check.sh` passed: 386 backend tests, 37 web tests, lint, typecheck, migration checks, web and Android builds. Production web dependencies reported zero vulnerabilities in `npm audit --omit=dev`.
+- Encrypted backup succeeded before release. Commit `1831852` was pushed and archive SHA-256 `3ac8fb6db19796a2640729cb381cca9fe44188807df37031000fc6eaf115d663` was deployed to `https://lotneeti.dpdns.org/`. Migration `funding.0012_bankaccount_is_imported_reference` is applied; HTTPS home and sign-in returned 200, API health returned OK, and app/infrastructure services are active. No real customer workbook was imported by the agent.
 
 ## B11 Settings account tabs and editable details — deployed, 2026-10-14
 
