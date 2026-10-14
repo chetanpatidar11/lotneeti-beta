@@ -244,6 +244,7 @@ def preview_payload(batch: AccountImportBatch) -> dict:
                 "dpid_masked": _mask(row["DPID"]),
                 "client_id_masked": _mask(row["CLIENT ID"]),
                 "upi_masked": _masked_upi(row["UPI ID"]),
+                "upi_id": row["UPI ID"],
                 "account_masked": _mask(row["Account Number"]),
                 "bank_name": row["Bank Name"],
                 "payment_reference": (
@@ -430,7 +431,7 @@ def confirm_batch(
                     bank.set_account_number(row["UPI ID"])
                     bank.save()
                     created["banks"] += 1
-                    upi = UPIHandle(bank=bank, holder=investor, verified=False)
+                    upi = UPIHandle(bank=bank, holder=investor, verified=True)
                     upi.set_handle(row["UPI ID"])
                     upi.save()
                     created["upis"] += 1
@@ -477,7 +478,7 @@ def confirm_batch(
             created["banks"] += 1
         upi = existing_upi
         if upi is None:
-            upi = UPIHandle(bank=bank, holder=investor, verified=False)
+            upi = UPIHandle(bank=bank, holder=investor, verified=True)
             upi.set_handle(row["UPI ID"])
             upi.save()
             created["upis"] += 1

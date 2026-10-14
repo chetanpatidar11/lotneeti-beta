@@ -11,19 +11,20 @@ import PreferredFunding, { type BankOption, type FundingPreference } from "./pre
 import AccountImport from "./account-import";
 
 type Workspace = { id: string; name: string; role: string };
-type Investor = { id: string; name: string; pan_masked: string; planning_priority: number; active: boolean; payment_ready: boolean; payment_hint_masked: string };
+type Investor = { id: string; name: string; pan_masked: string; planning_priority: number; active: boolean; payment_ready: boolean; payment_hint: string };
 type Demat = { id: string; depository: string; dp_id_masked: string; client_id_masked: string; broker: string; active: boolean };
-type Upi = { id: string; holder: string; bank_id: string; handle_masked: string; active: boolean; verified: boolean };
+type Upi = { id: string; holder: string; bank_id: string; handle: string; active: boolean; verified: boolean };
 type LinkedAccounts = Record<string, { demats: Demat[]; upis: Upi[] }>;
-type Tab = "investors" | "funding" | "accounts" | "import";
+type Tab = "investors" | "demats" | "banks" | "upis" | "import";
 type AddAccountKind = "demat" | "bank" | "upi";
 type Selection = Record<SettingsKind, string[]>;
-type AccountRow = { id: string; name: string; owner: string; detail: string; active: boolean; verified?: boolean; isPlaceholder?: boolean };
+type AccountRow = { id: string; name: string; owner: string; detail: string; active: boolean; isPlaceholder?: boolean; statusLabel?: string };
 const emptySelection = (): Selection => ({ investor: [], demat: [], bank: [], upi: [] });
 
 async function accountError(response: Response, fallback: string): Promise<string> {
   const body = await response.json().catch(() => null) as Record<string, unknown> | null;
   if (typeof body?.detail === "string") return body.detail;
+  if (typeof body?.message === "string") return body.message;
   const messages = Object.values(body ?? {}).flatMap((value) =>
     typeof value === "string" ? [value] : Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [],
   );
@@ -38,7 +39,7 @@ const labelForKind: Record<SettingsKind, string> = {
 };
 
 function AccountTable({
-  title, kind, rows, selected, canEdit, busy, onToggle, onSelectAll, onAction, onAdd, onEdit, addLabel, addDisabled,
+  title, kind, rows, selected, canEdit, busy, onToggle, onSelectAll, onAction, onAdd, onEdit, addLabel, addDisabled, addDisabledReason,
 }: {
   title: string;
   kind: SettingsKind;
@@ -53,19 +54,20 @@ function AccountTable({
   onEdit?: (id: string) => void;
   addLabel: string;
   addDisabled: boolean;
+  addDisabledReason?: string;
 }) {
   const visible = [...new Map(rows.map((row) => [row.id, row])).values()].sort((a, b) => Number(b.active) - Number(a.active));
   const selectedActive = visible.filter((row) => row.active && selected.includes(row.id)).map((row) => row.id);
   const selectedInactive = visible.filter((row) => !row.active && !row.isPlaceholder && selected.includes(row.id)).map((row) => row.id);
   return <section className="settings-account-group" aria-label={title}>
-    <SectionHeading title={title} action={canEdit && <div className="settings-section-actions"><button type="button" className="button-secondary" disabled={busy || addDisabled} onClick={onAdd}>+ {addLabel}</button>{visible.length > 0 && <><button type="button" className="button-secondary" disabled={busy} onClick={() => onSelectAll(kind, visible.map((row) => row.id), !visible.every((row) => selected.includes(row.id)))}>{visible.every((row) => selected.includes(row.id)) ? "Clear selection" : "Select all"}</button>{selectedActive.length > 0 && <button type="button" className="button-secondary" disabled={busy} onClick={() => onAction(kind, selectedActive, "deactivate")}>Deactivate selected ({selectedActive.length})</button>}{selectedInactive.length > 0 && <button type="button" className="button-secondary" disabled={busy} onClick={() => onAction(kind, selectedInactive, "activate")}>Activate selected ({selectedInactive.length})</button>}{selected.length > 0 && <button type="button" className="button-danger" disabled={busy} onClick={() => onAction(kind, selected, "delete")}>Delete selected ({selected.length})</button>}</>}</div>} />
+    <SectionHeading title={title} action={canEdit && <div className="settings-section-actions"><span title={addDisabled ? addDisabledReason : undefined}><button type="button" className="button-secondary" disabled={busy || addDisabled} onClick={onAdd}>+ {addLabel}</button></span>{visible.length > 0 && <><button type="button" className="button-secondary" disabled={busy} onClick={() => onSelectAll(kind, visible.map((row) => row.id), !visible.every((row) => selected.includes(row.id)))}>{visible.every((row) => selected.includes(row.id)) ? "Clear selection" : "Select all"}</button>{selectedActive.length > 0 && <button type="button" className="button-secondary" disabled={busy} onClick={() => onAction(kind, selectedActive, "deactivate")}>Deactivate selected ({selectedActive.length})</button>}{selectedInactive.length > 0 && <button type="button" className="button-secondary" disabled={busy} onClick={() => onAction(kind, selectedInactive, "activate")}>Activate selected ({selectedInactive.length})</button>}{selected.length > 0 && <button type="button" className="button-danger" disabled={busy} onClick={() => onAction(kind, selected, "delete")}>Delete selected ({selected.length})</button>}</>}</div>} />
     {visible.length === 0 ? <div className="settings-account-empty">No {kind === "upi" ? "UPI IDs" : title.toLowerCase()} added yet.</div> : <div className="settings-table-wrap"><table className="settings-table"><thead><tr>
       {canEdit && <th scope="col" className="settings-select-cell"><label><input type="checkbox" aria-label={`Select all ${title.toLowerCase()}`} checked={visible.every((row) => selected.includes(row.id))} disabled={busy} onChange={(event) => onSelectAll(kind, visible.map((row) => row.id), event.target.checked)} /></label></th>}
       <th scope="col">Account</th><th scope="col">Investor</th><th scope="col">Details</th><th scope="col">Status</th><th scope="col">Action</th>
     </tr></thead><tbody>{visible.map((row) => <tr key={row.id} className={row.active ? "" : "settings-inactive-row"}>
       {canEdit && <td data-label="Select" className="settings-select-cell"><label><input type="checkbox" aria-label={`Select ${row.name}`} checked={selected.includes(row.id)} disabled={busy} onChange={(event) => onToggle(kind, row.id, event.target.checked)} /></label></td>}
-      <th scope="row" data-label="Account">{row.name}</th><td data-label="Investor">{row.owner}</td><td data-label="Details">{row.detail}</td><td data-label="Status"><StatusBadge tone={row.active ? "positive" : row.isPlaceholder ? "warning" : "neutral"}>{row.isPlaceholder ? "Needs details" : row.active ? "Active" : "Inactive"}</StatusBadge></td>
-      <td data-label="Action">{canEdit ? <div className="settings-row-actions">{onEdit && !(kind === "upi" && row.verified) && <button type="button" className="button-secondary" disabled={busy} onClick={() => onEdit(row.id)}>{kind === "upi" ? "Verify" : row.isPlaceholder ? "Complete details" : "Edit"}</button>}{!row.isPlaceholder && <button type="button" className="button-secondary" disabled={busy} onClick={() => onAction(kind, [row.id], row.active ? "deactivate" : "activate")}>{row.active ? "Deactivate" : "Activate"}</button>}<button type="button" className="button-ghost-danger" disabled={busy} onClick={() => onAction(kind, [row.id], "delete")}>Delete</button></div> : "—"}</td>
+      <th scope="row" data-label="Account">{row.name}</th><td data-label="Investor">{row.owner}</td><td data-label="Details">{row.detail}</td><td data-label="Status"><StatusBadge tone={row.statusLabel ? "warning" : row.active ? "positive" : row.isPlaceholder ? "warning" : "neutral"}>{row.statusLabel ?? (row.isPlaceholder ? "Needs details" : row.active ? "Active" : "Inactive")}</StatusBadge></td>
+      <td data-label="Action">{canEdit ? <div className="settings-row-actions">{onEdit && <button type="button" className="button-secondary" disabled={busy} onClick={() => onEdit(row.id)}>{row.isPlaceholder ? "Complete details" : "Edit"}</button>}{!row.isPlaceholder && <button type="button" className="button-secondary" disabled={busy} onClick={() => onAction(kind, [row.id], row.active ? "deactivate" : "activate")}>{row.active ? "Deactivate" : "Activate"}</button>}<button type="button" className="button-ghost-danger" disabled={busy} onClick={() => onAction(kind, [row.id], "delete")}>Delete</button></div> : "—"}</td>
     </tr>)}</tbody></table></div>}
   </section>;
 }
@@ -97,6 +99,7 @@ export default function PrioritySettings({
   const [showAddInvestor, setShowAddInvestor] = useState(false);
   const [addAccountKind, setAddAccountKind] = useState<AddAccountKind | null>(null);
   const [editDematId, setEditDematId] = useState<string | null>(null);
+  const [editDepository, setEditDepository] = useState<"CDSL" | "NSDL">("CDSL");
   const [editDpId, setEditDpId] = useState("");
   const [editClientId, setEditClientId] = useState("");
   const [editBroker, setEditBroker] = useState("");
@@ -104,7 +107,10 @@ export default function PrioritySettings({
   const [editBankOwner, setEditBankOwner] = useState("");
   const [editBankName, setEditBankName] = useState("");
   const [editAccountNumber, setEditAccountNumber] = useState("");
-  const [verifyUpiId, setVerifyUpiId] = useState<string | null>(null);
+  const [editUpiId, setEditUpiId] = useState<string | null>(null);
+  const [editUpiHolder, setEditUpiHolder] = useState("");
+  const [editUpiBankId, setEditUpiBankId] = useState("");
+  const [editUpiHandle, setEditUpiHandle] = useState("");
   const [accountInvestorId, setAccountInvestorId] = useState(initialInvestors.find((investor) => investor.active)?.id ?? "");
   const [depository, setDepository] = useState<"CDSL" | "NSDL">("CDSL");
   const [dpId, setDpId] = useState("");
@@ -131,18 +137,21 @@ export default function PrioritySettings({
   const investorName = (id: string) => investors.find((item) => item.id === id)?.name ?? "Investor";
   const dematRows = Object.entries(linkedAccounts).flatMap(([owner, accounts]) => accounts.demats.map((demat) => ({
     id: demat.id, name: `${demat.depository} · ${demat.client_id_masked}`, owner: investorName(owner),
-    detail: [demat.dp_id_masked, demat.broker].filter(Boolean).join(" · "), active: demat.active,
+    detail: demat.broker || "Broker not set", active: demat.active,
   })));
   const bankRows = banks.map((bank) => ({
     id: bank.id, name: `${bank.is_placeholder ? "Bank details needed" : bank.bank_name} · ${bank.account_masked}`, owner: bank.is_placeholder ? "Choose holder" : investorName(bank.owner),
     detail: bank.is_placeholder ? "UPI reference · add real bank details" : `Balance ${formatInr(bank.current_balance)}`, active: bank.active, isPlaceholder: bank.is_placeholder,
   }));
-  const upiRows = Object.values(linkedAccounts).flatMap((accounts) => accounts.upis.map((upi) => ({
-    id: upi.id, name: upi.handle_masked, owner: banks.find((bank) => bank.id === upi.bank_id)?.is_placeholder ? "Choose holder" : investorName(upi.holder),
-    detail: `${banks.find((bank) => bank.id === upi.bank_id)?.bank_name || "Bank details needed"} · ${upi.verified ? "Verified" : "Not verified"}`,
-    active: upi.active, verified: upi.verified,
-  })));
-  const accountCount = new Set(dematRows.map((row) => row.id)).size + new Set(bankRows.map((row) => row.id)).size + new Set(upiRows.map((row) => row.id)).size;
+  const upiRows = Object.values(linkedAccounts).flatMap((accounts) => accounts.upis.map((upi) => {
+    const bank = banks.find((item) => item.id === upi.bank_id);
+    const holder = investors.find((item) => item.id === upi.holder);
+    return {
+      id: upi.id, name: upi.handle, owner: bank?.is_placeholder ? "Choose holder" : investorName(upi.holder),
+      detail: bank?.bank_name || "Bank details needed", active: upi.active,
+      statusLabel: upi.active ? (bank?.is_placeholder ? "Bank details needed" : !bank?.active ? "Bank inactive" : !holder?.active ? "Investor inactive" : undefined) : undefined,
+    };
+  }));
 
   function note(text: string, error = false) {
     setMessage(text);
@@ -227,22 +236,55 @@ export default function PrioritySettings({
     } finally { setBusy(false); }
   }
 
-  function openEditBank(id: string) {
+  async function openEditBank(id: string) {
     const bank = banks.find((item) => item.id === id);
-    if (!bank) return;
-    setEditBankId(id);
-    setEditBankOwner(bank.is_placeholder ? "" : bank.owner);
-    setEditBankName(bank.is_placeholder ? "" : bank.bank_name);
-    setEditAccountNumber("");
+    if (!workspace || !bank) return;
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/workspaces/${workspace.id}/banks/${id}`);
+      if (!response.ok) throw new Error(await accountError(response, "Could not load the bank details."));
+      const detail = await response.json() as BankOption & { account_number: string };
+      setEditBankOwner(detail.is_placeholder ? "" : detail.owner);
+      setEditBankName(detail.is_placeholder ? "" : detail.bank_name);
+      setEditAccountNumber(detail.is_placeholder ? "" : detail.account_number);
+      setEditBankId(id);
+    } catch (error) { note(error instanceof Error ? error.message : "Could not load the bank details.", true); }
+    finally { setBusy(false); }
   }
 
-  function openEditDemat(id: string) {
-    const demat = Object.values(linkedAccounts).flatMap((accounts) => accounts.demats).find((item) => item.id === id);
-    if (!demat) return;
-    setEditDematId(id);
-    setEditDpId("");
-    setEditClientId("");
-    setEditBroker(demat.broker);
+  async function openEditDemat(id: string) {
+    if (!workspace) return;
+    const ownerId = Object.entries(linkedAccounts).find(([, accounts]) => accounts.demats.some((item) => item.id === id))?.[0];
+    if (!ownerId) return;
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/workspaces/${workspace.id}/investors/${ownerId}/demats/${id}`);
+      if (!response.ok) throw new Error(await accountError(response, "Could not load the demat details."));
+      const detail = await response.json() as Demat & { dp_id: string; client_id: string };
+      setEditDepository(detail.depository as "CDSL" | "NSDL");
+      setEditDpId(detail.dp_id);
+      setEditClientId(detail.client_id);
+      setEditBroker(detail.broker);
+      setEditDematId(id);
+    } catch (error) { note(error instanceof Error ? error.message : "Could not load the demat details.", true); }
+    finally { setBusy(false); }
+  }
+
+  async function openEditUpi(id: string) {
+    if (!workspace) return;
+    const upi = Object.values(linkedAccounts).flatMap((accounts) => accounts.upis).find((item) => item.id === id);
+    if (!upi) return;
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/workspaces/${workspace.id}/banks/${upi.bank_id}/upis/${id}`);
+      if (!response.ok) throw new Error(await accountError(response, "Could not load the UPI details."));
+      const detail = await response.json() as Upi;
+      setEditUpiHolder(detail.holder);
+      setEditUpiBankId(upi.bank_id);
+      setEditUpiHandle(detail.handle);
+      setEditUpiId(id);
+    } catch (error) { note(error instanceof Error ? error.message : "Could not load the UPI details.", true); }
+    finally { setBusy(false); }
   }
 
   async function saveDemat(event: FormEvent<HTMLFormElement>) {
@@ -254,7 +296,7 @@ export default function PrioritySettings({
     try {
       const response = await fetch(`/api/workspaces/${workspace.id}/investors/${ownerId}/demats/${editDematId}`, {
         method: "PATCH", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...(editDpId ? { dp_id: editDpId } : {}), ...(editClientId ? { client_id: editClientId } : {}), broker: editBroker }),
+        body: JSON.stringify({ depository: editDepository, dp_id: editDpId, client_id: editClientId, broker: editBroker }),
       });
       if (!response.ok) throw new Error(await accountError(response, "Check the demat details and try again."));
       const saved = await response.json() as Demat;
@@ -282,7 +324,7 @@ export default function PrioritySettings({
       setBanks((current) => current.map((item) => item.id === updated.id ? updated : item));
       if (banks.find((item) => item.id === updated.id)?.is_placeholder) {
         setLinkedAccounts((current) => {
-          const moved = Object.values(current).flatMap((accounts) => accounts.upis).filter((item) => item.bank_id === updated.id && !item.verified).map((item) => ({ ...item, holder: updated.owner }));
+          const moved = Object.values(current).flatMap((accounts) => accounts.upis).filter((item) => item.bank_id === updated.id).map((item) => ({ ...item, holder: updated.owner }));
           const next = Object.fromEntries(Object.entries(current).map(([id, accounts]) => [id, {
             ...accounts, upis: accounts.upis.filter((item) => !moved.some((upi) => upi.id === item.id)),
           }]));
@@ -297,25 +339,32 @@ export default function PrioritySettings({
     } finally { setBusy(false); }
   }
 
-  async function verifyUpi() {
-    if (!workspace || !verifyUpiId) return;
-    const upi = Object.values(linkedAccounts).flatMap((accounts) => accounts.upis).find((item) => item.id === verifyUpiId);
+  async function saveUpi(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!workspace || !editUpiId) return;
+    const upi = Object.values(linkedAccounts).flatMap((accounts) => accounts.upis).find((item) => item.id === editUpiId);
     if (!upi) return;
     setBusy(true);
     try {
       const response = await fetch(`/api/workspaces/${workspace.id}/banks/${upi.bank_id}/upis/${upi.id}`, {
-        method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ verified: true }),
+        method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ holder: editUpiHolder, bank_id: editUpiBankId, handle: editUpiHandle }),
       });
-      if (!response.ok) throw new Error(await accountError(response, "Complete and activate the bank first."));
-      setLinkedAccounts((current) => Object.fromEntries(Object.entries(current).map(([id, accounts]) => [id, {
-        ...accounts, upis: accounts.upis.map((item) => item.id === upi.id ? { ...item, verified: true } : item),
-      }])));
+      if (!response.ok) throw new Error(await accountError(response, "Check the UPI details and try again."));
+      const saved = await response.json() as Upi;
+      setLinkedAccounts((current) => {
+        const next = Object.fromEntries(Object.entries(current).map(([id, accounts]) => [id, {
+          ...accounts, upis: accounts.upis.filter((item) => item.id !== upi.id),
+        }]));
+        const holderAccounts = next[saved.holder] ?? { demats: [], upis: [] };
+        next[saved.holder] = { ...holderAccounts, upis: [...holderAccounts.upis, { ...saved, bank_id: editUpiBankId }] };
+        return next;
+      });
       const investorsResponse = await fetch(`/api/workspaces/${workspace.id}/investors`);
       if (investorsResponse.ok) setInvestors(sortByPriority(await investorsResponse.json() as Investor[]));
-      setVerifyUpiId(null);
-      note("UPI verified.");
+      setEditUpiId(null);
+      note("UPI details saved.");
     } catch (error) {
-      note(error instanceof Error ? error.message : "We could not verify this UPI.", true);
+      note(error instanceof Error ? error.message : "We could not save this UPI.", true);
     } finally { setBusy(false); }
   }
 
@@ -358,7 +407,7 @@ export default function PrioritySettings({
       });
       setAddAccountKind(null);
       setUpiHandle("");
-      note("UPI added. It remains unverified until you verify it.");
+      note("UPI added.");
     } catch (error) {
       note(error instanceof Error ? error.message : "Check the UPI details and try again.", true);
     } finally { setBusy(false); }
@@ -390,13 +439,16 @@ export default function PrioritySettings({
         method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, ids, action }),
       });
       if (!response.ok) {
-        const body = await response.json().catch(() => ({})) as { message?: string };
-        throw new Error(body.message ?? "We could not change these items. Please try again.");
+        throw new Error(await accountError(response, "We could not change these items. Please try again."));
       }
       const next = applySettingsAction({ investors, banks, linkedAccounts }, kind, ids, action);
       setInvestors(next.investors);
       setBanks(next.banks);
       setLinkedAccounts(next.linkedAccounts);
+      if (kind === "bank" || kind === "upi") {
+        const investorsResponse = await fetch(`/api/workspaces/${workspace.id}/investors`);
+        if (investorsResponse.ok) setInvestors(sortByPriority(await investorsResponse.json() as Investor[]));
+      }
       setSelected(emptySelection());
       if (action === "delete") {
         const deleted = new Set(ids);
@@ -433,7 +485,7 @@ export default function PrioritySettings({
       <button type="submit" disabled={busy}>Create workspace</button>
     </form> : <>
       <nav className="settings-tabs" aria-label="Settings sections">
-        {([["investors", "Investors"], ["funding", "Funding Preferences"], ["accounts", "Accounts"], ["import", "Import"]] as const).map(([key, label]) => <button key={key} type="button" className={tab === key ? "settings-tab active" : "settings-tab"} aria-current={tab === key ? "page" : undefined} onClick={() => changeTab(key)}>{label}</button>)}
+        {([["investors", "Investors"], ["demats", "Demat Accounts"], ["banks", "Bank Accounts"], ["upis", "UPIs"], ["import", "Import"]] as const).map(([key, label]) => <button key={key} type="button" className={tab === key ? "settings-tab active" : "settings-tab"} aria-current={tab === key ? "page" : undefined} onClick={() => changeTab(key)}>{label}</button>)}
       </nav>
       {tab === "investors" && <section aria-label="Investors">
         <SectionHeading title="Investors" detail="Active investors are planned first. Inactive investors stay visible here." action={canEdit && <div className="settings-section-actions">
@@ -458,17 +510,9 @@ export default function PrioritySettings({
         </tr>)}</tbody></table></div>}
       </section>}
 
-      {tab === "funding" && <section aria-label="Funding preferences"><SectionHeading title="Funding Preferences" detail="Choose an investor to review and order their preferred accounts." />
-        {activeInvestors.length === 0 ? <EmptyState title="No active investors" detail="Add or activate an investor before setting funding preferences." /> : <div className="settings-funding-list">{activeInvestors.map((investor) => <button type="button" key={investor.id} className="settings-funding-row" onClick={() => setSelectedInvestor(investor.id)}><span><strong>{investor.name}</strong><small>{investor.pan_masked}</small></span><span>{preferences[investor.id]?.filter((item) => item.enabled).length ?? 0} preferred · {banks.filter((bank) => bank.owner === investor.id && bank.active).length} own bank(s)</span><span aria-hidden="true">›</span></button>)}</div>}
-      </section>}
-
-      {tab === "accounts" && <section aria-label="Accounts"><SectionHeading title="Linked accounts" detail={accountCount > 0 ? "Demat, bank and UPI accounts for this workspace." : undefined} action={accountCount > 0 ? <span className="settings-account-count">{accountCount} total</span> : undefined} />
-        {accountCount === 0 ? <div className="settings-accounts-empty"><span className="settings-accounts-empty-mark" aria-hidden="true">+</span><div><p className="settings-accounts-empty-kicker">GET STARTED</p><h3>{activeInvestors.length > 0 ? "Connect your first account" : investors.length > 0 ? "Activate an investor to add accounts" : "Set up your investor accounts"}</h3><p>{activeInvestors.length > 0 ? "Add a demat and bank account for an investor. You can link a UPI ID after adding a bank." : investors.length > 0 ? "Your investors are inactive. Activate one before linking a demat, bank or UPI account." : "Add an investor, then link their demat, bank and UPI details for IPO planning."}</p><div className="settings-accounts-empty-actions">{canEdit && (activeInvestors.length > 0 ? <><button type="button" onClick={() => openAddAccount("demat")}>+ Add demat</button><button type="button" className="button-secondary" onClick={() => openAddAccount("bank")}>+ Add bank</button></> : investors.length > 0 ? <button type="button" onClick={() => changeTab("investors")}>View investors</button> : <button type="button" onClick={() => setShowAddInvestor(true)}>+ Add investor</button>)}{canEdit && <button type="button" className="text-button" onClick={() => changeTab("import")}>Import accounts →</button>}</div></div></div> : <>
-          <AccountTable title="Demat Accounts" kind="demat" rows={dematRows} selected={selected.demat} canEdit={canEdit} busy={busy} onToggle={toggle} onSelectAll={selectAll} onAction={itemAction} onAdd={() => openAddAccount("demat")} onEdit={openEditDemat} addLabel="Add demat" addDisabled={investorsWithoutDemat.length === 0} />
-          <AccountTable title="Bank Accounts" kind="bank" rows={bankRows} selected={selected.bank} canEdit={canEdit} busy={busy} onToggle={toggle} onSelectAll={selectAll} onAction={itemAction} onAdd={() => openAddAccount("bank")} onEdit={openEditBank} addLabel="Add bank" addDisabled={activeInvestors.length === 0} />
-          <AccountTable title="UPIs" kind="upi" rows={upiRows} selected={selected.upi} canEdit={canEdit} busy={busy} onToggle={toggle} onSelectAll={selectAll} onAction={itemAction} onAdd={() => openAddAccount("upi")} onEdit={setVerifyUpiId} addLabel="Add UPI" addDisabled={activeInvestors.length === 0 || banks.every((bank) => !bank.active)} />
-        </>}
-      </section>}
+      {tab === "demats" && <AccountTable title="Demat Accounts" kind="demat" rows={dematRows} selected={selected.demat} canEdit={canEdit} busy={busy} onToggle={toggle} onSelectAll={selectAll} onAction={itemAction} onAdd={() => openAddAccount("demat")} onEdit={(id) => void openEditDemat(id)} addLabel="Add demat" addDisabled={investorsWithoutDemat.length === 0} addDisabledReason={activeInvestors.length === 0 ? "Add or activate an investor first." : "Every investor has a linked demat account."} />}
+      {tab === "banks" && <AccountTable title="Bank Accounts" kind="bank" rows={bankRows} selected={selected.bank} canEdit={canEdit} busy={busy} onToggle={toggle} onSelectAll={selectAll} onAction={itemAction} onAdd={() => openAddAccount("bank")} onEdit={(id) => void openEditBank(id)} addLabel="Add bank" addDisabled={activeInvestors.length === 0} addDisabledReason="Add or activate an investor first." />}
+      {tab === "upis" && <AccountTable title="UPIs" kind="upi" rows={upiRows} selected={selected.upi} canEdit={canEdit} busy={busy} onToggle={toggle} onSelectAll={selectAll} onAction={itemAction} onAdd={() => openAddAccount("upi")} onEdit={(id) => void openEditUpi(id)} addLabel="Add UPI" addDisabled={activeInvestors.length === 0 || banks.every((bank) => !bank.active)} addDisabledReason={activeInvestors.length === 0 ? "Add or activate an investor first." : "Complete and activate a bank account first."} />}
 
       {tab === "import" && <AccountImport workspaceId={workspace.id} canEdit={canEdit} />}
       {addAccountKind === "demat" && <Drawer title="Add demat account" onClose={() => setAddAccountKind(null)}><form className="sign-in-form" onSubmit={addDemat}>
@@ -481,15 +525,15 @@ export default function PrioritySettings({
         <button type="submit" disabled={busy}>Add demat account</button>
       </form></Drawer>}
       {editDematId && <Drawer title="Edit demat account" onClose={() => setEditDematId(null)}><form className="sign-in-form" onSubmit={saveDemat}>
-        <p className="form-note">Leave an ID field blank to keep its current value.</p>
-        <label htmlFor="edit-dp-id">New DP ID</label><input id="edit-dp-id" value={editDpId} onChange={(event) => setEditDpId(event.target.value)} />
-        <label htmlFor="edit-client-id">New Client ID</label><input id="edit-client-id" value={editClientId} onChange={(event) => setEditClientId(event.target.value)} />
+        <label htmlFor="edit-depository">Depository</label><select id="edit-depository" value={editDepository} onChange={(event) => setEditDepository(event.target.value as "CDSL" | "NSDL")}><option value="CDSL">CDSL</option><option value="NSDL">NSDL</option></select>
+        <label htmlFor="edit-dp-id">DP ID</label><input id="edit-dp-id" required={editDepository === "NSDL"} value={editDpId} onChange={(event) => setEditDpId(event.target.value)} />
+        <label htmlFor="edit-client-id">Client ID</label><input id="edit-client-id" required value={editClientId} onChange={(event) => setEditClientId(event.target.value)} />
         <label htmlFor="edit-broker">Broker</label><input id="edit-broker" value={editBroker} onChange={(event) => setEditBroker(event.target.value)} />
         <button type="submit" disabled={busy}>Save demat</button>
       </form></Drawer>}
-      {editBankId && <Drawer title="Complete bank details" onClose={() => setEditBankId(null)}><form className="sign-in-form" onSubmit={saveBank}>
-        <p className="form-note">The imported UPI ID was saved as an inactive reference. Enter the real bank details before using this account for planning.</p>
-        <label htmlFor="edit-bank-owner">Bank and UPI holder</label><select id="edit-bank-owner" value={editBankOwner} onChange={(event) => setEditBankOwner(event.target.value)} required><option value="">Choose holder</option>{activeInvestors.map((investor) => <option key={investor.id} value={investor.id}>{investor.name}</option>)}</select>
+      {editBankId && <Drawer title={banks.find((bank) => bank.id === editBankId)?.is_placeholder ? "Complete bank details" : "Edit bank account"} onClose={() => setEditBankId(null)}><form className="sign-in-form" onSubmit={saveBank}>
+        {banks.find((bank) => bank.id === editBankId)?.is_placeholder && <p className="form-note">Enter the real bank details before using this account for planning.</p>}
+        <label htmlFor="edit-bank-owner">Bank and UPI holder</label><select id="edit-bank-owner" value={editBankOwner} onChange={(event) => setEditBankOwner(event.target.value)} required><option value="">Choose holder</option>{investors.filter((investor) => investor.active || investor.id === editBankOwner).map((investor) => <option key={investor.id} value={investor.id}>{investor.name}{investor.active ? "" : " (inactive)"}</option>)}</select>
         <label htmlFor="edit-bank-name">Bank name</label><input id="edit-bank-name" required value={editBankName} onChange={(event) => setEditBankName(event.target.value)} />
         <label htmlFor="edit-bank-number">Real account number</label><input id="edit-bank-number" required autoComplete="off" value={editAccountNumber} onChange={(event) => setEditAccountNumber(event.target.value)} />
         <button type="submit" disabled={busy}>Save bank details</button>
@@ -505,13 +549,17 @@ export default function PrioritySettings({
         <label htmlFor="upi-holder">Investor</label><select id="upi-holder" value={accountInvestorId} onChange={(event) => setAccountInvestorId(event.target.value)} required>{activeInvestors.map((investor) => <option key={investor.id} value={investor.id}>{investor.name}</option>)}</select>
         <label htmlFor="upi-bank">Bank account</label><select id="upi-bank" value={upiBankId} onChange={(event) => setUpiBankId(event.target.value)} required>{banks.filter((bank) => bank.active).map((bank) => <option key={bank.id} value={bank.id}>{bank.bank_name} · {bank.account_masked}</option>)}</select>
         <label htmlFor="upi-handle">UPI ID</label><input id="upi-handle" required autoComplete="off" placeholder="name@provider" value={upiHandle} onChange={(event) => setUpiHandle(event.target.value)} />
-        <p className="form-note">New UPI IDs are unverified until verified separately.</p>
         <button type="submit" disabled={busy}>Add UPI</button>
       </form></Drawer>}
-      {focusedInvestor && <Drawer title={focusedInvestor.name} onClose={() => setSelectedInvestor(null)}><div className="settings-investor-detail"><p><strong>PAN</strong><span>{focusedInvestor.pan_masked}</span></p><p><strong>Status</strong><StatusBadge tone={!focusedInvestor.active ? "neutral" : focusedInvestor.payment_ready ? "positive" : "warning"}>{!focusedInvestor.active ? "Inactive" : focusedInvestor.payment_ready ? "Active" : "Payment needed"}</StatusBadge></p>{!focusedInvestor.payment_ready && <p><strong>UPI reference</strong><span>{focusedInvestor.payment_hint_masked} · Complete the shared bank details and verify its UPI before planning.</span></p>}</div><div className="settings-linked"><h3>Demat Account</h3>{linkedAccounts[focusedInvestor.id]?.demats.length ? linkedAccounts[focusedInvestor.id].demats.map((demat) => <p key={demat.id}>{demat.depository} · {demat.dp_id_masked} / {demat.client_id_masked} <small>{demat.broker} · {demat.active ? "Active" : "Inactive"}</small></p>) : <p>No demat account yet.</p>}<h3>Bank Accounts</h3>{banks.filter((bank) => bank.owner === focusedInvestor.id).map((bank) => <p key={bank.id}>{bank.is_placeholder ? "Bank details needed" : bank.bank_name} · {bank.account_masked} <small>{bank.active ? "Active" : "Inactive"}</small></p>)}<h3>UPIs</h3>{linkedAccounts[focusedInvestor.id]?.upis.length ? linkedAccounts[focusedInvestor.id].upis.map((upi) => <p key={upi.id}>{upi.handle_masked} <small>{upi.verified ? "Verified" : "Not verified"} · {upi.active ? "Active" : "Inactive"}</small></p>) : <p>No UPIs yet.</p>}</div>{focusedInvestor.active && <PreferredFunding key={focusedInvestor.id} workspaceId={workspace.id} investor={focusedInvestor} investors={activeInvestors} banks={banks.filter((bank) => bank.active)} initialPreferences={preferences[focusedInvestor.id] ?? []} canEdit={canEdit} />}</Drawer>}
+      {editUpiId && <Drawer title="Edit UPI" onClose={() => setEditUpiId(null)}><form className="sign-in-form" onSubmit={saveUpi}>
+        <label htmlFor="edit-upi-holder">Investor</label><select id="edit-upi-holder" value={editUpiHolder} onChange={(event) => setEditUpiHolder(event.target.value)} required>{investors.filter((investor) => investor.active || investor.id === editUpiHolder).map((investor) => <option key={investor.id} value={investor.id}>{investor.name}{investor.active ? "" : " (inactive)"}</option>)}</select>
+        <label htmlFor="edit-upi-bank">Bank account</label><select id="edit-upi-bank" value={editUpiBankId} onChange={(event) => setEditUpiBankId(event.target.value)} required>{banks.filter((bank) => bank.active || bank.id === editUpiBankId).map((bank) => <option key={bank.id} value={bank.id}>{bank.is_placeholder ? "Bank details needed" : bank.bank_name} · {bank.account_masked}</option>)}</select>
+        <label htmlFor="edit-upi-handle">UPI ID</label><input id="edit-upi-handle" required autoComplete="off" value={editUpiHandle} onChange={(event) => setEditUpiHandle(event.target.value)} />
+        <button type="submit" disabled={busy}>Save UPI</button>
+      </form></Drawer>}
+      {focusedInvestor && <Drawer title={focusedInvestor.name} onClose={() => setSelectedInvestor(null)}><div className="settings-investor-detail"><p><strong>PAN</strong><span>{focusedInvestor.pan_masked}</span></p><p><strong>Status</strong><StatusBadge tone={!focusedInvestor.active ? "neutral" : focusedInvestor.payment_ready ? "positive" : "warning"}>{!focusedInvestor.active ? "Inactive" : focusedInvestor.payment_ready ? "Active" : "Payment needed"}</StatusBadge></p>{!focusedInvestor.payment_ready && <p><strong>UPI reference</strong><span>{focusedInvestor.payment_hint} · Complete and activate the linked bank before planning.</span></p>}</div><div className="settings-linked"><h3>Demat Account</h3>{linkedAccounts[focusedInvestor.id]?.demats.length ? linkedAccounts[focusedInvestor.id].demats.map((demat) => <p key={demat.id}>{demat.depository} · {demat.dp_id_masked} / {demat.client_id_masked} <small>{demat.broker} · {demat.active ? "Active" : "Inactive"}</small></p>) : <p>No demat account yet.</p>}<h3>Bank Accounts</h3>{banks.filter((bank) => bank.owner === focusedInvestor.id).map((bank) => <p key={bank.id}>{bank.is_placeholder ? "Bank details needed" : bank.bank_name} · {bank.account_masked} <small>{bank.active ? "Active" : "Inactive"}</small></p>)}<h3>UPIs</h3>{linkedAccounts[focusedInvestor.id]?.upis.length ? linkedAccounts[focusedInvestor.id].upis.map((upi) => <p key={upi.id}>{upi.handle} <small>{upi.verified ? "Verified" : "Not verified"} · {upi.active ? "Active" : "Inactive"}</small></p>) : <p>No UPIs yet.</p>}</div>{focusedInvestor.active && <PreferredFunding key={focusedInvestor.id} workspaceId={workspace.id} investor={focusedInvestor} investors={activeInvestors} banks={banks.filter((bank) => bank.active)} initialPreferences={preferences[focusedInvestor.id] ?? []} canEdit={canEdit} />}</Drawer>}
       {showAddInvestor && <Drawer title="Add investor" onClose={() => setShowAddInvestor(false)}><form onSubmit={addInvestor} className="sign-in-form"><label htmlFor="investor-name">Name</label><input id="investor-name" required value={name} onChange={(event) => setName(event.target.value)} /><label htmlFor="investor-pan">PAN</label><input id="investor-pan" required maxLength={10} autoComplete="off" value={pan} onChange={(event) => setPan(event.target.value)} /><button type="submit" disabled={busy}>Add investor</button></form></Drawer>}
       {pendingRemoval && <ConfirmationDialog title={`Permanently delete ${pendingCount} ${pendingName}${pendingCount === 1 ? "" : "s"}?`} description={`These records cannot be restored. ${pendingRemoval.kind === "bank" || pendingRemoval.kind === "investor" ? "Bank balance history stays in Funds. Accounts linked to applications cannot be deleted." : "Records linked to applications cannot be deleted."} ${confirmationDetail}`} confirmLabel={`Delete ${pendingCount === 1 ? pendingName : "selected"}`} busy={busy} onCancel={() => setPendingRemoval(null)} onConfirm={() => void updateItems(pendingRemoval.kind, pendingRemoval.ids, "delete")} />}
-      {verifyUpiId && <ConfirmationDialog title="Verify UPI ID?" description="Confirm that you checked the UPI ID, its holder and its real bank account. This allows the payment method to be used in planning once the bank is active." confirmLabel="Mark verified" busy={busy} onCancel={() => setVerifyUpiId(null)} onConfirm={() => void verifyUpi()} />}
     </>}
   </div></main>;
 }

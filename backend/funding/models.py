@@ -141,7 +141,7 @@ class UPIHandle(models.Model):
     handle_ciphertext = models.TextField()
     handle_lookup_hash = models.CharField(max_length=64)
     active = models.BooleanField(default=True)
-    verified = models.BooleanField(default=False)
+    verified = models.BooleanField(default=True)
     count_limit_override = models.PositiveSmallIntegerField(null=True, blank=True)
     amount_limit_override = models.DecimalField(
         max_digits=14,
@@ -165,6 +165,10 @@ class UPIHandle(models.Model):
         normalized = value.strip().lower()
         self.handle_ciphertext = encrypt_value(normalized, purpose="upi")
         self.handle_lookup_hash = upi_hash_for_workspace(self.bank.workspace_id, normalized)
+
+    @property
+    def handle(self) -> str:
+        return decrypt_value(self.handle_ciphertext, purpose="upi")
 
     @property
     def handle_masked(self) -> str:

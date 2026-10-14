@@ -298,7 +298,7 @@ def test_one_file_import_registers_one_inactive_bank_and_upi_for_shared_handle()
     assert preview.data["error_count"] == 0
     assert all(row["payment_pending"] for row in preview.data["rows"])
     assert all(row["payment_reference"] == "••••name" for row in preview.data["rows"])
-    assert "somename@upi" not in str(preview.data)
+    assert all(row["upi_id"] == "somename@upi" for row in preview.data["rows"])
 
     result = client.post(
         reverse("account-import-preview", args=[workspace.pk, preview.data["id"]]),
@@ -319,7 +319,7 @@ def test_one_file_import_registers_one_inactive_bank_and_upi_for_shared_handle()
     assert placeholder.is_placeholder is True
     assert placeholder.active is False
     assert placeholder.bank_name == ""
-    assert UPIHandle.objects.get().verified is False
+    assert UPIHandle.objects.get().verified is True
     balance_attempt = client.post(
         reverse("bank-set-balance", args=[workspace.pk, placeholder.pk]),
         {"amount": "1000.00"},
@@ -338,12 +338,12 @@ def test_one_file_import_registers_one_inactive_bank_and_upi_for_shared_handle()
         format="json",
     )
     assert activation.status_code == 400
-    premature_verification = client.patch(
+    premature_activation = client.patch(
         reverse("upi-detail", args=[workspace.pk, placeholder.pk, UPIHandle.objects.get().pk]),
-        {"verified": True},
+        {"active": True},
         format="json",
     )
-    assert premature_verification.status_code == 400
+    assert premature_activation.status_code == 400
     same_reference = client.patch(
         reverse("bank-detail", args=[workspace.pk, placeholder.pk]),
         {"bank_name": "Synthetic Bank", "account_number": "somename@upi"},
@@ -370,13 +370,7 @@ def test_one_file_import_registers_one_inactive_bank_and_upi_for_shared_handle()
         format="json",
     )
     assert activation.status_code == 200
-    upi = UPIHandle.objects.get()
-    verification = client.patch(
-        reverse("upi-detail", args=[workspace.pk, placeholder.pk, upi.pk]),
-        {"verified": True},
-        format="json",
-    )
-    assert verification.status_code == 200
+    assert UPIHandle.objects.get().verified is True
     assert all(investor.payment_ready for investor in Investor.objects.all())
     assert all(applicant.active for applicant in build_snapshot(workspace=workspace).applicants)
 
@@ -524,7 +518,7 @@ def test_distinct_pan_rows_import_as_separate_investors():
         "payment_pending": 0,
     }
     assert Investor.objects.count() == 2
-    assert all(not upi.verified for upi in UPIHandle.objects.all())
+    assert all(upi.verified for upi in UPIHandle.objects.all())
     assert all(bank.current_balance == 0 for bank in BankAccount.objects.all())
     assert client.post(url, {"row_numbers": [2]}, format="json").status_code == 400
 

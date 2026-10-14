@@ -2,7 +2,7 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import mixins, viewsets
 
-from accounts.models import Workspace
+from accounts.models import Workspace, WorkspaceMembership
 from accounts.permissions import WorkspaceDataPermission
 from core.audit import record_event
 from investors.models import DematAccount, Investor
@@ -75,7 +75,17 @@ class DematAccountViewSet(
         return DematAccount.objects.filter(investor=self.get_investor()).order_by("id")
 
     def get_serializer_context(self):
-        return {**super().get_serializer_context(), "investor": self.get_investor()}
+        investor = self.get_investor()
+        can_edit = WorkspaceMembership.objects.filter(
+            workspace=investor.workspace,
+            user=self.request.user,
+            role__in=(WorkspaceMembership.Role.OWNER, WorkspaceMembership.Role.OPERATOR),
+        ).exists()
+        return {
+            **super().get_serializer_context(),
+            "investor": investor,
+            "reveal_details": self.action == "retrieve" and can_edit,
+        }
 
     def perform_create(self, serializer):
         with transaction.atomic():

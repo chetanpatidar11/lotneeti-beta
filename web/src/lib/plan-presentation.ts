@@ -150,7 +150,7 @@ const issueMessages: Record<string, string> = {
   INVALID_BANK: "Choose an active bank.",
   INVALID_CATEGORY: "Choose valid Retail or sHNI lots for this IPO.",
   INVALID_DEMAT: "Choose an active demat for this applicant.",
-  INVALID_UPI: "Choose an active, verified UPI for this bank.",
+  INVALID_UPI: "Choose an active UPI linked to an active bank and investor.",
   IPO_NOT_SELECTED: "Select this IPO before planning an application.",
   LOCKED_ROW_CHANGED: "A locked application changed. Review its mapping.",
   LOCKED_ROW_INFEASIBLE: "This locked mapping cannot be submitted yet. Fix the highlighted issue.",

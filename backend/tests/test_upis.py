@@ -40,16 +40,17 @@ def test_upi_create_edit_mask_and_limit_overrides():
 
     assert response.status_code == 201
     assert response.data["handle_masked"] == "••••@upi.test"
-    assert "handle" not in response.data
+    assert response.data["handle"] == "demo@upi.test"
     upi = UPIHandle.objects.get(pk=response.data["id"])
     assert "demo@upi.test" not in upi.handle_ciphertext
     assert upi.verified is True
     assert upi.count_limit_override == 4
     detail_url = reverse("upi-detail", args=[workspace.pk, bank.pk, upi.pk])
+    assert client.get(detail_url).data["handle"] == "demo@upi.test"
     updated = client.patch(detail_url, {"active": False, "verified": False})
     assert updated.status_code == 200
     assert updated.data["active"] is False
-    assert updated.data["verified"] is False
+    assert updated.data["verified"] is True
     assert (
         client.post(list_url, {"holder": str(holder.pk), "handle": "demo@upi.test"}).status_code
         == 400
@@ -87,3 +88,39 @@ def test_upi_holder_scope_and_viewer_write_denial():
     client.force_authenticate(viewer)
     assert client.get(detail_url).status_code == 200
     assert client.patch(detail_url, {"verified": True}).status_code == 403
+
+
+@pytest.mark.django_db
+def test_upi_edit_rejects_inactive_linked_account_and_can_move_to_active_bank():
+    owner = User.objects.create_user(email="owner@example.test")
+    workspace = create_workspace(name="Family", owner=owner)
+    holder, bank = setup_bank(workspace)
+    another = BankAccount(workspace=workspace, owner=holder, bank_name="Second Bank")
+    another.set_account_number("DEMO-ACCOUNT-0002")
+    another.save()
+    inactive = Investor(workspace=workspace, name="Inactive", active=False)
+    inactive.set_pan("TESTX0002A")
+    inactive.save()
+    client = APIClient()
+    client.force_authenticate(owner)
+    created = client.post(
+        reverse("upi-list", args=[workspace.pk, bank.pk]),
+        {
+            "holder": str(holder.pk),
+            "handle": "demo@upi.test",
+            "active": True,
+        },
+    )
+    assert created.status_code == 201
+    detail_url = reverse("upi-detail", args=[workspace.pk, bank.pk, created.data["id"]])
+    assert client.patch(detail_url, {"holder": str(inactive.pk)}).status_code == 400
+    another.active = False
+    another.save(update_fields=["active"])
+    assert client.patch(detail_url, {"bank_id": str(another.pk)}).status_code == 400
+    another.active = True
+    another.save(update_fields=["active"])
+    moved = client.patch(detail_url, {"bank_id": str(another.pk), "handle": "new@upi.test"})
+    assert moved.status_code == 200
+    assert moved.data["handle"] == "new@upi.test"
+    upi = UPIHandle.objects.get(pk=created.data["id"])
+    assert upi.bank_id == another.pk

@@ -59,6 +59,14 @@ class Investor(models.Model):
         return f"••••{prefix[-4:]}@{provider}"
 
     @property
+    def payment_hint(self) -> str:
+        return (
+            decrypt_value(self.payment_hint_ciphertext, purpose="payment-hint")
+            if self.payment_hint_ciphertext
+            else ""
+        )
+
+    @property
     def payment_ready(self) -> bool:
         if not self.payment_setup_pending:
             return True

@@ -37,7 +37,7 @@ def test_submitted_then_blocked_updates_capital_without_changing_balance():
     assert client.post(track_url, {}, format="json").status_code == 201
     assert Application.objects.count() == 1
     application = Application.objects.get()
-    assert first.data[0]["upi_label"].startswith("••••@")
+    assert first.data[0]["upi_label"] == "demo@upi.test"
     assert first.data[0]["close_date"] == application.ipo.close_date
     assert first.data[0]["allotment_date"] == application.ipo.allotment_date
     assert first.data[0]["sold_quantity"] == 0

@@ -51,6 +51,8 @@ def test_bank_create_has_masked_number_balance_and_opening_history():
     assert change.actor == owner
 
     detail_url = reverse("bank-detail", args=[workspace.pk, bank.pk])
+    assert client.get(detail_url).data["account_number"] == "DEMO-ACCOUNT-0001"
+    assert "account_number" not in client.get(list_url).data[0]
     assert client.patch(detail_url, {"active": False}).status_code == 200
     assert client.patch(detail_url, {"initial_balance": "70000.00"}).status_code == 400
     bank.refresh_from_db()
@@ -99,5 +101,7 @@ def test_bank_workspace_scope_and_viewer_write_denial():
     assert client.get(detail_url).status_code == 403
 
     client.force_authenticate(viewer)
-    assert client.get(detail_url).status_code == 200
+    viewer_detail = client.get(detail_url)
+    assert viewer_detail.status_code == 200
+    assert "account_number" not in viewer_detail.data
     assert client.patch(detail_url, {"active": False}).status_code == 403

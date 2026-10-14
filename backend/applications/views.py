@@ -53,7 +53,7 @@ def _result(item):
         "applicant_name": item.applicant.name,
         "bank": str(item.bank_id),
         "bank_label": f"{item.bank.bank_name} {item.bank.account_masked}",
-        "upi_label": item.upi.handle_masked,
+        "upi_label": item.upi.handle,
         "close_date": item.ipo.close_date,
         "allotment_date": item.ipo.allotment_date,
         "sold_quantity": sold_quantity,

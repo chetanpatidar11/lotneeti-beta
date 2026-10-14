@@ -3,6 +3,7 @@ import re
 from django.db import IntegrityError, transaction
 from rest_framework import serializers
 
+from core.crypto import decrypt_value
 from investors.models import DematAccount, Investor, pan_hash_for_workspace
 
 PAN_PATTERN = re.compile(r"^[A-Z]{5}[0-9]{4}[A-Z]$")
@@ -12,6 +13,7 @@ class InvestorSerializer(serializers.ModelSerializer):
     pan = serializers.CharField(write_only=True, required=False)
     pan_masked = serializers.CharField(read_only=True)
     payment_hint_masked = serializers.CharField(read_only=True)
+    payment_hint = serializers.CharField(read_only=True)
     payment_ready = serializers.BooleanField(read_only=True)
 
     class Meta:
@@ -22,6 +24,7 @@ class InvestorSerializer(serializers.ModelSerializer):
             "pan",
             "pan_masked",
             "payment_hint_masked",
+            "payment_hint",
             "payment_ready",
             "planning_priority",
             "active",
@@ -102,7 +105,23 @@ class DematAccountSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("id", "dp_id_masked", "client_id_masked", "created_at", "updated_at")
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if self.context.get("reveal_details"):
+            data["dp_id"] = (
+                decrypt_value(instance.dp_id_ciphertext, purpose="demat")
+                if instance.dp_id_ciphertext
+                else ""
+            )
+            data["client_id"] = decrypt_value(instance.client_id_ciphertext, purpose="demat")
+        return data
+
     def validate(self, attrs):
+        investor = self.context["investor"]
+        if (self.instance is None or attrs.get("active")) and not investor.active:
+            raise serializers.ValidationError(
+                {"active": "Activate the investor before using this demat account."}
+            )
         if self.instance is None:
             if DematAccount.objects.filter(investor=self.context["investor"]).exists():
                 raise serializers.ValidationError(
@@ -116,6 +135,16 @@ class DematAccountSerializer(serializers.ModelSerializer):
                 missing["dp_id"] = "This field is required for NSDL accounts."
             if missing:
                 raise serializers.ValidationError(missing)
+        elif attrs.get("depository", self.instance.depository) == DematAccount.Depository.NSDL:
+            dp_id = attrs.get("dp_id")
+            if dp_id is None:
+                dp_id = (
+                    decrypt_value(self.instance.dp_id_ciphertext, purpose="demat")
+                    if self.instance.dp_id_ciphertext
+                    else ""
+                )
+            if not dp_id:
+                raise serializers.ValidationError({"dp_id": "DP ID is required for NSDL accounts."})
         return attrs
 
     def create(self, validated_data):

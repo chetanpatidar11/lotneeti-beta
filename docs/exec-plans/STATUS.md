@@ -1,5 +1,10 @@
 # LotNeeti execution status
 
+## B11 Settings account tabs and editable details — in progress, 2026-10-14
+
+- Founder requested separate Demat Accounts, Bank Accounts and UPIs tabs, with funding preferences available from each investor view. Demat Details should show Broker, edit drawers should load the saved values, disabled Add demat should explain why, and full UPI IDs should be visible in the signed-in workspace.
+- UPI records will be marked verified automatically by the application, including existing records after migration. A missing or inactive bank/investor still blocks use in planning and gives a specific error. Work is under test before deployment.
+
 ## B10 one demat and shared UPI import — deployed, 2026-10-14
 
 - Founder requests exactly one demat per investor and automatic creation of payment records from a single workbook, including rows where 17 investors share six UPI IDs. Existing production data has no investors with multiple demats.

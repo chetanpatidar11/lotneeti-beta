@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
+from core.crypto import decrypt_value
 from funding.models import (
     BalanceChange,
     BankAccount,
@@ -61,9 +62,21 @@ class BankAccountSerializer(serializers.ModelSerializer):
             fields["restricted_investor"].queryset = scoped_investors
         return fields
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if self.context.get("reveal_details"):
+            data["account_number"] = decrypt_value(
+                instance.account_ciphertext, purpose="bank-account"
+            )
+        return data
+
     def validate(self, attrs):
         if self.instance is None and "account_number" not in attrs:
             raise serializers.ValidationError({"account_number": "Account number is required."})
+        owner = attrs.get("owner", getattr(self.instance, "owner", None))
+        effective_active = attrs.get("active", self.instance.active if self.instance else True)
+        if effective_active and owner is not None and not owner.active:
+            raise serializers.ValidationError({"owner": "Activate the bank account owner first."})
         if self.instance is not None and "initial_balance" in self.initial_data:
             raise serializers.ValidationError(
                 {"initial_balance": "Use a balance action to change this amount."}
@@ -139,7 +152,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
             instance.is_placeholder = False
         instance.save()
         if was_placeholder and not instance.is_placeholder:
-            instance.upis.filter(verified=False).update(holder=instance.owner)
+            instance.upis.update(holder=instance.owner)
         return instance
 
 
@@ -148,7 +161,10 @@ UPI_PATTERN = re.compile(r"^[a-z0-9._-]+@[a-z0-9._-]+$")
 
 class UPIHandleSerializer(serializers.ModelSerializer):
     holder = serializers.PrimaryKeyRelatedField(queryset=Investor.objects.none())
-    handle = serializers.CharField(write_only=True, required=False, max_length=120)
+    bank_id = serializers.PrimaryKeyRelatedField(
+        source="bank", queryset=BankAccount.objects.none(), required=False, write_only=True
+    )
+    handle = serializers.CharField(required=False, max_length=120)
     handle_masked = serializers.CharField(read_only=True)
 
     class Meta:
@@ -156,6 +172,7 @@ class UPIHandleSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "holder",
+            "bank_id",
             "handle",
             "handle_masked",
             "active",
@@ -165,13 +182,14 @@ class UPIHandleSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("id", "handle_masked", "created_at", "updated_at")
+        read_only_fields = ("id", "handle_masked", "verified", "created_at", "updated_at")
 
     def get_fields(self):
         fields = super().get_fields()
         bank = self.context.get("bank")
         if bank is not None:
             fields["holder"].queryset = Investor.objects.filter(workspace=bank.workspace)
+            fields["bank_id"].queryset = BankAccount.objects.filter(workspace=bank.workspace)
         return fields
 
     def validate_handle(self, value):
@@ -189,18 +207,36 @@ class UPIHandleSerializer(serializers.ModelSerializer):
         return normalized
 
     def validate(self, attrs):
+        bank = attrs.get("bank", self.context["bank"])
         if self.instance is None and "handle" not in attrs:
             raise serializers.ValidationError({"handle": "UPI ID is required."})
-        if attrs.get("verified") and (
-            self.context["bank"].is_placeholder or not self.context["bank"].active
+        if self.instance is None and "bank" in attrs and bank != self.context["bank"]:
+            raise serializers.ValidationError({"bank_id": "Choose the bank from the account page."})
+        if (
+            self.instance is not None
+            and bank != self.instance.bank
+            and self.instance.applications.exists()
         ):
             raise serializers.ValidationError(
-                {"verified": "Complete and activate the bank account first."}
+                {"bank_id": "This UPI is used by an application. Add a new UPI for another bank."}
             )
+        if self.instance is None and (bank.is_placeholder or not bank.active):
+            raise serializers.ValidationError(
+                {"bank": "Complete and activate the bank account before adding a UPI ID."}
+            )
+        effective_active = attrs.get("active", self.instance.active if self.instance else True)
+        if effective_active and (bank.is_placeholder or not bank.active):
+            raise serializers.ValidationError(
+                {"bank_id": "Complete and activate the linked bank account first."}
+            )
+        holder = attrs.get("holder", getattr(self.instance, "holder", None))
+        if effective_active and not holder.active:
+            raise serializers.ValidationError({"holder": "Activate the UPI holder first."})
         return attrs
 
     def create(self, validated_data):
         handle = validated_data.pop("handle")
+        validated_data.pop("bank", None)
         upi = UPIHandle(bank=self.context["bank"], **validated_data)
         upi.set_handle(handle)
         upi.save()
