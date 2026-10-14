@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from accounts.models import WorkspaceMembership
 from core.crypto import decrypt_value
 from exports.adapters import ExportArtifact, ExportRegistry, ExportRow
+from exports.demat_csv import DematCSVAdapter
 from exports.generic_csv import GenericCSVAdapter
 from funding.models import BankAccount, UPIHandle
 from investors.models import DematAccount, Investor
@@ -12,7 +13,7 @@ from ipos.models import IPO
 from planner.export_readiness import assert_exportable_plan
 from planner.models import PlanRun
 
-DEFAULT_EXPORT_REGISTRY = ExportRegistry((GenericCSVAdapter(),))
+DEFAULT_EXPORT_REGISTRY = ExportRegistry((GenericCSVAdapter(), DematCSVAdapter()))
 
 
 def export_saved_plan(
@@ -20,6 +21,7 @@ def export_saved_plan(
     plan_run: PlanRun,
     actor,
     format_id: str = "generic_csv",
+    ipo_id: str | None = None,
     registry: ExportRegistry = DEFAULT_EXPORT_REGISTRY,
 ) -> ExportArtifact:
     if not WorkspaceMembership.objects.filter(
@@ -30,6 +32,12 @@ def export_saved_plan(
         raise ValidationError("This member cannot export the plan")
     assert_exportable_plan(plan_run)
     plan_rows = list(plan_run.rows.all())
+    if ipo_id is not None:
+        plan_rows = [row for row in plan_rows if row.ipo_ref == ipo_id]
+        if not plan_rows:
+            raise ValidationError("This IPO is not in the saved plan")
+    if format_id == "demat_csv" and ipo_id is None:
+        raise ValidationError("Choose one IPO for this export")
     ipo_ids = {row.ipo_ref for row in plan_rows}
     applicant_ids = {row.applicant_ref for row in plan_rows}
     demat_ids = {row.demat_ref for row in plan_rows}

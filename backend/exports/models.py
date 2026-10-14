@@ -16,6 +16,8 @@ class PlanExport(models.Model):
     format_version = models.CharField(max_length=40)
     content_type = models.CharField(max_length=100)
     object_key = models.CharField(max_length=240, unique=True)
+    download_filename = models.CharField(max_length=255, blank=True)
+    ipo_ref = models.CharField(max_length=40, blank=True)
     content_sha256 = models.CharField(max_length=64)
     planner_version = models.CharField(max_length=40)
     settings_version = models.CharField(max_length=80)

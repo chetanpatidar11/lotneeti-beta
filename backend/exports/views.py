@@ -33,14 +33,18 @@ class PlanExportCreateView(APIView):
         )
         _require_writer(workspace_id, request.user)
         format_id = request.data.get("format_id", "generic_csv")
-        if format_id != "generic_csv":
+        if format_id not in ("generic_csv", "demat_csv"):
             return Response({"detail": "Unknown export format."}, status=400)
+        ipo_id = request.data.get("ipo_id") if format_id == "demat_csv" else None
+        if format_id == "demat_csv" and not isinstance(ipo_id, str):
+            return Response({"detail": "Choose one IPO for export."}, status=400)
         try:
             record = generate_plan_export(
                 plan_run=run,
                 actor=request.user,
                 storage=get_export_storage(),
                 format_id=format_id,
+                ipo_id=ipo_id,
             )
         except ImproperlyConfigured:
             return Response({"detail": "Private export storage is not configured."}, status=503)

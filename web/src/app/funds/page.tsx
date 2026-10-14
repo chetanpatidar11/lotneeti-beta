@@ -16,14 +16,6 @@ type Bank = {
   current_balance: string;
   active: boolean;
 };
-type Change = {
-  id: number;
-  operation: "ADD" | "REMOVE" | "SET";
-  amount: string;
-  balance: string;
-  note: string;
-  created_at: string;
-};
 type CapitalLine = { balance: string; blocked: string; planned: string; available: string };
 type ArchivedBank = { id: string; bank_name: string; account_masked: string; last_changed: string };
 
@@ -51,16 +43,11 @@ export default async function FundsPage() {
   const banks = allBanks.filter((bank) => bank.active && investors.some((investor) => investor.id === bank.owner));
   const capital = capitalResponse.ok ? (await capitalResponse.json()) as { by_bank?: Record<string, CapitalLine> } : null;
   const archivedBanks = archiveResponse.ok ? (await archiveResponse.json()) as ArchivedBank[] : [];
-  let changes: Change[] = [];
   let payments: ScheduledPayment[] = [];
   if (banks[0]) {
-    const [historyResponse, paymentsResponse] = await Promise.all([
-      getData(`workspaces/${workspace.id}/banks/${banks[0].id}/balance-changes/`, cookieHeader),
-      getData(`workspaces/${workspace.id}/banks/${banks[0].id}/recurring-debits/`, cookieHeader),
-    ]);
-    if (historyResponse.ok) changes = (await historyResponse.json()) as Change[];
+    const paymentsResponse = await getData(`workspaces/${workspace.id}/banks/${banks[0].id}/recurring-debits/`, cookieHeader);
     if (paymentsResponse.ok) payments = (await paymentsResponse.json()) as ScheduledPayment[];
   }
 
-  return <FundsScreen workspace={workspace} investors={investors} initialBanks={banks} initialChanges={changes} initialPayments={payments} capitalByBank={capital?.by_bank ?? {}} archivedBanks={archivedBanks} />;
+  return <FundsScreen workspace={workspace} investors={investors} initialBanks={banks} statementBanks={allBanks} initialPayments={payments} capitalByBank={capital?.by_bank ?? {}} archivedBanks={archivedBanks} />;
 }

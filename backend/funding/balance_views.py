@@ -1,5 +1,7 @@
 from decimal import Decimal
+from uuid import UUID
 
+from django.core.paginator import Paginator
 from django.db.models import Max
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers, status
@@ -96,6 +98,60 @@ class RecentBalanceChangesView(APIView):
                 }
                 for change in changes
             ]
+        )
+
+
+class WorkspaceBalanceStatementView(APIView):
+    permission_classes = [WorkspaceDataPermission]
+
+    def get(self, request, workspace_id):
+        bank_id = request.query_params.get("bank", "")
+        banks = BankAccount.objects.filter(workspace_id=workspace_id)
+        if bank_id:
+            try:
+                parsed_bank_id = UUID(bank_id)
+            except ValueError as exc:
+                raise ValidationError("Choose a valid bank account.") from exc
+            bank = get_object_or_404(banks, pk=parsed_bank_id)
+            banks = banks.filter(pk=bank.pk)
+        try:
+            page_number = int(request.query_params.get("page", "1"))
+        except ValueError as exc:
+            raise ValidationError("Page must be a positive number.") from exc
+        if page_number < 1:
+            raise ValidationError("Page must be a positive number.")
+        changes = (
+            BalanceChange.objects.filter(bank__in=banks)
+            .select_related("bank", "bank__owner")
+            .order_by("-created_at", "-id")
+        )
+        pages = Paginator(changes, 50)
+        page = pages.get_page(page_number)
+        return Response(
+            {
+                "results": [
+                    {
+                        "id": change.pk,
+                        "bank_id": str(change.bank_id),
+                        "bank_name": change.bank.bank_name,
+                        "owner_name": change.bank.owner.name,
+                        "account_masked": change.bank.account_masked,
+                        "operation": change.operation,
+                        "delta": str(change.delta),
+                        "amount": str(
+                            change.new_balance
+                            if change.operation == BalanceChange.Operation.SET
+                            else abs(change.delta)
+                        ),
+                        "balance": str(change.new_balance),
+                        "note": change.note,
+                        "created_at": change.created_at.isoformat(),
+                    }
+                    for change in page.object_list
+                ],
+                "next_page": page.next_page_number() if page.has_next() else None,
+                "total": pages.count,
+            }
         )
 
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { Drawer } from "@/components/drawer";
 import { EmptyState, PageHeader, SectionHeading, StatusBadge } from "@/components/ui";
@@ -127,6 +127,17 @@ export default function PrioritySettings({
   const [message, setMessage] = useState("");
   const [messageError, setMessageError] = useState(false);
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!workspace?.id) return;
+    try {
+      const key = `lotneeti-import-success:${workspace.id}`;
+      const imported = sessionStorage.getItem(key);
+      if (imported) {
+        sessionStorage.removeItem(key);
+        queueMicrotask(() => { setMessage(imported); setTab("investors"); });
+      }
+    } catch { /* The page still works when browser storage is unavailable. */ }
+  }, [workspace?.id]);
   const canEdit = workspace?.role !== "VIEWER";
   const activeInvestors = sortByPriority(investors.filter((investor) => investor.active));
   const investorsWithoutDemat = activeInvestors.filter((investor) => !linkedAccounts[investor.id]?.demats.length);

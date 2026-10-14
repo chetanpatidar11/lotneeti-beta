@@ -6,6 +6,7 @@ from funding.balance_views import (
     RecentBalanceChangesView,
     RemoveMoneyView,
     SetBalanceView,
+    WorkspaceBalanceStatementView,
 )
 from funding.views import (
     BankAccountViewSet,
@@ -32,6 +33,11 @@ preference_detail = FundingPreferenceViewSet.as_view(
 )
 
 urlpatterns = [
+    path(
+        "workspaces/<uuid:workspace_id>/balance-statement/",
+        WorkspaceBalanceStatementView.as_view(),
+        name="workspace-balance-statement",
+    ),
     path(
         "workspaces/<uuid:workspace_id>/banks/archived-history/",
         ArchivedBankHistoryListView.as_view(),

@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
+import { Drawer } from "@/components/drawer";
 import { formatInr } from "@/lib/money";
 import { amountForLots, minimumShniLots, sumAmounts } from "@/lib/plan-amount";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/ui";
-import { bankReasonSummary, canExportPlan, issueMessage, lockedMappings, planStatus, rankedBanks, reviewedMappings, rowIssueMessages, rowStatus, selectableApplicants, selectableDemats, selectableUpis, type BankLookup, type DematLookup, type FundingPreference, type PlanPreview, type PlanRow, type UpiLookup } from "@/lib/plan-presentation";
+import { canExportPlan, issueMessage, lockedMappings, planStatus, rankedBanks, reviewedMappings, rowIssueMessages, selectableApplicants, selectableDemats, selectableUpis, type BankLookup, type DematLookup, type FundingPreference, type PlanPreview, type PlanRow, type UpiLookup } from "@/lib/plan-presentation";
 
 export type PlanLookups = {
   ipos: Record<string, { name: string; upperPrice: string; lotSize: number; gmpPercent: string | null; closeDate: string }>;
@@ -35,6 +36,8 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
   const [validating, setValidating] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState<PlanRow | null>(null);
   const previewRef = useRef<PlanPreview | null>(null);
   const validationSequence = useRef(0);
 
@@ -166,7 +169,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
     finally { setBusy(false); }
   }
 
-  async function exportCsv() {
+  async function exportCsv(ipoId: string) {
     const current = previewRef.current;
     if (!current || !canExportPlan(current) || validating || busy) return;
     setBusy(true);
@@ -186,7 +189,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
       const exportResponse = await fetch(`/api/workspaces/${workspaceId}/planner/runs/${saved.id}/exports`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ format_id: "generic_csv" }),
+        body: JSON.stringify({ format_id: "demat_csv", ipo_id: ipoId }),
       });
       const exportRecord = await exportResponse.json();
       if (!exportResponse.ok) throw new Error("We could not export this plan.");
@@ -199,6 +202,28 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
     } finally {
       setBusy(false);
     }
+  }
+
+  function openEdit(index: number) {
+    const row = previewRef.current?.rows[index];
+    if (!row) return;
+    setEditingIndex(index);
+    setEditDraft({ ...row });
+  }
+
+  function updateDraft(changes: Partial<PlanRow>) {
+    setEditDraft((current) => current ? { ...current, ...changes } : current);
+  }
+
+  async function saveDraftEdit() {
+    if (editingIndex === null || !editDraft) return;
+    await updateRow(editingIndex, {
+      applicant: editDraft.applicant, demat: editDraft.demat, bank: editDraft.bank,
+      upi: editDraft.upi, category: editDraft.category, lots: editDraft.lots,
+      locked: editDraft.locked,
+    });
+    setEditingIndex(null);
+    setEditDraft(null);
   }
 
   return <main className="page settings-page">
@@ -229,7 +254,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
       </div>
       <div className="plan-toolbar">
         <button type="button" onClick={generate} disabled={busy || validating || !canEdit || lookups.selectedIpos.length === 0}>{busy ? "Working…" : preview ? "Re-plan unlocked" : "Generate Plan"}</button>
-        {preview && <><button className="button-secondary" type="button" onClick={() => void validatePlan()} disabled={busy || validating}>Validate</button><button className="button-secondary" type="button" onClick={() => void savePlan()} disabled={busy || validating || !canEdit}>Save</button><button type="button" onClick={() => void exportCsv()} disabled={busy || validating || !canEdit || !canExportPlan(preview)}>Export CSV</button></>}
+        {preview && <><button className="button-secondary" type="button" onClick={() => void validatePlan()} disabled={busy || validating}>Validate</button><button className="button-secondary" type="button" onClick={() => void savePlan()} disabled={busy || validating || !canEdit}>Save</button></>}
       </div>
       {error && <p className="plan-error" role="alert">{error}</p>}
       {message && <p className="plan-note" role="status">{message}</p>}
@@ -249,52 +274,52 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
         </div>}
         {preview.uncovered.length > 0 && <p className="plan-note">{preview.uncovered.length} applicant/IPO {preview.uncovered.length === 1 ? "pair" : "pairs"} could not be planned.</p>}
         <details className="plan-breakdown"><summary>Plan summary by IPO and uncovered applicants</summary><div className="plan-breakdown-grid">{lookups.selectedIpos.map((selection) => { const rows = preview.rows.filter((row) => row.ipo === selection.ipo); return <div key={selection.ipo}><strong>{lookups.ipos[selection.ipo]?.name ?? "IPO"}</strong><span>{rows.length} applications · {rows.filter((row) => row.category === "RETAIL").length} Retail · {rows.filter((row) => row.category === "SHNI").length} sHNI</span><span>{formatInr(sumAmounts(rows.map((row) => row.amount)))}</span></div>; })}</div>{preview.uncovered.length > 0 && <p>{preview.uncovered.length} applicant/IPO pairs are uncovered. Review the bank and UPI details below.</p>}</details>
-        {preview.rows.length === 0 ? <p className="plan-empty">No applications are in this draft. Select an IPO and check your investors, banks and UPIs.</p> : <div className="plan-table-wrap">
-          <table className="plan-table">
-            <caption>Draft applications</caption>
-            <thead><tr><th>Applicant</th><th>Priority</th><th>IPO</th><th>Category</th><th>Lots</th><th>Amount</th><th>Demat</th><th>Funding Bank</th><th>UPI</th><th>Funding Type</th><th>Status</th><th>Lock</th></tr></thead>
-            <tbody>{preview.rows.map((row, index) => <tr className={row.locked ? "is-locked" : ""} key={`${row.ipo}:${row.applicant}:${index}`}>
-              <td data-label="Applicant"><select aria-label={`Applicant for ${lookups.ipos[row.ipo]?.name || "IPO"}`} value={row.applicant} disabled={row.locked || busy || !canEdit} onChange={(event) => void updateRow(index, { applicant: event.target.value })}>
-                {!lookups.applicants[row.applicant]?.active && <option value={row.applicant} disabled>Current applicant unavailable</option>}
-                {selectableApplicants(lookups.applicants).map((applicant) => <option key={applicant.id} value={applicant.id}>{applicant.name}</option>)}
-              </select></td>
-              <td data-label="Priority">{lookups.applicants[row.applicant]?.priority ?? "—"}</td>
-              <td data-label="IPO">{lookups.ipos[row.ipo]?.name || "Selected IPO"}</td>
-              <td data-label="Category"><select aria-label={`Category for ${lookups.applicants[row.applicant]?.name || "applicant"}`} value={row.category} disabled={row.locked || busy || !canEdit} onChange={(event) => {
-                const category = event.target.value as "RETAIL" | "SHNI";
-                const ipo = lookups.ipos[row.ipo];
-                if (!ipo) return;
-                const lots = category === "RETAIL" ? 1 : minimumShniLots(ipo.upperPrice, ipo.lotSize);
-                void updateRow(index, { category, lots });
-              }}><option value="RETAIL">Retail</option><option value="SHNI">sHNI</option></select></td>
-              <td data-label="Lots"><input aria-label={`Lots for ${lookups.applicants[row.applicant]?.name || "applicant"}`} type="number" min={row.category === "RETAIL" ? 1 : lookups.ipos[row.ipo] ? minimumShniLots(lookups.ipos[row.ipo].upperPrice, lookups.ipos[row.ipo].lotSize) : 1} step="1" value={row.lots} disabled={row.locked || row.category === "RETAIL" || busy || !canEdit} onChange={(event) => {
-                const lots = Number(event.target.value);
-                if (Number.isSafeInteger(lots) && lots >= 1) void updateRow(index, { lots });
-              }} /></td>
-              <td data-label="Amount" className="money-cell">{formatInr(row.amount)}</td>
-              <td data-label="Demat"><select aria-label={`Demat for ${lookups.applicants[row.applicant]?.name || "applicant"}`} value={row.demat} disabled={row.locked || busy || !canEdit} onChange={(event) => void updateRow(index, { demat: event.target.value })}>
-                {!selectableDemats(lookups.demats, row.applicant).some((demat) => demat.id === row.demat) && <option value={row.demat} disabled>Current demat unavailable</option>}
-                {selectableDemats(lookups.demats, row.applicant).map((demat) => <option key={demat.id} value={demat.id}>{demat.label}</option>)}
-              </select></td>
-              <td data-label="Bank"><select aria-label={`Bank for ${lookups.applicants[row.applicant]?.name || "applicant"}`} value={row.bank} disabled={row.locked || busy || !canEdit} onChange={(event) => {
-                const bank = event.target.value;
-                const firstUpi = selectableUpis(lookups.upis, bank, row.applicant)[0];
-                if (firstUpi) void updateRow(index, { bank, upi: firstUpi.id });
-              }}>
-                {!lookups.banks[row.bank] && <option value={row.bank} disabled>Current bank unavailable</option>}
-                {rankedBanks(lookups.banks, lookups.upis, lookups.preferences[row.applicant] ?? [], row.applicant).map((option) => <option key={option.id} value={option.id} disabled={option.disabled}>{option.group}: {lookups.banks[option.id].label} · {formatInr(lookups.banks[option.id].balance)}{option.disabled ? " · unavailable" : ""}</option>)}
-              </select>{bankReasonSummary(row).length > 0 && <details className="bank-explanation"><summary>Why this bank?</summary><ul>{bankReasonSummary(row).map((reason) => <li key={reason}>{reason}</li>)}</ul></details>}</td>
-              <td data-label="UPI"><select aria-label={`UPI for ${lookups.applicants[row.applicant]?.name || "applicant"}`} value={row.upi} disabled={row.locked || busy || !canEdit} onChange={(event) => void updateRow(index, { upi: event.target.value })}>
-                {!selectableUpis(lookups.upis, row.bank, row.applicant).some((upi) => upi.id === row.upi) && <option value={row.upi} disabled>Current UPI unavailable</option>}
-                {selectableUpis(lookups.upis, row.bank, row.applicant).map((upi) => <option key={upi.id} value={upi.id}>{upi.label}</option>)}
-              </select></td>
-              <td data-label="Funding"><StatusBadge tone={fundingType(row, lookups) === "Own" ? "positive" : fundingType(row, lookups) === "Preferred" ? "info" : "warning"}>{fundingType(row, lookups)}</StatusBadge></td>
-              <td data-label="Status"><span className={`plan-status ${rowStatus(row).toLowerCase()}`}>{rowStatus(row) === "Ready" ? "✓ Ready" : `⚠ ${rowStatus(row)}`}</span>{rowIssueMessages(row).map((message, messageIndex) => <small key={`${message}-${messageIndex}`}>{message}</small>)}</td>
-              <td data-label="Lock"><button type="button" disabled={busy || validating || !canEdit} aria-label={`${row.locked ? "Unlock" : "Lock"} ${lookups.applicants[row.applicant]?.name || "applicant"} for ${lookups.ipos[row.ipo]?.name || "IPO"}`} onClick={() => void updateRow(index, { locked: !row.locked })}>{row.locked ? "Locked" : "Lock"}</button></td>
-            </tr>)}</tbody>
-          </table>
+        {preview.rows.length === 0 ? <p className="plan-empty">No applications are in this draft. Select an IPO and check your investors, banks and UPIs.</p> : <div className="draft-ipo-groups">
+          {[...new Set(preview.rows.map((row) => row.ipo))].map((ipoId) => <section className="draft-ipo-group" key={ipoId}>
+            <div className="draft-ipo-heading"><div><h2>{lookups.ipos[ipoId]?.name ?? "IPO"}</h2><p>{preview.rows.filter((row) => row.ipo === ipoId).length} draft applications</p></div>
+              <button type="button" className="button-secondary" onClick={() => void exportCsv(ipoId)} disabled={busy || validating || !canEdit || !canExportPlan(preview)}>Export this IPO CSV</button></div>
+            <div className="plan-table-wrap"><table className="plan-table draft-applications-table"><caption>Draft applications for {lookups.ipos[ipoId]?.name ?? "IPO"}</caption>
+              <thead><tr><th>Applicant</th><th>Demat</th><th>UPI</th><th>Category</th><th>Lots</th><th>Amount</th><th>Funding Type</th><th><span className="visually-hidden">Edit</span></th></tr></thead>
+              <tbody>{preview.rows.map((row, index) => row.ipo !== ipoId ? null : <tr key={`${row.ipo}:${row.applicant}:${index}`}>
+                <th scope="row" data-label="Applicant">{lookups.applicants[row.applicant]?.name ?? "Applicant"}{rowIssueMessages(row).length > 0 && <small className="draft-issue">Needs review: {rowIssueMessages(row).join("; ")}</small>}{row.locked && <small>Locked for re-planning</small>}</th>
+                <td data-label="Demat">{lookups.demats[row.demat]?.label ?? "Unavailable"}</td>
+                <td data-label="UPI">{lookups.upis[row.upi]?.label ?? "Unavailable"}</td>
+                <td data-label="Category">{row.category === "SHNI" ? "sHNI" : "Retail"}</td>
+                <td data-label="Lots">{row.lots}</td>
+                <td data-label="Amount" className="money-cell">{formatInr(row.amount)}</td>
+                <td data-label="Funding Type"><StatusBadge tone={fundingType(row, lookups) === "Own" ? "positive" : fundingType(row, lookups) === "Preferred" ? "info" : "warning"}>{fundingType(row, lookups)}</StatusBadge></td>
+                <td data-label="Edit"><button type="button" className="button-secondary" disabled={busy || validating || !canEdit} onClick={() => openEdit(index)}>Edit</button></td>
+              </tr>)}</tbody>
+            </table></div>
+          </section>)}
         </div>}
       </section>}
+      {editDraft && editingIndex !== null && <Drawer title="Edit draft application" onClose={() => { setEditDraft(null); setEditingIndex(null); }}><form className="sign-in-form" onSubmit={(event) => { event.preventDefault(); void saveDraftEdit(); }}>
+        <p className="intro">{lookups.ipos[editDraft.ipo]?.name ?? "IPO"}</p>
+        <label htmlFor="draft-applicant">Applicant</label><select id="draft-applicant" value={editDraft.applicant} onChange={(event) => {
+          const applicant = event.target.value;
+          const demat = selectableDemats(lookups.demats, applicant)[0];
+          const bank = rankedBanks(lookups.banks, lookups.upis, lookups.preferences[applicant] ?? [], applicant).find((option) => !option.disabled);
+          const upi = bank && selectableUpis(lookups.upis, bank.id, applicant)[0];
+          updateDraft({ applicant, demat: demat?.id ?? editDraft.demat, bank: bank?.id ?? editDraft.bank, upi: upi?.id ?? editDraft.upi });
+        }}>{!selectableApplicants(lookups.applicants).some((applicant) => applicant.id === editDraft.applicant) && <option value={editDraft.applicant} disabled>Current applicant unavailable</option>}{selectableApplicants(lookups.applicants).map((applicant) => <option key={applicant.id} value={applicant.id}>{applicant.name}</option>)}</select>
+        <label htmlFor="draft-demat">Demat</label><select id="draft-demat" value={editDraft.demat} onChange={(event) => updateDraft({ demat: event.target.value })}>{!selectableDemats(lookups.demats, editDraft.applicant).some((demat) => demat.id === editDraft.demat) && <option value={editDraft.demat} disabled>Current demat unavailable</option>}{selectableDemats(lookups.demats, editDraft.applicant).map((demat) => <option key={demat.id} value={demat.id}>{demat.label}</option>)}</select>
+        <label htmlFor="draft-category">Category</label><select id="draft-category" value={editDraft.category} onChange={(event) => {
+          const category = event.target.value as "RETAIL" | "SHNI";
+          const ipo = lookups.ipos[editDraft.ipo];
+          updateDraft({ category, lots: category === "RETAIL" ? 1 : ipo ? minimumShniLots(ipo.upperPrice, ipo.lotSize) : editDraft.lots });
+        }}><option value="RETAIL">Retail</option><option value="SHNI">sHNI</option></select>
+        <label htmlFor="draft-lots">Lots</label><input id="draft-lots" type="number" min={editDraft.category === "SHNI" && lookups.ipos[editDraft.ipo] ? minimumShniLots(lookups.ipos[editDraft.ipo].upperPrice, lookups.ipos[editDraft.ipo].lotSize) : 1} step="1" value={editDraft.lots} disabled={editDraft.category === "RETAIL"} onChange={(event) => updateDraft({ lots: Number(event.target.value) })} />
+        <label htmlFor="draft-bank">Funding bank</label><select id="draft-bank" value={editDraft.bank} onChange={(event) => {
+          const bank = event.target.value;
+          const upi = selectableUpis(lookups.upis, bank, editDraft.applicant)[0];
+          updateDraft({ bank, upi: upi?.id ?? editDraft.upi });
+        }}>{!lookups.banks[editDraft.bank] && <option value={editDraft.bank} disabled>Current bank unavailable</option>}{rankedBanks(lookups.banks, lookups.upis, lookups.preferences[editDraft.applicant] ?? [], editDraft.applicant).map((option) => <option key={option.id} value={option.id} disabled={option.disabled}>{option.group}: {lookups.banks[option.id].label}</option>)}</select>
+        <label htmlFor="draft-upi">UPI</label><select id="draft-upi" value={editDraft.upi} onChange={(event) => updateDraft({ upi: event.target.value })}>{!selectableUpis(lookups.upis, editDraft.bank, editDraft.applicant).some((upi) => upi.id === editDraft.upi) && <option value={editDraft.upi} disabled>Current UPI unavailable</option>}{selectableUpis(lookups.upis, editDraft.bank, editDraft.applicant).map((upi) => <option key={upi.id} value={upi.id}>{upi.label}</option>)}</select>
+        <p className="intro">Amount: {lookups.ipos[editDraft.ipo] ? formatInr(amountForLots(lookups.ipos[editDraft.ipo].upperPrice, lookups.ipos[editDraft.ipo].lotSize, editDraft.lots)) : "—"}</p>
+        <label className="draft-lock-label"><input type="checkbox" checked={editDraft.locked} onChange={(event) => updateDraft({ locked: event.target.checked })} /> Keep this application when re-planning</label>
+        <button type="submit" disabled={busy || validating}>Save changes</button>
+      </form></Drawer>}
       <p><Link href="/">Home</Link></p>
     </div>
   </main>;

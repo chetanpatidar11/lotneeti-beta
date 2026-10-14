@@ -882,6 +882,37 @@ body > #main-content > .page .auth-actions .text-button { min-height: 36px; padd
 .account-import-table th:nth-child(6) { width: 33%; }
 .account-import-table th:nth-child(7) { width: 10%; }
 .account-import-table td:nth-child(6), .account-import-table td:nth-child(7) { overflow: visible; }
+.account-import-table { min-width: 0; }
+.account-import-table th, .account-import-table td { position: relative; white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
+.account-import-table thead th { position: sticky; top: 0; }
+.account-import-table th { padding-right: 15px; }
+.account-import-table th:nth-child(n) { width: auto; }
+.import-column-resizer { position: absolute; top: 0; right: 0; z-index: 2; width: 11px; height: 100%; cursor: col-resize; touch-action: none; }
+.import-column-resizer::after { content: ""; position: absolute; top: 20%; bottom: 20%; left: 5px; width: 2px; background: var(--border-strong); }
+.import-column-resizer:hover::after, .import-column-resizer:focus-visible::after { background: var(--accent); }
+.funds-tabs { margin-bottom: 18px; flex-wrap: wrap; }
+.funds-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+.funds-owner-cell, .funds-statement-table th { text-align: left !important; }
+.funds-owner-cell strong, .funds-owner-cell span, .funds-statement-table th strong, .funds-statement-table th span, .funds-statement-table td small { display: block; }
+.funds-owner-cell span, .funds-statement-table th span, .funds-statement-table td small { margin-top: 3px; color: var(--muted); font-size: 12px; font-weight: 500; }
+.funds-table tr.selected-row { background: transparent; }
+.funds-statement, .funds-scheduled, .archived-bank-history { padding: 17px; }
+.funds-statement .section-heading, .funds-scheduled .section-heading, .archived-bank-history .section-heading { margin-top: 0; }
+.funds-filter { display: grid; gap: 6px; max-width: 410px; margin: 0 0 14px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.funds-filter select { width: 100%; min-height: 42px; }
+.funds-statement-table { min-width: 750px; }
+.funds-statement-table td, .funds-statement-table th { text-align: left; }
+.draft-ipo-groups { display: grid; gap: 18px; margin-top: 15px; }
+.draft-ipo-group { overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.draft-ipo-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px; }
+.draft-ipo-heading p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+.draft-ipo-group .plan-table-wrap { margin: 0; border: 0; border-radius: 0; }
+.draft-applications-table { min-width: 890px; }
+.draft-applications-table th, .draft-applications-table td { text-align: left; vertical-align: middle; }
+.draft-applications-table th small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 500; }
+.draft-applications-table th small.draft-issue { color: var(--danger); }
+.draft-lock-label { display: flex !important; align-items: center; gap: 8px; }
+.draft-lock-label input { width: auto !important; }
 .import-bank-details { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 7px; min-width: 0; }
 .import-bank-details label { display: block; min-width: 0; }
 .import-bank-details input, .account-import-table .import-bank-details input[type="text"] { display: block; width: 100%; min-width: 0; max-width: none; min-height: 36px; padding: 6px 9px; border: 1px solid #b9d0c1; border-radius: 8px; background: #fff; color: var(--text); font-size: 12px; }

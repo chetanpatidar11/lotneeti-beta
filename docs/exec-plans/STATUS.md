@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## B12 Import, Funds, plan and per-IPO export polish — in progress, 2026-10-15
+
+- Founder requests readable and resizable import review columns, owner choices after the rows, automatic refresh after import, a clearer Funds workflow with separate Scheduled Payments and Deleted bank history tabs, combined balance history, per-IPO demat exports with exact fields, and a compact draft application table with one Edit action.
+- Implement and verify these changes using synthetic data. Keep export files private and workspace scoped. Deployment pending.
+- Implementation complete: import review now has full text and resizable columns, refreshed success state, and owner choices below rows; Funds now has Accounts, combined paginated Bank statement, Scheduled Payments, and Deleted bank history tabs; balance actions require an explicit bank choice; drafts are grouped by IPO with one Edit drawer; each IPO exports the requested eight-column CSV with bank details blank. Full `scripts/check.sh` passed (391 backend, 37 web, 1 Android tests; lint, typecheck, migrations, builds). Live deployment pending.
+
 ## B11 shared UPI owner choices — deployed, 2026-10-14
 
 - Founder reports that a shared UPI can belong to an investor elsewhere in the workbook or already in the workspace; two different UPIs may have the same owner. Owner selectors now cover every selected workbook investor and active existing workspace investor, for every UPI. A unique UPI defaults to its row investor, while multiple UPIs may point to the same owner. Backend validates selected row, active status and workspace scope and rejects a conflicting existing UPI assignment.

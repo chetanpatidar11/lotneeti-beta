@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useState } from "react";
+import { ChangeEvent, FormEvent, PointerEvent, useRef, useState } from "react";
 
 type ImportRow = {
   row_number: number; name: string; pan_masked: string; type: string;
@@ -14,6 +14,8 @@ type ImportPreview = {
 };
 type ExistingInvestor = { id: string; name: string; pan_masked: string; active: boolean };
 const selectable = (row: ImportRow) => row.errors.length === 0;
+const initialColumnWidths = [76, 240, 130, 220, 250, 250, 140];
+const columnLabels = ["Import", "Name", "PAN", "Demat", "UPI", "Bank details", "Status"];
 
 export default function AccountImport({ workspaceId, canEdit, investors }: { workspaceId: string; canEdit: boolean; investors: ExistingInvestor[] }) {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
@@ -21,6 +23,21 @@ export default function AccountImport({ workspaceId, canEdit, investors }: { wor
   const [upiOwners, setUpiOwners] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [columnWidths, setColumnWidths] = useState(initialColumnWidths);
+  const resize = useRef<{ index: number; startX: number; startWidth: number } | null>(null);
+
+  function startResize(event: PointerEvent<HTMLSpanElement>, index: number) {
+    resize.current = { index, startX: event.clientX, startWidth: columnWidths[index] };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveResize(event: PointerEvent<HTMLSpanElement>) {
+    if (!resize.current) return;
+    const { index, startX, startWidth } = resize.current;
+    setColumnWidths((current) => current.map((width, position) =>
+      position === index ? Math.max(72, startWidth + event.clientX - startX) : width,
+    ));
+  }
 
   async function upload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -60,8 +77,10 @@ export default function AccountImport({ workspaceId, canEdit, investors }: { wor
         throw new Error(rowErrors || result.detail || "The selected rows could not be imported.");
       }
       const result = await response.json() as { imported_rows: number; created: { banks: number; upis: number; payment_pending: number } };
-      setPreview({ ...preview, status: "CONFIRMED" });
-      setMessage(`${result.imported_rows} investor(s) imported with one demat each. ${result.created.upis} UPI ID(s) and ${result.created.banks} active bank account(s) added with ₹0 opening Balance. You can update BANK and the account number later.`);
+      try {
+        sessionStorage.setItem(`lotneeti-import-success:${workspaceId}`, `${result.imported_rows} investor(s), ${result.created.upis} UPI ID(s) and ${result.created.banks} bank account(s) imported.`);
+      } catch { /* Import succeeded; storage may be unavailable in private browsing. */ }
+      window.location.reload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The selected rows could not be imported.");
     } finally { setBusy(false); }
@@ -84,10 +103,10 @@ export default function AccountImport({ workspaceId, canEdit, investors }: { wor
     </label>}
     {preview && <form onSubmit={confirm}>
       <p><strong>{preview.source_filename}</strong> · {preview.row_count} row(s), {preview.error_count} with errors</p>
-      {ownerGroups.length > 0 && <div className="account-import-shared"><h3>Bank account owners</h3><p>Choose from any selected investor in this workbook or an active investor already in your workspace. The same person can own more than one UPI. A UPI used by one row defaults to that investor.</p>{ownerGroups.map(([upi, rows]) => <label key={upi} htmlFor={`upi-owner-${rows?.[0]?.row_number}`}>{upi}<select id={`upi-owner-${rows?.[0]?.row_number}`} value={ownerChoice(upi, rows ?? [])} disabled={!canEdit || busy || preview.status === "CONFIRMED"} onChange={(event) => setUpiOwners((current) => ({ ...current, [upi]: event.target.value }))} required><option value="">Choose bank account owner</option><optgroup label="Investors in this import">{preview.rows.filter((row) => selected.includes(row.row_number)).map((row) => <option key={row.row_number} value={`row:${row.row_number}`}>{row.name} · row {row.row_number}</option>)}</optgroup>{investors.some((investor) => investor.active) && <optgroup label="Already in this workspace">{investors.filter((investor) => investor.active).map((investor) => <option key={investor.id} value={`investor:${investor.id}`}>{investor.name} · {investor.pan_masked}</option>)}</optgroup>}</select></label>)}</div>}
-      <div className="plan-table-wrap"><table className="plan-table account-import-table">
+      <div className="plan-table-wrap"><table className="plan-table account-import-table" style={{ width: columnWidths.reduce((total, width) => total + width, 0) }}>
         <caption>Review import rows</caption>
-        <thead><tr><th>Import</th><th>Name</th><th>PAN</th><th>Demat</th><th>UPI</th><th>Bank details</th><th>Status</th></tr></thead>
+        <colgroup>{columnWidths.map((width, index) => <col key={columnLabels[index]} style={{ width }} />)}</colgroup>
+        <thead><tr>{columnLabels.map((label, index) => <th key={label} scope="col">{label}<span className="import-column-resizer" role="separator" tabIndex={0} aria-label={`Resize ${label} column`} aria-orientation="vertical" onPointerDown={(event) => startResize(event, index)} onPointerMove={moveResize} onPointerUp={() => { resize.current = null; }} onPointerCancel={() => { resize.current = null; }} onKeyDown={(event) => { if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); setColumnWidths((current) => current.map((width, position) => position === index ? Math.max(72, width + (event.key === "ArrowRight" ? 24 : -24)) : width)); } }} /></th>)}</tr></thead>
         <tbody>{preview.rows.map((row) => {
           const checked = selected.includes(row.row_number);
           const canSelect = selectable(row);
@@ -101,8 +120,8 @@ export default function AccountImport({ workspaceId, canEdit, investors }: { wor
           </tr>;
         })}</tbody>
       </table></div>
+      {ownerGroups.length > 0 && <div className="account-import-shared"><h3>Bank account owners</h3><p>Choose from any selected investor in this workbook or an active investor already in your workspace. The same person can own more than one UPI. A UPI used by one row defaults to that investor.</p>{ownerGroups.map(([upi, rows]) => <label key={upi} htmlFor={`upi-owner-${rows?.[0]?.row_number}`}>{upi}<select id={`upi-owner-${rows?.[0]?.row_number}`} value={ownerChoice(upi, rows ?? [])} disabled={!canEdit || busy || preview.status === "CONFIRMED"} onChange={(event) => setUpiOwners((current) => ({ ...current, [upi]: event.target.value }))} required><option value="">Choose bank account owner</option><optgroup label="Investors in this import">{preview.rows.filter((row) => selected.includes(row.row_number)).map((row) => <option key={row.row_number} value={`row:${row.row_number}`}>{row.name}</option>)}</optgroup>{investors.some((investor) => investor.active) && <optgroup label="Already in this workspace">{investors.filter((investor) => investor.active).map((investor) => <option key={investor.id} value={`investor:${investor.id}`}>{investor.name} · {investor.pan_masked}</option>)}</optgroup>}</select></label>)}</div>}
       {canEdit && preview.status === "PREVIEWED" && <button type="submit" disabled={busy || selected.length === 0}>Import selected ({selected.length})</button>}
-      {preview.status === "CONFIRMED" && <button type="button" className="button-secondary" onClick={() => window.location.reload()}>Refresh Settings</button>}
     </form>}
     {message && <p role="status">{message}</p>}
   </section>;
