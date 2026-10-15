@@ -25,6 +25,7 @@ elif EMAIL_DELIVERY == "smtp":
     EMAIL_HOST = required_env("EMAIL_HOST")
     EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
     EMAIL_USE_TLS = True
+    EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "15"))
     EMAIL_HOST_USER = required_env("EMAIL_HOST_USER")
     EMAIL_HOST_PASSWORD = required_env("EMAIL_HOST_PASSWORD")
 else:
