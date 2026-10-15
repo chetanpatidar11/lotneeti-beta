@@ -1,5 +1,9 @@
 # LotNeeti execution status
 
+## E22 Intentional cross-funding notices — local, 2026-10-15
+
+- The founder asked to remove duplicate “Needs review” messages for intentional cross-funding and the bank WARN preference; the Funding Type column already identifies the choice. The planner still emits and retains its warning codes for deterministic validation and audit, while the web presentation filters those two notices from row messages and status. Cash, limit, and blocking issues remain visible. Web tests, lint, typecheck, and production build passed. Production deployment pending because AWS CLI access to the signed-in cache is denied in this workspace.
+
 ## A05 email OTP registration and password recovery — deployed, 2026-10-15
 
 - The single email/password form now sends a six-digit code for a new address and creates the account only after verification. Existing members still sign in with their password and keep the secure 30-day session. Forgot password sends a six-digit email code and accepts a new password after code verification; the start response is identical for registered and unregistered addresses.

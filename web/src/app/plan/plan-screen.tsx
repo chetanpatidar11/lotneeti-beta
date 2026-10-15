@@ -267,7 +267,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
           <div><span>Retail / sHNI</span><strong>{preview.rows.filter((row) => row.category === "RETAIL").length} / {preview.rows.filter((row) => row.category === "SHNI").length}</strong></div>
           <div><span>Status</span><strong>{validating ? "Checking" : planStatus(preview)}</strong></div>
         </div>
-        {!validating && <p className="plan-note" role="status">{canExportPlan(preview) ? "Ready to export. Review any warnings before using this plan." : "⚠ Blocking: Resolve issues before export."}</p>}
+        {!validating && <p className="plan-note" role="status">{!canExportPlan(preview) ? "⚠ Blocking: Resolve issues before export." : planStatus(preview) === "Warning" ? "Ready to export. Review the highlighted issues first." : "Ready to export."}</p>}
         {preview.audit_issues.length > 0 && <div className="plan-error" role="alert">
           <strong>⚠ Blocking: Resolve these issues before export</strong>
           <ul>{preview.audit_issues.map((issue, index) => <li key={`${issue.code}-${index}`}>{issueMessage(issue.code)}</li>)}</ul>

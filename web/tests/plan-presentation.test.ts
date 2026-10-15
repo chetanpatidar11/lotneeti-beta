@@ -31,8 +31,9 @@ test("plan choices exclude closed IPOs and count unavailable selections", () => 
   });
 });
 
-test("blocking status outranks a cross-funding warning", () => {
-  assert.equal(rowStatus({ ...row, warnings: ["CROSS_FUNDING"] }), "Warning");
+test("intentional cross-funding notices do not create a review status", () => {
+  assert.equal(rowStatus({ ...row, warnings: ["CROSS_FUNDING"] }), "Ready");
+  assert.equal(rowStatus({ ...row, warnings: ["CROSS_FUNDING", "CROSS_FUNDING_POLICY_WARNING"] }), "Ready");
   assert.equal(rowStatus({ ...row, warnings: ["CROSS_FUNDING"], blocking_reasons: ["INSUFFICIENT_BALANCE"] }), "Blocking");
   assert.equal(rowStatus(row), "Ready");
 });
@@ -110,17 +111,18 @@ test("only exact locked mapping fields enter the next planner run", () => {
   }]);
 });
 
-test("blocking prevents export readiness while warnings remain visible", () => {
+test("blocking prevents export while redundant cross-funding notices stay hidden", () => {
   const base = { status: "READY" as const, planned_total: "15000.00", rows: [row], audit_issues: [], uncovered: [] };
   assert.equal(planStatus(base), "Ready");
   assert.equal(canExportPlan(base), true);
   const warning = { ...base, rows: [{ ...row, warnings: ["CROSS_FUNDING"] }] };
-  assert.equal(planStatus(warning), "Warning");
+  assert.equal(planStatus(warning), "Ready");
   assert.equal(canExportPlan(warning), true);
-  assert.deepEqual(rowIssueMessages(warning.rows[0]), ["This application uses another person's funding account."]);
+  assert.deepEqual(rowIssueMessages({ ...warning.rows[0], warnings: ["CROSS_FUNDING", "CROSS_FUNDING_POLICY_WARNING"] }), []);
   const blocked = { ...warning, rows: [{ ...warning.rows[0], blocking_reasons: ["LOCKED_ROW_INFEASIBLE"] }] };
   assert.equal(planStatus(blocked), "Blocking");
   assert.equal(canExportPlan(blocked), false);
+  assert.deepEqual(rowIssueMessages({ ...warning.rows[0], warnings: ["CROSS_FUNDING", "OWNER_CASH_CONFLICT"] }), ["This may leave the bank owner short for another selected IPO."]);
 });
 
 test("reviewed export rows keep edits and locks without display-only fields", () => {

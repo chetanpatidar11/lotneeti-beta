@@ -35,13 +35,13 @@ export function reviewedMappings(rows: PlanRow[]): Pick<PlanRow, "ipo" | "applic
 
 export function rowStatus(row: PlanRow): "Ready" | "Warning" | "Blocking" {
   if (row.blocking_reasons.length) return "Blocking";
-  if (row.warnings.length) return "Warning";
+  if (visibleWarnings(row).length) return "Warning";
   return "Ready";
 }
 
 export function planStatus(plan: PlanPreview): "Ready" | "Warning" | "Blocking" {
   if (plan.status === "BLOCKED" || plan.audit_issues.length || plan.rows.some((row) => row.blocking_reasons.length)) return "Blocking";
-  if (plan.rows.some((row) => row.warnings.length)) return "Warning";
+  if (plan.rows.some((row) => visibleWarnings(row).length)) return "Warning";
   return "Ready";
 }
 
@@ -131,9 +131,15 @@ export function selectableUpis(
 }
 
 export function rowIssueMessages(row: PlanRow): string[] {
-  return [...new Set([...row.blocking_reasons, ...row.warnings])]
+  return [...new Set([...row.blocking_reasons, ...visibleWarnings(row)])]
     .map(issueMessage)
     .filter((message, index, all) => all.indexOf(message) === index);
+}
+
+const redundantFundingWarnings = new Set(["CROSS_FUNDING", "CROSS_FUNDING_POLICY_WARNING"]);
+
+function visibleWarnings(row: PlanRow): string[] {
+  return row.warnings.filter((code) => !redundantFundingWarnings.has(code));
 }
 
 const issueMessages: Record<string, string> = {
@@ -141,9 +147,7 @@ const issueMessages: Record<string, string> = {
   BANK_LIMIT_EXCEEDED: "This bank has reached its application limit.",
   BANK_PAN_RESTRICTED: "This bank is restricted to another applicant.",
   CASH_OVERSPEND: "This bank needs more available money.",
-  CROSS_FUNDING: "This application uses another person's funding account.",
   CROSS_FUNDING_DISALLOWED: "This bank cannot fund this applicant.",
-  CROSS_FUNDING_POLICY_WARNING: "This bank's funding setting asks for a review.",
   DUPLICATE_APPLICANT_IPO: "This applicant already has an application for this IPO.",
   INSUFFICIENT_BALANCE: "This bank needs more available money.",
   INVALID_AMOUNT: "The amount does not match the chosen lots. Review the current IPO price.",
