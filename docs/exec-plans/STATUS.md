@@ -5,6 +5,7 @@
 - Founder requested full PAN and demat client ID in the signed-in workspace, the Bank Accounts heading “Account Number”, and IPO-wise application selection with edit and cancellation after planning or submission.
 - Preserve encrypted identifiers at rest and workspace authorization. Treat a submitted cancellation as a tracked status change with audit history, not a broker cancellation. Add transaction-safe bulk actions and verify with synthetic fixtures before deployment.
 - Implemented owner/operator identifier display in Settings, import review, and plan choices; viewers retain masked fields and sensitive endpoints use private no-store responses. Applications now group by IPO, support live search/status filters and IPO-wise selection, individual corrections before block/result, and atomic bulk status/cancel actions. Cancellation is retained as audited history and excluded from planner limits and capital. Full `scripts/check.sh` passed: 395 backend, 37 web, and 1 Android test, plus lint, typecheck, migration and production-build gates. Production deployment pending.
+- Deployment access is pending: automatic permission review did not grant the workspace read access to the local AWS CLI login cache, and computer control of Chrome was rejected. The Founder was asked to open a signed-in AWS Console in the Codex in-app browser. No B13 files or migration have been deployed; no live data was changed.
 
 ## B12 Import, Funds, plan and per-IPO export polish — deployed, 2026-10-15
 
