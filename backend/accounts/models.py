@@ -100,6 +100,7 @@ class EmailLoginToken(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
     used_at = models.DateTimeField(null=True, blank=True)
+    failed_attempts = models.PositiveSmallIntegerField(default=0)
 
     def __str__(self):
         return f"Email login token {self.pk}"

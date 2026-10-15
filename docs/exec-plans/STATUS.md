@@ -1,5 +1,10 @@
 # LotNeeti execution status
 
+## A05 email OTP registration and password recovery — local, 2026-10-15
+
+- The single email/password form now sends a six-digit code for a new address and creates the account only after verification. Existing members still sign in with their password and keep the secure 30-day session. Forgot password sends a six-digit email code and accepts a new password after code verification; the start response is identical for registered and unregistered addresses.
+- Codes expire after 15 minutes, are keyed-hashed at rest, allow five failed attempts, and are throttled by both per-address send cooldown and existing request rate limits. Old outstanding one-time links remain consumable until their original expiry. Focused auth/rate-limit tests and the full `scripts/check.sh` gate passed (397 backend, 37 web, 1 Android test; lint, typecheck, migrations and builds). Production backup and deployment pending.
+
 ## B13 Identifier display and application management — in progress, 2026-10-15
 
 - Founder requested full PAN and demat client ID in the signed-in workspace, the Bank Accounts heading “Account Number”, and IPO-wise application selection with edit and cancellation after planning or submission.

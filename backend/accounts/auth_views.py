@@ -5,15 +5,20 @@ from django.conf import settings
 from django.contrib.auth import login, logout
 from django.http import Http404
 from rest_framework import serializers, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.auth import (
+    INVALID_CODE,
     complete_password_reset,
+    complete_password_reset_code,
     consume_registration,
-    login_or_create_with_password,
+    login_with_password,
     request_password_reset,
+    request_registration,
+    verify_registration_code,
 )
 from accounts.models import User, WorkspaceMembership
 from accounts.services import create_workspace
@@ -28,11 +33,19 @@ class TokenSerializer(serializers.Serializer):
     token = serializers.CharField(min_length=32, max_length=256)
 
 
+class LegacyResetSerializer(TokenSerializer):
+    password = serializers.CharField(trim_whitespace=False, min_length=8, max_length=128)
+
+
 class PasswordSerializer(EmailSerializer):
     password = serializers.CharField(trim_whitespace=False, min_length=8, max_length=128)
 
 
-class PasswordResetSerializer(TokenSerializer):
+class CodeSerializer(EmailSerializer):
+    code = serializers.RegexField(r"^\d{6}$")
+
+
+class CodePasswordSerializer(CodeSerializer):
     password = serializers.CharField(trim_whitespace=False, min_length=8, max_length=128)
 
 
@@ -50,8 +63,8 @@ class RegisterView(APIView):
     def post(self, request):
         serializer = PasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = login_or_create_with_password(request, **serializer.validated_data)
-        return Response({"id": user.pk, "email": user.email}, status=status.HTTP_200_OK)
+        request_registration(**serializer.validated_data)
+        return Response({"verification_required": True}, status=status.HTTP_202_ACCEPTED)
 
 
 class RegisterVerifyView(APIView):
@@ -59,9 +72,16 @@ class RegisterVerifyView(APIView):
     permission_classes = [FrontendOrigin]
 
     def post(self, request):
-        serializer = TokenSerializer(data=request.data)
+        if "token" in request.data:
+            serializer = TokenSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            user = consume_registration(request, serializer.validated_data["token"])
+            return Response({"id": user.pk, "email": user.email}, status=status.HTTP_200_OK)
+        serializer = CodeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = consume_registration(request, serializer.validated_data["token"])
+        user = verify_registration_code(request, **serializer.validated_data)
+        if user is None:
+            raise ValidationError(INVALID_CODE)
         return Response({"id": user.pk, "email": user.email}, status=status.HTTP_200_OK)
 
 
@@ -72,7 +92,9 @@ class PasswordLoginView(APIView):
     def post(self, request):
         serializer = PasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = login_or_create_with_password(request, **serializer.validated_data)
+        if request_registration(**serializer.validated_data):
+            return Response({"verification_required": True}, status=status.HTTP_202_ACCEPTED)
+        user = login_with_password(request, **serializer.validated_data)
         return Response({"id": user.pk, "email": user.email}, status=status.HTTP_200_OK)
 
 
@@ -84,7 +106,7 @@ class PasswordResetStartView(APIView):
         serializer = EmailSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         request_password_reset(serializer.validated_data["email"])
-        return Response({"message": "If this account exists, a reset email is on its way."})
+        return Response({"message": "If this account exists, a reset code is on its way."})
 
 
 class PasswordResetCompleteView(APIView):
@@ -92,9 +114,16 @@ class PasswordResetCompleteView(APIView):
     permission_classes = [FrontendOrigin]
 
     def post(self, request):
-        serializer = PasswordResetSerializer(data=request.data)
+        if "token" in request.data:
+            serializer = LegacyResetSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            user = complete_password_reset(request, **serializer.validated_data)
+            return Response({"id": user.pk, "email": user.email}, status=status.HTTP_200_OK)
+        serializer = CodePasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = complete_password_reset(request, **serializer.validated_data)
+        user = complete_password_reset_code(request, **serializer.validated_data)
+        if user is None:
+            raise ValidationError(INVALID_CODE)
         return Response({"id": user.pk, "email": user.email}, status=status.HTTP_200_OK)
 
 

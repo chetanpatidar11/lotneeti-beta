@@ -1,4 +1,5 @@
-from urllib.parse import parse_qs, urlparse
+import re
+from datetime import timedelta
 
 import pytest
 from django.core import mail
@@ -14,22 +15,39 @@ FRONTEND_ORIGIN = "http://127.0.0.1:3000"
 
 
 def token_from_email():
-    link = mail.outbox[-1].body.splitlines()[-1]
-    return parse_qs(urlparse(link).query)["token"][0]
+    return re.search(r"\b\d{6}\b", mail.outbox[-1].body).group()
 
 
 @pytest.mark.django_db
-def test_one_form_creates_account_without_email_then_signs_in_for_30_days():
+def test_one_form_verifies_new_account_then_signs_in_for_30_days():
     client = APIClient(HTTP_ORIGIN=FRONTEND_ORIGIN)
     credentials = {"email": "New@Example.Test", "password": "Safe test password 284!"}
     created = client.post(reverse("password-login"), credentials)
-    assert created.status_code == 200
-    assert created.data["email"] == "new@example.test"
+    assert created.status_code == 202
+    assert created.data == {"verification_required": True}
+    assert User.objects.count() == 0
+    assert client.get(reverse("me")).status_code == 403
+    assert len(mail.outbox) == 1
+    code = token_from_email()
+    assert credentials["password"] not in mail.outbox[-1].body
+    assert code not in EmailLoginToken.objects.get().token_hash
+    assert (
+        client.post(
+            reverse("register-verify"), {"email": "new@example.test", "code": "999999"}
+        ).status_code
+        == 400
+    )
+    assert User.objects.count() == 0
+    verified = client.post(reverse("register-verify"), {"email": "new@example.test", "code": code})
+    assert verified.status_code == 200
     user = User.objects.get(email="new@example.test")
-    assert user.email_verified_at is None
+    assert user.email_verified_at is not None
     assert user.check_password(credentials["password"])
-    assert len(mail.outbox) == 0
-    assert AuditEvent.objects.filter(action="auth.account_created", actor=user).exists()
+    assert AuditEvent.objects.filter(action="auth.email_verified", actor=user).exists()
+    assert (
+        client.post(reverse("register-verify"), {"email": user.email, "code": code}).status_code
+        == 400
+    )
     assert client.get(reverse("me")).status_code == 200
     assert client.session.get_expiry_age() > 29 * 24 * 60 * 60
     assert client.post(reverse("session-refresh")).status_code == 204
@@ -37,7 +55,7 @@ def test_one_form_creates_account_without_email_then_signs_in_for_30_days():
     assert client.post(reverse("logout")).status_code == 204
     assert client.post(reverse("password-login"), credentials).status_code == 200
     assert User.objects.count() == 1
-    assert len(mail.outbox) == 0
+    assert len(mail.outbox) == 1
 
 
 @pytest.mark.django_db
@@ -58,16 +76,26 @@ def test_existing_account_wrong_password_does_not_create_or_change_account():
 
 
 @pytest.mark.django_db
-def test_register_alias_uses_same_account_entry_without_verification_email():
+def test_register_alias_sends_code_and_existing_address_remains_unchanged():
     client = APIClient(HTTP_ORIGIN=FRONTEND_ORIGIN)
     response = client.post(
         reverse("register"), {"email": "person@example.test", "password": "Safe test password 284!"}
     )
-    assert response.status_code == 200
-    assert client.get(reverse("me")).status_code == 200
-    assert User.objects.count() == 1
-    assert EmailLoginToken.objects.count() == 0
-    assert len(mail.outbox) == 0
+    assert response.status_code == 202
+    assert client.get(reverse("me")).status_code == 403
+    assert User.objects.count() == 0
+    assert EmailLoginToken.objects.count() == 1
+    assert len(mail.outbox) == 1
+    user = User.objects.create_user(
+        email="existing@example.test", password="Old safe password 284!"
+    )
+    repeated = client.post(
+        reverse("register"), {"email": user.email, "password": "New safe password 284!"}
+    )
+    assert repeated.status_code == 202
+    assert len(mail.outbox) == 1
+    user.refresh_from_db()
+    assert user.check_password("Old safe password 284!")
 
 
 @pytest.mark.django_db
@@ -83,7 +111,7 @@ def test_password_reset_response_does_not_disclose_account_and_recovers_old_magi
     assert (
         client.post(
             reverse("password-reset-complete"),
-            {"token": token, "password": "New safe password 284!"},
+            {"email": user.email, "code": token, "password": "New safe password 284!"},
         ).status_code
         == 200
     )
@@ -118,14 +146,14 @@ def test_password_reset_is_one_time_and_invalidates_old_password():
     assert (
         client.post(
             reverse("password-reset-complete"),
-            {"token": token, "password": "New safe password 284!"},
+            {"email": user.email, "code": token, "password": "New safe password 284!"},
         ).status_code
         == 200
     )
     assert (
         client.post(
             reverse("password-reset-complete"),
-            {"token": token, "password": "Other safe password 284!"},
+            {"email": user.email, "code": token, "password": "Other safe password 284!"},
         ).status_code
         == 400
     )
@@ -142,6 +170,52 @@ def test_password_reset_is_one_time_and_invalidates_old_password():
         ).status_code
         == 200
     )
+
+
+@pytest.mark.django_db
+def test_registration_code_expires_and_limits_wrong_attempts():
+    client = APIClient(HTTP_ORIGIN=FRONTEND_ORIGIN)
+    email = "codes@example.test"
+    credentials = {"email": email, "password": "Safe test password 284!"}
+    assert client.post(reverse("password-login"), credentials).status_code == 202
+    code = token_from_email()
+    record = EmailLoginToken.objects.get()
+    wrong = "000000" if code != "000000" else "999999"
+    for _ in range(5):
+        assert (
+            client.post(reverse("register-verify"), {"email": email, "code": wrong}).status_code
+            == 400
+        )
+    record.refresh_from_db()
+    assert record.failed_attempts == 5
+    assert (
+        client.post(reverse("register-verify"), {"email": email, "code": code}).status_code == 400
+    )
+    assert User.objects.count() == 0
+    record.failed_attempts = 0
+    record.expires_at = timezone.now() - timedelta(seconds=1)
+    record.save(update_fields=["failed_attempts", "expires_at"])
+    assert (
+        client.post(reverse("register-verify"), {"email": email, "code": code}).status_code == 400
+    )
+    assert User.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_password_reset_code_rejects_wrong_email_and_password_weakness():
+    user = User.objects.create_user(email="person@example.test", password="Old safe password 284!")
+    client = APIClient(HTTP_ORIGIN=FRONTEND_ORIGIN)
+    assert client.post(reverse("password-reset-start"), {"email": user.email}).status_code == 200
+    code = token_from_email()
+    payload = {"email": "other@example.test", "code": code, "password": "New safe password 284!"}
+    assert client.post(reverse("password-reset-complete"), payload).status_code == 400
+    payload["email"] = user.email
+    payload["password"] = "password"
+    assert client.post(reverse("password-reset-complete"), payload).status_code == 400
+    payload["password"] = "New safe password 284!"
+    assert client.post(reverse("password-reset-complete"), payload).status_code == 200
+    user.refresh_from_db()
+    assert user.check_password(payload["password"])
 
 
 @pytest.mark.django_db

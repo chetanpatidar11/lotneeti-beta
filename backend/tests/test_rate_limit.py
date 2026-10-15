@@ -105,6 +105,6 @@ def test_registration_endpoint_returns_429_after_limit(client):
         REMOTE_ADDR="192.0.2.10",
         HTTP_ORIGIN="http://127.0.0.1:3000",
     )
-    assert first.status_code == 200
+    assert first.status_code == 202
     assert second.status_code == 429
     assert second.json() == {"detail": "Too many requests. Please try again shortly."}
