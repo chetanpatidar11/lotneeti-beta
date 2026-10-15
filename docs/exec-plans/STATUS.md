@@ -1,8 +1,9 @@
 # LotNeeti execution status
 
-## E22 Intentional cross-funding notices — local, 2026-10-15
+## E22 Intentional cross-funding notices — deployed, 2026-10-15
 
-- The founder asked to remove duplicate “Needs review” messages for intentional cross-funding and the bank WARN preference; the Funding Type column already identifies the choice. The planner still emits and retains its warning codes for deterministic validation and audit, while the web presentation filters those two notices from row messages and status. Cash, limit, and blocking issues remain visible. Web tests, lint, typecheck, and production build passed. Production deployment pending because AWS CLI access to the signed-in cache is denied in this workspace.
+- The founder asked to remove duplicate “Needs review” messages for intentional cross-funding and the bank WARN preference; the Funding Type column already identifies the choice. The planner still emits and retains its warning codes for deterministic validation and audit, while the web presentation filters those two notices from row messages and status. Cash, limit, and blocking issues remain visible. Web tests, lint, typecheck, and production build passed.
+- The founder refreshed AWS sign-in in VS Code; CLI access returned. An encrypted pre-release backup succeeded. Commit `ea16f61` was pushed and release archive SHA-256 `ecd018c27b016ec973179c40c123e1247a844422edd5920509e80bd5c53b5105` deployed to `https://lotneeti.dpdns.org/`. Production build and Django system check passed; no migrations were needed. Public API health returned 200 with valid TLS, all application/proxy/database/cache services and backup timer are active, and the deployed source contains the intended warning filter. SMTP remains unconfigured; the sender switch requested separately has not been made.
 
 ## A05 email OTP registration and password recovery — deployed, 2026-10-15
 
