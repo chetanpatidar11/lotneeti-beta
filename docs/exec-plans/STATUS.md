@@ -1,16 +1,18 @@
 # LotNeeti execution status
 
-## A05 email OTP registration and password recovery — local, 2026-10-15
+## A05 email OTP registration and password recovery — deployed, 2026-10-15
 
 - The single email/password form now sends a six-digit code for a new address and creates the account only after verification. Existing members still sign in with their password and keep the secure 30-day session. Forgot password sends a six-digit email code and accepts a new password after code verification; the start response is identical for registered and unregistered addresses.
-- Codes expire after 15 minutes, are keyed-hashed at rest, allow five failed attempts, and are throttled by both per-address send cooldown and existing request rate limits. Old outstanding one-time links remain consumable until their original expiry. Focused auth/rate-limit tests and the full `scripts/check.sh` gate passed (397 backend, 37 web, 1 Android test; lint, typecheck, migrations and builds). Production backup and deployment pending.
+- Codes expire after 15 minutes, are keyed-hashed at rest, allow five failed attempts, and are throttled by both per-address send cooldown and existing request rate limits. Old outstanding one-time links remain consumable until their original expiry. Focused auth/rate-limit tests and the full `scripts/check.sh` gate passed (397 backend, 37 web, 1 Android test; lint, typecheck, migrations and builds).
+- Encrypted pre-release backup succeeded. Commit `c9a9ecb` was pushed and release archive SHA-256 `f66e6008d00dd508f0888e790dcccf1c257b737c5af6f41f53dd387751ea7e17` deployed to `https://lotneeti.dpdns.org/`. Migrations `accounts.0008_emaillogintoken_failed_attempts` and `applications.0002_remove_application_unique_workspace_ipo_applicant_and_more` applied. Home, sign-in and health returned HTTPS 200 with valid TLS; the live sign-in page displayed the new verification copy and reset-code action, and an invalid code request returned the expected 400.
+- AWS SES `GetAccount` reports sending enabled but `ProductionAccessEnabled=false` in `us-east-1`. OTP delivery to arbitrary new addresses remains blocked by the SES sandbox until AWS approves the already-submitted production-access request; verified recipient addresses can be used for beta testing. No real signup/reset email was sent during deployment checks.
 
-## B13 Identifier display and application management — in progress, 2026-10-15
+## B13 Identifier display and application management — deployed, 2026-10-15
 
 - Founder requested full PAN and demat client ID in the signed-in workspace, the Bank Accounts heading “Account Number”, and IPO-wise application selection with edit and cancellation after planning or submission.
 - Preserve encrypted identifiers at rest and workspace authorization. Treat a submitted cancellation as a tracked status change with audit history, not a broker cancellation. Add transaction-safe bulk actions and verify with synthetic fixtures before deployment.
 - Implemented owner/operator identifier display in Settings, import review, and plan choices; viewers retain masked fields and sensitive endpoints use private no-store responses. Applications now group by IPO, support live search/status filters and IPO-wise selection, individual corrections before block/result, and atomic bulk status/cancel actions. Cancellation is retained as audited history and excluded from planner limits and capital. Full `scripts/check.sh` passed: 395 backend, 37 web, and 1 Android test, plus lint, typecheck, migration and production-build gates. Production deployment pending.
-- Deployment access is pending: automatic permission review did not grant the workspace read access to the local AWS CLI login cache, and computer control of Chrome was rejected. The Founder was asked to open a signed-in AWS Console in the Codex in-app browser. No B13 files or migration have been deployed; no live data was changed.
+- Deployment access returned through the existing AWS CLI session. B13 shipped in the A05 release above after a successful encrypted backup and application migration. No live application or bank data was modified by release verification.
 
 ## B12 Import, Funds, plan and per-IPO export polish — deployed, 2026-10-15
 
