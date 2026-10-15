@@ -3,8 +3,8 @@
 import { ChangeEvent, FormEvent, PointerEvent, useRef, useState } from "react";
 
 type ImportRow = {
-  row_number: number; name: string; pan_masked: string; type: string;
-  dpid_masked: string; client_id_masked: string; upi_id: string;
+  row_number: number; name: string; pan_masked: string; pan_display: string; type: string;
+  dpid_masked: string; client_id_masked: string; client_id_display: string; upi_id: string;
   account_masked: string; bank_name: string; payment_reference: string;
   payment_pending: boolean; shared_upi: boolean; using_upi_as_account: boolean; errors: string[];
 };
@@ -12,7 +12,7 @@ type ImportPreview = {
   id: string; status: "PREVIEWED" | "CONFIRMED"; source_filename: string;
   row_count: number; error_count: number; rows: ImportRow[];
 };
-type ExistingInvestor = { id: string; name: string; pan_masked: string; active: boolean };
+type ExistingInvestor = { id: string; name: string; pan_masked: string; pan_display: string; active: boolean };
 const selectable = (row: ImportRow) => row.errors.length === 0;
 const initialColumnWidths = [76, 240, 130, 220, 250, 250, 140];
 const columnLabels = ["Import", "Name", "PAN", "Demat", "UPI", "Bank details", "Status"];
@@ -112,15 +112,15 @@ export default function AccountImport({ workspaceId, canEdit, investors }: { wor
           const canSelect = selectable(row);
           return <tr key={row.row_number}>
             <td data-label="Import"><input type="checkbox" aria-label={`Import row ${row.row_number} for ${row.name}`} checked={checked} disabled={!canEdit || busy || !canSelect || preview.status === "CONFIRMED"} onChange={(event) => setSelected((current) => event.target.checked ? [...current, row.row_number] : current.filter((number) => number !== row.row_number))} /></td>
-            <td data-label="Name" title={row.name}>{row.name}</td><td data-label="PAN">{row.pan_masked}</td>
-            <td data-label="Demat" title={`${row.type} · ${row.dpid_masked} · ${row.client_id_masked}`}>{row.type} · {row.dpid_masked} · {row.client_id_masked}</td>
+            <td data-label="Name" title={row.name}>{row.name}</td><td data-label="PAN">{row.pan_display}</td>
+            <td data-label="Demat" title={`${row.type} · ${row.dpid_masked} · ${row.client_id_display}`}>{row.type} · {row.dpid_masked} · {row.client_id_display}</td>
             <td data-label="UPI" title={row.upi_id}>{row.upi_id}</td>
             <td data-label="Bank details"><span>{row.bank_name} · {row.account_masked}</span></td>
             <td data-label="Status">{preview.status === "CONFIRMED" && checked ? "Imported" : canSelect ? checked && !ownerChoice(row.upi_id, selectedGroups[row.upi_id] ?? []) ? "Choose owner" : "Ready" : <details className="import-row-errors"><summary>{row.errors.length} {row.errors.length === 1 ? "issue" : "issues"}</summary><ul>{row.errors.map((error) => <li key={error}>{error}</li>)}</ul></details>}</td>
           </tr>;
         })}</tbody>
       </table></div>
-      {ownerGroups.length > 0 && <div className="account-import-shared"><h3>Bank account owners</h3><p>Choose from any selected investor in this workbook or an active investor already in your workspace. The same person can own more than one UPI. A UPI used by one row defaults to that investor.</p>{ownerGroups.map(([upi, rows]) => <label key={upi} htmlFor={`upi-owner-${rows?.[0]?.row_number}`}>{upi}<select id={`upi-owner-${rows?.[0]?.row_number}`} value={ownerChoice(upi, rows ?? [])} disabled={!canEdit || busy || preview.status === "CONFIRMED"} onChange={(event) => setUpiOwners((current) => ({ ...current, [upi]: event.target.value }))} required><option value="">Choose bank account owner</option><optgroup label="Investors in this import">{preview.rows.filter((row) => selected.includes(row.row_number)).map((row) => <option key={row.row_number} value={`row:${row.row_number}`}>{row.name}</option>)}</optgroup>{investors.some((investor) => investor.active) && <optgroup label="Already in this workspace">{investors.filter((investor) => investor.active).map((investor) => <option key={investor.id} value={`investor:${investor.id}`}>{investor.name} · {investor.pan_masked}</option>)}</optgroup>}</select></label>)}</div>}
+      {ownerGroups.length > 0 && <div className="account-import-shared"><h3>Bank account owners</h3><p>Choose from any selected investor in this workbook or an active investor already in your workspace. The same person can own more than one UPI. A UPI used by one row defaults to that investor.</p>{ownerGroups.map(([upi, rows]) => <label key={upi} htmlFor={`upi-owner-${rows?.[0]?.row_number}`}>{upi}<select id={`upi-owner-${rows?.[0]?.row_number}`} value={ownerChoice(upi, rows ?? [])} disabled={!canEdit || busy || preview.status === "CONFIRMED"} onChange={(event) => setUpiOwners((current) => ({ ...current, [upi]: event.target.value }))} required><option value="">Choose bank account owner</option><optgroup label="Investors in this import">{preview.rows.filter((row) => selected.includes(row.row_number)).map((row) => <option key={row.row_number} value={`row:${row.row_number}`}>{row.name}</option>)}</optgroup>{investors.some((investor) => investor.active) && <optgroup label="Already in this workspace">{investors.filter((investor) => investor.active).map((investor) => <option key={investor.id} value={`investor:${investor.id}`}>{investor.name} · {investor.pan_display}</option>)}</optgroup>}</select></label>)}</div>}
       {canEdit && preview.status === "PREVIEWED" && <button type="submit" disabled={busy || selected.length === 0}>Import selected ({selected.length})</button>}
     </form>}
     {message && <p role="status">{message}</p>}

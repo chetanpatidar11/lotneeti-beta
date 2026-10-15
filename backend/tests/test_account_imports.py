@@ -11,7 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from accounts.models import User
+from accounts.models import User, WorkspaceMembership
 from accounts.services import create_workspace
 from core.models import AuditEvent
 from funding.models import BalanceChange, BankAccount, UPIHandle
@@ -186,7 +186,7 @@ def seventeen_rows_six_upis_upload():
 
 
 @pytest.mark.django_db
-def test_sample_account_workbook_previews_masked_rows_and_confirms_only_selected_rows():
+def test_sample_account_workbook_previews_authorized_ids_and_confirms_only_selected_rows():
     owner = User.objects.create_user(email="owner@example.test")
     workspace = create_workspace(name="Family", owner=owner)
     client = APIClient()
@@ -201,11 +201,19 @@ def test_sample_account_workbook_previews_masked_rows_and_confirms_only_selected
     assert preview.data["row_count"] == 2
     assert preview.data["error_count"] == 0
     assert preview.data["rows"][0]["pan_masked"] == "******234F"
+    assert preview.data["rows"][0]["pan_display"] == "ABCDE1234F"
+    assert preview.data["rows"][0]["client_id_display"]
     assert preview.data["rows"][0]["account_masked"] == "••••6789"
-    assert "ABCDE1234F" not in str(preview.data)
 
     batch = AccountImportBatch.objects.get(pk=preview.data["id"])
     assert "ABCDE1234F" not in batch.rows_ciphertext
+    viewer = User.objects.create_user(email="viewer@example.test")
+    WorkspaceMembership.objects.create(workspace=workspace, user=viewer, role="VIEWER")
+    client.force_authenticate(viewer)
+    masked = client.get(reverse("account-import-preview", args=[workspace.pk, batch.pk]))
+    assert masked.data["rows"][0]["pan_display"] == "******234F"
+    assert masked.data["rows"][0]["client_id_display"] == masked.data["rows"][0]["client_id_masked"]
+    client.force_authenticate(owner)
     confirmed = client.post(
         reverse("account-import-preview", args=[workspace.pk, batch.pk]),
         {"row_numbers": [2]},

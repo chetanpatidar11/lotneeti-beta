@@ -222,7 +222,7 @@ def _masked_upi(value: str) -> str:
     return f"••••@{value.rsplit('@', 1)[1]}" if "@" in value else "—"
 
 
-def preview_payload(batch: AccountImportBatch) -> dict:
+def preview_payload(batch: AccountImportBatch, *, reveal_details: bool = False) -> dict:
     rows = (
         json.loads(decrypt_value(batch.rows_ciphertext, purpose="account-import"))
         if batch.status == AccountImportBatch.Status.PREVIEWED
@@ -242,9 +242,13 @@ def preview_payload(batch: AccountImportBatch) -> dict:
                 "row_number": row["row_number"],
                 "name": row["Name"],
                 "pan_masked": _mask(row["PAN"], prefix="******"),
+                "pan_display": row["PAN"] if reveal_details else _mask(row["PAN"], prefix="******"),
                 "type": row["Type"],
                 "dpid_masked": _mask(row["DPID"]),
                 "client_id_masked": _mask(row["CLIENT ID"]),
+                "client_id_display": row["CLIENT ID"]
+                if reveal_details
+                else _mask(row["CLIENT ID"]),
                 "upi_masked": _masked_upi(row["UPI ID"]),
                 "upi_id": row["UPI ID"],
                 "account_masked": (

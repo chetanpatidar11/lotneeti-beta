@@ -398,8 +398,21 @@ html:not([data-theme="dark"]) .settings-funding-row:hover:not(:disabled) > span:
 .application-summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 13px; }
 .application-summary span { display: inline-flex; align-items: baseline; gap: 6px; min-height: 35px; padding: 7px 11px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--muted); font-size: 11px; font-weight: 700; }
 .application-summary strong { color: var(--text); font-size: 15px; font-variant-numeric: tabular-nums; }
+.application-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin: 0 0 14px; }
+.application-filters label { display: grid; gap: 5px; min-width: 170px; color: var(--muted); font-size: 11px; font-weight: 750; }
+.application-filters label:first-child { flex: 1 1 220px; }
+.application-filters input, .application-filters select { width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--surface); color: var(--text); font: inherit; font-size: 12px; }
+.application-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin: 0 0 14px; padding: 11px 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-soft); }
+.application-bulk strong { margin-right: 6px; font-size: 12px; }
+.application-bulk button { min-height: 33px; padding: 6px 10px; font-size: 11px; }
+.application-ipo-group { margin: 0 0 16px; }
+.application-ipo-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 8px; }
+.application-ipo-heading h2 { margin: 0; color: var(--text); font-size: 16px; letter-spacing: -.02em; }
+.application-ipo-heading p { margin: 2px 0 0; color: var(--muted); font-size: 11px; }
+.application-select-group { display: inline-flex; align-items: center; gap: 7px; color: var(--text); font-size: 11px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.application-select-group input, .application-select-cell input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
 .application-table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
-.application-table { width: 100%; min-width: 960px; border-collapse: collapse; font-size: 12px; }
+.application-table { width: 100%; min-width: 1080px; border-collapse: collapse; font-size: 12px; }
 .application-table thead { position: sticky; top: 0; z-index: 1; background: var(--surface-raised); }
 .application-table th, .application-table td { padding: 10px 11px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
 .application-table thead th { color: var(--faint); font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; white-space: nowrap; }
@@ -409,8 +422,10 @@ html:not([data-theme="dark"]) .settings-funding-row:hover:not(:disabled) > span:
 .application-table td strong, .application-table td small { display: block; }
 .application-table td small { margin-top: 2px; color: var(--faint); }
 .application-table .money-cell { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.application-row-actions { display: flex; flex-wrap: wrap; gap: 5px; min-width: 145px; }
+.application-row-actions { display: flex; flex-wrap: wrap; gap: 5px; min-width: 230px; }
 .application-row-actions button, .application-row-actions a { min-height: 30px; padding: 5px 8px; font-size: 11px; white-space: nowrap; }
+.application-edit-preview { margin: 5px 0 13px; color: var(--muted); font-size: 12px; }
+.application-edit-preview strong { color: var(--text); }
 .application-detail { padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .application-detail p { margin: 9px 0 0; color: var(--muted); }
 .application-timeline { display: grid; gap: 0; padding: 0 0 0 21px; list-style: none; border-left: 1px solid var(--border-strong); }

@@ -281,21 +281,20 @@ class WorkspaceCapitalView(APIView):
         }
         latest = PlanRun.objects.filter(workspace=workspace).first()
         planned_by_bank = {}
-        applications = {
-            (str(item.ipo_id), str(item.applicant_id)): item
-            for item in Application.objects.filter(workspace=workspace)
-        }
+        applications = list(Application.objects.filter(workspace=workspace))
+        tracked_by_row = {item.plan_row_id: item for item in applications}
         if latest is not None:
             for row in latest.rows.all():
-                tracked = applications.get((row.ipo_ref, row.applicant_ref))
-                if tracked is not None and tracked.status not in {
-                    Application.Status.PLANNED,
-                    Application.Status.SUBMITTED,
-                }:
+                tracked = tracked_by_row.get(row.pk)
+                if tracked is None:
+                    bank_id, amount = row.bank_ref, row.amount
+                elif tracked.status in {Application.Status.PLANNED, Application.Status.SUBMITTED}:
+                    bank_id, amount = str(tracked.bank_id), tracked.amount
+                else:
                     continue
-                planned_by_bank[row.bank_ref] = planned_by_bank.get(row.bank_ref, 0) + row.amount
+                planned_by_bank[bank_id] = planned_by_bank.get(bank_id, 0) + amount
         blocked_by_bank = {}
-        for item in applications.values():
+        for item in applications:
             if item.status == Application.Status.BLOCKED:
                 bank_id = str(item.bank_id)
                 blocked_by_bank[bank_id] = blocked_by_bank.get(bank_id, 0) + item.amount

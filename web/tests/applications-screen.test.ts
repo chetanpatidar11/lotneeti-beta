@@ -6,9 +6,12 @@ import ApplicationsScreen, { type ApplicationItem } from "../src/app/application
 
 const item: ApplicationItem = {
   id: "application-1",
+  ipo: "ipo-1",
   ipo_name: "Synthetic Industries",
   applicant_name: "Synthetic Investor",
+  bank: "bank-1",
   bank_label: "Example Bank ••••0001",
+  upi: "upi-1",
   upi_label: "••••@example",
   category: "RETAIL",
   lots: 1,
@@ -19,6 +22,8 @@ const item: ApplicationItem = {
   submitted_at: null,
   blocked_at: null,
   result_at: null,
+  edited_at: null,
+  cancelled_at: null,
   allotted_quantity: null,
   actual_cost: null,
   close_date: "2026-10-03",
@@ -35,14 +40,17 @@ function render(status: ApplicationItem["status"], canEdit = true) {
   }));
 }
 
-test("application actions follow status and keep masked funding visible", () => {
+test("application actions follow status and group rows by IPO", () => {
   const planned = render("PLANNED");
-  assert.match(planned, /Mark Submitted/);
-  assert.doesNotMatch(planned, /Record Result/);
+  assert.match(planned, /Mark submitted/);
+  assert.match(planned, /Select this IPO/);
+  assert.match(planned, /Edit/);
+  assert.match(planned, /Cancel/);
+  assert.doesNotMatch(planned, /Record result/);
   assert.match(planned, /••••@example/);
-  assert.match(render("SUBMITTED"), /Mark Blocked/);
+  assert.match(render("SUBMITTED"), /Mark blocked/);
   const blocked = render("BLOCKED");
-  assert.match(blocked, /Record Result/);
-  assert.doesNotMatch(blocked, /Mark Submitted/);
-  assert.doesNotMatch(render("BLOCKED", false), /Record Result/);
+  assert.match(blocked, /Record result/);
+  assert.doesNotMatch(blocked, /Mark submitted/);
+  assert.doesNotMatch(render("BLOCKED", false), /Record result/);
 });

@@ -23,12 +23,14 @@ def test_owner_can_create_edit_and_deactivate_investor_with_masked_pan():
     )
     assert created.status_code == 201
     assert created.data["pan_masked"] == "******001A"
+    assert created.data["pan_display"] == SYNTHETIC_PAN
     assert "pan" not in created.data
     investor = Investor.objects.get(pk=created.data["id"])
     assert SYNTHETIC_PAN not in investor.pan_ciphertext
     assert investor.pan_lookup_hash != SYNTHETIC_PAN
 
     detail_url = reverse("investor-detail", args=[workspace.pk, investor.pk])
+    assert client.get(list_url).data[0]["pan_display"] == SYNTHETIC_PAN
     updated = client.patch(detail_url, {"planning_priority": 1, "active": False})
     assert updated.status_code == 200
     investor.refresh_from_db()
@@ -111,6 +113,7 @@ def test_investor_access_is_scoped_and_viewer_is_read_only():
     assert client.patch(detail_url, {"name": "Changed"}).status_code == 403
 
     client.force_authenticate(viewer)
+    assert client.get(list_url).data[0]["pan_display"] == "******001A"
     assert client.get(detail_url).status_code == 200
     assert client.patch(detail_url, {"name": "Changed"}).status_code == 403
     assert client.post(list_url, {"name": "New", "pan": "TESTX0002B"}).status_code == 403

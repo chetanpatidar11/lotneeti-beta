@@ -9,7 +9,15 @@ from investors.models import DematAccount, Investor
 from investors.serializers import DematAccountSerializer, InvestorSerializer
 
 
+class SensitiveNoStoreMixin:
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+
 class InvestorViewSet(
+    SensitiveNoStoreMixin,
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
@@ -31,7 +39,17 @@ class InvestorViewSet(
         )
 
     def get_serializer_context(self):
-        return {**super().get_serializer_context(), "workspace": self.get_workspace()}
+        workspace = self.get_workspace()
+        can_reveal = WorkspaceMembership.objects.filter(
+            workspace=workspace,
+            user=self.request.user,
+            role__in=(WorkspaceMembership.Role.OWNER, WorkspaceMembership.Role.OPERATOR),
+        ).exists()
+        return {
+            **super().get_serializer_context(),
+            "workspace": workspace,
+            "reveal_details": can_reveal,
+        }
 
     def perform_create(self, serializer):
         with transaction.atomic():
@@ -55,6 +73,7 @@ class InvestorViewSet(
 
 
 class DematAccountViewSet(
+    SensitiveNoStoreMixin,
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
@@ -85,6 +104,7 @@ class DematAccountViewSet(
             **super().get_serializer_context(),
             "investor": investor,
             "reveal_details": self.action == "retrieve" and can_edit,
+            "display_details": can_edit,
         }
 
     def perform_create(self, serializer):

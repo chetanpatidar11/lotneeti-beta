@@ -31,6 +31,7 @@ def test_demat_create_edit_and_masked_identifiers():
     assert response.status_code == 201
     assert response.data["dp_id_masked"] == "••••0001"
     assert response.data["client_id_masked"] == "••••0002"
+    assert response.data["client_id_display"] == "DEMO-CLIENT-0002"
     assert "dp_id" not in response.data
     demat = DematAccount.objects.get(pk=response.data["id"])
     assert "DEMO-DP-0001" not in demat.dp_id_ciphertext
@@ -40,6 +41,7 @@ def test_demat_create_edit_and_masked_identifiers():
     assert client.get(detail_url).data["dp_id"] == "DEMO-DP-0001"
     assert client.get(detail_url).data["client_id"] == "DEMO-CLIENT-0002"
     assert "client_id" not in client.get(list_url).data[0]
+    assert client.get(list_url).data[0]["client_id_display"] == "DEMO-CLIENT-0002"
     updated = client.patch(detail_url, {"active": False, "depository": "NSDL"})
     assert updated.status_code == 200
     assert updated.data["active"] is False
@@ -94,4 +96,5 @@ def test_demat_workspace_scope_and_viewer_write_denial():
     assert viewer_detail.status_code == 200
     assert "dp_id" not in viewer_detail.data
     assert "client_id" not in viewer_detail.data
+    assert viewer_detail.data["client_id_display"] == "••••0002"
     assert client.patch(detail_url, {"active": False}).status_code == 403

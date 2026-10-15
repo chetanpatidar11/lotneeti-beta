@@ -12,6 +12,7 @@ PAN_PATTERN = re.compile(r"^[A-Z]{5}[0-9]{4}[A-Z]$")
 class InvestorSerializer(serializers.ModelSerializer):
     pan = serializers.CharField(write_only=True, required=False)
     pan_masked = serializers.CharField(read_only=True)
+    pan_display = serializers.SerializerMethodField()
     payment_hint_masked = serializers.CharField(read_only=True)
     payment_hint = serializers.CharField(read_only=True)
     payment_ready = serializers.BooleanField(read_only=True)
@@ -23,6 +24,7 @@ class InvestorSerializer(serializers.ModelSerializer):
             "name",
             "pan",
             "pan_masked",
+            "pan_display",
             "payment_hint_masked",
             "payment_hint",
             "payment_ready",
@@ -32,6 +34,11 @@ class InvestorSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = ("id", "pan_masked", "created_at", "updated_at")
+
+    def get_pan_display(self, instance):
+        if self.context.get("reveal_details"):
+            return decrypt_value(instance.pan_ciphertext, purpose="pan")
+        return instance.pan_masked
 
     def validate_pan(self, value):
         normalized = value.strip().upper()
@@ -88,6 +95,7 @@ class DematAccountSerializer(serializers.ModelSerializer):
     client_id = serializers.CharField(write_only=True, required=False, max_length=32)
     dp_id_masked = serializers.CharField(read_only=True)
     client_id_masked = serializers.CharField(read_only=True)
+    client_id_display = serializers.SerializerMethodField()
 
     class Meta:
         model = DematAccount
@@ -98,12 +106,18 @@ class DematAccountSerializer(serializers.ModelSerializer):
             "dp_id_masked",
             "client_id",
             "client_id_masked",
+            "client_id_display",
             "broker",
             "active",
             "created_at",
             "updated_at",
         )
         read_only_fields = ("id", "dp_id_masked", "client_id_masked", "created_at", "updated_at")
+
+    def get_client_id_display(self, instance):
+        if self.context.get("display_details"):
+            return decrypt_value(instance.client_id_ciphertext, purpose="demat")
+        return instance.client_id_masked
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

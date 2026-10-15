@@ -2,6 +2,7 @@ from django.urls import path
 
 from applications.views import (
     ApplicationActionView,
+    ApplicationBulkView,
     ApplicationListView,
     StartTrackingView,
     WorkspaceOperationsView,
@@ -17,6 +18,11 @@ urlpatterns = [
         "workspaces/<uuid:workspace_id>/applications/",
         ApplicationListView.as_view(),
         name="application-list",
+    ),
+    path(
+        "workspaces/<uuid:workspace_id>/applications/bulk/",
+        ApplicationBulkView.as_view(),
+        name="application-bulk",
     ),
     path(
         "workspaces/<uuid:workspace_id>/planner/runs/<uuid:run_id>/track/",

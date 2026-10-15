@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import Workspace
+from accounts.models import Workspace, WorkspaceMembership
 from accounts.permissions import WorkspaceDataPermission
 from investors.account_imports import (
     AccountImportError,
@@ -14,6 +14,14 @@ from investors.account_imports import (
     preview_payload,
 )
 from investors.models import AccountImportBatch
+
+
+def _can_reveal(workspace, user):
+    return WorkspaceMembership.objects.filter(
+        workspace=workspace,
+        user=user,
+        role__in=(WorkspaceMembership.Role.OWNER, WorkspaceMembership.Role.OPERATOR),
+    ).exists()
 
 
 class AccountImportConfirmSerializer(serializers.Serializer):
@@ -33,6 +41,11 @@ class AccountImportListView(APIView):
     permission_classes = [IsAuthenticated, WorkspaceDataPermission]
     parser_classes = [MultiPartParser, FormParser]
 
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        response["Cache-Control"] = "private, no-store"
+        return response
+
     def post(self, request, workspace_id):
         workspace = get_object_or_404(
             Workspace.objects.filter(memberships__user=request.user), pk=workspace_id
@@ -49,11 +62,19 @@ class AccountImportListView(APIView):
             if exc.errors:
                 payload["errors"] = exc.errors
             return Response(payload, status=400)
-        return Response(preview_payload(batch), status=status.HTTP_201_CREATED)
+        return Response(
+            preview_payload(batch, reveal_details=_can_reveal(workspace, request.user)),
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class AccountImportPreviewView(APIView):
     permission_classes = [IsAuthenticated, WorkspaceDataPermission]
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        response["Cache-Control"] = "private, no-store"
+        return response
 
     def get_batch(self, request, workspace_id, pk):
         return get_object_or_404(
@@ -63,7 +84,10 @@ class AccountImportPreviewView(APIView):
         )
 
     def get(self, request, workspace_id, pk):
-        return Response(preview_payload(self.get_batch(request, workspace_id, pk)))
+        batch = self.get_batch(request, workspace_id, pk)
+        return Response(
+            preview_payload(batch, reveal_details=_can_reveal(batch.workspace, request.user))
+        )
 
     def post(self, request, workspace_id, pk):
         batch = self.get_batch(request, workspace_id, pk)

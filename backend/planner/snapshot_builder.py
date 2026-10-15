@@ -219,7 +219,7 @@ def build_snapshot(
                 upi_id=str(item.upi_id),
                 amount=item.amount,
                 submitted_at=item.submitted_at,
-                cancelled=False,
+                cancelled=item.status == Application.Status.CANCELLED,
             )
             for item in applications
             if item.submitted_at is not None
@@ -229,7 +229,7 @@ def build_snapshot(
                 id=str(item.pk),
                 ipo_id=str(item.ipo_id),
                 applicant_id=str(item.applicant_id),
-                cancelled=False,
+                cancelled=item.status == Application.Status.CANCELLED,
             )
             for item in applications
         ),

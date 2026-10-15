@@ -10,12 +10,13 @@ type Investor = {
   id: string;
   name: string;
   pan_masked: string;
+  pan_display: string;
   planning_priority: number;
   active: boolean;
   payment_ready: boolean;
   payment_hint: string;
 };
-type Demat = { id: string; depository: string; dp_id_masked: string; client_id_masked: string; broker: string; active: boolean };
+type Demat = { id: string; depository: string; dp_id_masked: string; client_id_masked: string; client_id_display: string; broker: string; active: boolean };
 type Upi = { id: string; holder: string; bank_id: string; handle: string; active: boolean; verified: boolean };
 type LinkedAccounts = Record<string, { demats: Demat[]; upis: Upi[] }>;
 

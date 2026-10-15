@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 
 from accounts.models import Workspace, WorkspaceMembership
@@ -39,9 +40,15 @@ def start_tracking_plan(*, plan_run, actor) -> tuple[Application, ...]:
         demat = DematAccount.objects.get(pk=row.demat_ref, investor__workspace=workspace)
         bank = BankAccount.objects.get(pk=row.bank_ref, workspace=workspace)
         upi = UPIHandle.objects.get(pk=row.upi_ref, bank__workspace=workspace)
-        existing = Application.objects.filter(
-            workspace=workspace, ipo=ipo, applicant=applicant
-        ).first()
+        existing = (
+            Application.objects.filter(workspace=workspace, ipo=ipo, applicant=applicant)
+            .exclude(status=Application.Status.CANCELLED)
+            .first()
+        )
+        if existing is None and Application.objects.filter(plan_row=row).exists():
+            raise ValidationError(
+                "This plan row was cancelled. Create a new plan before tracking it again"
+            )
         if existing is not None:
             if existing.plan_row_id != row.pk:
                 raise ValidationError(
@@ -70,6 +77,103 @@ def start_tracking_plan(*, plan_run, actor) -> tuple[Application, ...]:
             metadata={"status": application.status},
         )
     return tuple(tracked)
+
+
+@transaction.atomic
+def edit_application(
+    *, application: Application, actor, category: str, lots: int, bank_id, upi_id
+) -> Application:
+    item = (
+        Application.objects.select_for_update()
+        .select_related("ipo", "bank", "upi")
+        .get(pk=application.pk)
+    )
+    _require_writer(item.workspace, actor)
+    if item.status not in {Application.Status.PLANNED, Application.Status.SUBMITTED}:
+        raise ValidationError("Only planned or submitted applications can be edited")
+    if category not in {"RETAIL", "SHNI"} or type(lots) is not int or lots < 1:
+        raise ValidationError("Choose a valid category and number of lots")
+    if category == "RETAIL" and lots != 1:
+        raise ValidationError("Retail applications use one lot")
+    bank = BankAccount.objects.filter(
+        pk=bank_id, workspace=item.workspace, active=True, is_placeholder=False
+    ).first()
+    if bank is None:
+        raise ValidationError("Choose an active bank account in this workspace")
+    upi = UPIHandle.objects.filter(pk=upi_id, bank=bank, active=True, verified=True).first()
+    if upi is None:
+        raise ValidationError("Choose an active UPI linked to that bank")
+    amount = (item.amount / item.lots * lots).quantize(Decimal("0.01"))
+    if category == "SHNI" and amount <= Decimal("200000.00"):
+        raise ValidationError("sHNI applications must be above ₹2,00,000")
+    if (category, lots, bank.pk, upi.pk) == (item.category, item.lots, item.bank_id, item.upi_id):
+        return item
+    other_commitments = Application.objects.filter(
+        workspace=item.workspace,
+        bank=bank,
+        status__in=(
+            Application.Status.PLANNED,
+            Application.Status.SUBMITTED,
+            Application.Status.BLOCKED,
+        ),
+    ).exclude(pk=item.pk).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    if amount + other_commitments > bank.current_balance:
+        raise ValidationError("Bank Balance is below the updated application amount")
+    before = {
+        "category": item.category,
+        "lots": item.lots,
+        "amount": str(item.amount),
+        "bank_id": str(item.bank_id),
+        "upi_id": str(item.upi_id),
+    }
+    item.category = category
+    item.lots = lots
+    item.amount = amount
+    item.bank = bank
+    item.upi = upi
+    item.edited_at = timezone.now()
+    item.save(update_fields=["category", "lots", "amount", "bank", "upi", "edited_at"])
+    record_event(
+        action="application.edited",
+        target=item,
+        actor=actor,
+        workspace=item.workspace,
+        metadata={
+            "before": before,
+            "after": {
+                "category": category,
+                "lots": lots,
+                "amount": str(amount),
+                "bank_id": str(bank.pk),
+                "upi_id": str(upi.pk),
+            },
+        },
+    )
+    return item
+
+
+@transaction.atomic
+def cancel_application(*, application: Application, actor) -> Application:
+    item = Application.objects.select_for_update().get(pk=application.pk)
+    _require_writer(item.workspace, actor)
+    if item.status not in {
+        Application.Status.PLANNED,
+        Application.Status.SUBMITTED,
+        Application.Status.BLOCKED,
+    }:
+        raise ValidationError("Only planned, submitted or blocked applications can be cancelled")
+    previous_status = item.status
+    item.status = Application.Status.CANCELLED
+    item.cancelled_at = timezone.now()
+    item.save(update_fields=["status", "cancelled_at"])
+    record_event(
+        action="application.cancelled",
+        target=item,
+        actor=actor,
+        workspace=item.workspace,
+        metadata={"previous_status": previous_status},
+    )
+    return item
 
 
 @transaction.atomic

@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## B13 Identifier display and application management — in progress, 2026-10-15
+
+- Founder requested full PAN and demat client ID in the signed-in workspace, the Bank Accounts heading “Account Number”, and IPO-wise application selection with edit and cancellation after planning or submission.
+- Preserve encrypted identifiers at rest and workspace authorization. Treat a submitted cancellation as a tracked status change with audit history, not a broker cancellation. Add transaction-safe bulk actions and verify with synthetic fixtures before deployment.
+- Implemented owner/operator identifier display in Settings, import review, and plan choices; viewers retain masked fields and sensitive endpoints use private no-store responses. Applications now group by IPO, support live search/status filters and IPO-wise selection, individual corrections before block/result, and atomic bulk status/cancel actions. Cancellation is retained as audited history and excluded from planner limits and capital. Full `scripts/check.sh` passed: 395 backend, 37 web, and 1 Android test, plus lint, typecheck, migration and production-build gates. Production deployment pending.
+
 ## B12 Import, Funds, plan and per-IPO export polish — deployed, 2026-10-15
 
 - Founder requests readable and resizable import review columns, owner choices after the rows, automatic refresh after import, a clearer Funds workflow with separate Scheduled Payments and Deleted bank history tabs, combined balance history, per-IPO demat exports with exact fields, and a compact draft application table with one Edit action.

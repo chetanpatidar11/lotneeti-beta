@@ -2,11 +2,13 @@ import { formatInr } from "./money";
 
 export type ApplicationHistoryInput = {
   amount: string;
-  status: "PLANNED" | "SUBMITTED" | "BLOCKED" | "ALLOTTED" | "NOT_ALLOTTED";
+  status: "PLANNED" | "SUBMITTED" | "BLOCKED" | "ALLOTTED" | "NOT_ALLOTTED" | "CANCELLED";
   planned_at: string;
   submitted_at: string | null;
   blocked_at: string | null;
   result_at: string | null;
+  edited_at?: string | null;
+  cancelled_at?: string | null;
   allotted_quantity: number | null;
   actual_cost: string | null;
 };
@@ -21,6 +23,12 @@ export function applicationHistory(item: ApplicationHistoryInput): ApplicationHi
   if (item.blocked_at) {
     events.push({ at: item.blocked_at, label: `${formatInr(item.amount)} blocked` });
   }
+  if (item.edited_at) {
+    events.push({ at: item.edited_at, label: "Application details updated" });
+  }
+  if (item.cancelled_at) {
+    events.push({ at: item.cancelled_at, label: "Cancelled in LotNeeti" });
+  }
   if (item.result_at && item.status === "NOT_ALLOTTED") {
     events.push({ at: item.result_at, label: "Not allotted" });
     events.push({ at: item.result_at, label: `${formatInr(item.amount)} released from Blocked; Balance unchanged` });
@@ -30,5 +38,5 @@ export function applicationHistory(item: ApplicationHistoryInput): ApplicationHi
     events.push({ at: item.result_at, label: `${formatInr(item.actual_cost)} deducted from Balance` });
     events.push({ at: item.result_at, label: `${formatInr(item.amount)} released from Blocked` });
   }
-  return events;
+  return events.sort((first, second) => new Date(first.at).getTime() - new Date(second.at).getTime());
 }

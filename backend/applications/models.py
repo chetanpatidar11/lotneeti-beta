@@ -4,6 +4,7 @@ import uuid
 
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 
 
 class Application(models.Model):
@@ -13,6 +14,7 @@ class Application(models.Model):
         BLOCKED = "BLOCKED", "Blocked"
         ALLOTTED = "ALLOTTED", "Allotted"
         NOT_ALLOTTED = "NOT_ALLOTTED", "Not allotted"
+        CANCELLED = "CANCELLED", "Cancelled"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workspace = models.ForeignKey(
@@ -42,6 +44,8 @@ class Application(models.Model):
     submitted_at = models.DateTimeField(null=True, blank=True)
     blocked_at = models.DateTimeField(null=True, blank=True)
     result_at = models.DateTimeField(null=True, blank=True)
+    edited_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
     expected_release_date = models.DateField(null=True, blank=True)
     allotted_quantity = models.PositiveIntegerField(null=True, blank=True)
     actual_cost = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
@@ -51,7 +55,9 @@ class Application(models.Model):
         ordering = ["-planned_at", "-id"]
         constraints = [
             models.UniqueConstraint(
-                fields=["workspace", "ipo", "applicant"], name="unique_workspace_ipo_applicant"
+                fields=["workspace", "ipo", "applicant"],
+                condition=~Q(status="CANCELLED"),
+                name="unique_active_workspace_ipo_applicant",
             )
         ]
 
@@ -76,7 +82,7 @@ class Application(models.Model):
         ):
             return
         row = self.plan_row
-        if (
+        if self.edited_at is None and (
             row.plan_run.workspace_id != self.workspace_id
             or str(self.ipo_id) != row.ipo_ref
             or str(self.applicant_id) != row.applicant_ref

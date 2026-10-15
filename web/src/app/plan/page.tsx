@@ -9,7 +9,7 @@ type Workspace = { id: string; role: string };
 type Investor = { id: string; name: string; planning_priority: number; active: boolean };
 type Bank = { id: string; owner: string; bank_name: string; account_masked: string; account_reference: string; current_balance: string; active: boolean; cross_funding_policy: string };
 type IPO = { id: string; issuer_name: string; upper_price: string; lot_size: number; current_gmp_percent: string | null; close_date: string; status: string };
-type Demat = { id: string; depository: string; dp_id_masked: string; client_id_masked: string; active: boolean };
+type Demat = { id: string; depository: string; dp_id_masked: string; client_id_masked: string; client_id_display: string; active: boolean };
 type UPI = { id: string; handle: string; holder: string; active: boolean; verified: boolean };
 type Preference = { bank: string; priority: number; enabled: boolean };
 type Decision = { ipo: string; selected: boolean; mode: string };
@@ -61,7 +61,7 @@ export default async function PlanPage() {
   const lookups: PlanLookups = {
     ipos: Object.fromEntries(ipos.map((ipo) => [ipo.id, { name: ipo.issuer_name, upperPrice: ipo.upper_price, lotSize: ipo.lot_size, gmpPercent: ipo.current_gmp_percent, closeDate: ipo.close_date }])),
     applicants: Object.fromEntries(investors.map((investor) => [investor.id, { name: investor.name, priority: investor.planning_priority, active: investor.active }])),
-    demats: Object.fromEntries(dematLists.flatMap((group) => group.items.map((demat) => [demat.id, { label: `${demat.depository} ${demat.dp_id_masked} / ${demat.client_id_masked}`, applicant: group.applicant, active: demat.active }]))),
+    demats: Object.fromEntries(dematLists.flatMap((group) => group.items.map((demat) => [demat.id, { label: `${demat.depository} ${demat.dp_id_masked} / ${demat.client_id_display}`, applicant: group.applicant, active: demat.active }]))),
     banks: Object.fromEntries(banks.map((bank) => [bank.id, { label: `${bank.bank_name} ${bank.account_reference || bank.account_masked}`, owner: bank.owner, balance: bank.current_balance, active: bank.active, policy: bank.cross_funding_policy }])),
     upis: Object.fromEntries(upiLists.flatMap((group) => group.items.map((upi) => [upi.id, { label: upi.handle, bank: group.bank, holder: upi.holder, active: upi.active, verified: upi.verified }]))),
     preferences: Object.fromEntries(preferenceLists.map((group) => [group.applicant, group.items])),
