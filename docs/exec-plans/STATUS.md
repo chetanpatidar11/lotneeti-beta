@@ -1,5 +1,10 @@
 # LotNeeti execution status
 
+## E23 Investor deletion with application history — verified locally, 2026-10-15
+
+- Investor Delete now marks `is_deleted=true` and `active=false`, hides the investor from workspace lists and direct investor endpoints, and keeps linked applications, balances, bank history, and saved plan references. Linked demat, bank, UPI, and scheduled payment records become inactive so they cannot enter new plans or continue scheduled balance changes. Other account types retain their existing deletion rules.
+- Settings confirmation text explains this behavior. Focused tests cover deletion with an application, continued application cancellation, retained balance history, linked account deactivation, and exclusion from new planner snapshots. Full `scripts/check.sh` passed: 398 backend, 38 web, and 1 Android test plus lint, typecheck, migration and build checks. Deployment pending.
+
 ## E22 Intentional cross-funding notices — deployed, 2026-10-15
 
 - The founder asked to remove duplicate “Needs review” messages for intentional cross-funding and the bank WARN preference; the Funding Type column already identifies the choice. The planner still emits and retains its warning codes for deterministic validation and audit, while the web presentation filters those two notices from row messages and status. Cash, limit, and blocking issues remain visible. Web tests, lint, typecheck, and production build passed.

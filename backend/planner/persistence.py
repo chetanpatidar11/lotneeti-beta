@@ -22,7 +22,7 @@ def _verify_scope(workspace, snapshot: PlannerSnapshot) -> None:
     checks = (
         (
             {item.id for item in snapshot.applicants},
-            Investor.objects.filter(workspace=workspace),
+            Investor.objects.filter(workspace=workspace, is_deleted=False),
             "applicants",
         ),
         (

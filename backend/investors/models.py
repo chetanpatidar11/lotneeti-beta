@@ -22,6 +22,7 @@ class Investor(models.Model):
         default=1, validators=[MinValueValidator(1)]
     )
     active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False, db_index=True)
     payment_setup_pending = models.BooleanField(default=False)
     payment_hint_ciphertext = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

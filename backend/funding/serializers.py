@@ -62,7 +62,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
         fields = super().get_fields()
         workspace = self.context.get("workspace")
         if workspace is not None:
-            scoped_investors = Investor.objects.filter(workspace=workspace)
+            scoped_investors = Investor.objects.filter(workspace=workspace, is_deleted=False)
             fields["owner"].queryset = scoped_investors
             fields["restricted_investor"].queryset = scoped_investors
         return fields
@@ -211,7 +211,9 @@ class UPIHandleSerializer(serializers.ModelSerializer):
         fields = super().get_fields()
         bank = self.context.get("bank")
         if bank is not None:
-            fields["holder"].queryset = Investor.objects.filter(workspace=bank.workspace)
+            fields["holder"].queryset = Investor.objects.filter(
+                workspace=bank.workspace, is_deleted=False
+            )
             fields["bank_id"].queryset = BankAccount.objects.filter(workspace=bank.workspace)
         return fields
 
@@ -294,6 +296,13 @@ class RecurringDebitSerializer(serializers.ModelSerializer):
         extra_kwargs = {"next_due_date": {"required": False}}
 
     def validate(self, attrs):
+        bank = self.context["bank"]
+        if attrs.get("active", self.instance.active if self.instance else True) and (
+            not bank.active or bank.owner.is_deleted
+        ):
+            raise serializers.ValidationError(
+                {"active": "Activate the bank account owner and bank before scheduling payments."}
+            )
         start_date = attrs.get("start_date", getattr(self.instance, "start_date", None))
         next_due_date = attrs.get("next_due_date", getattr(self.instance, "next_due_date", None))
         if next_due_date is None and start_date is not None:

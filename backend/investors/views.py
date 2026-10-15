@@ -34,7 +34,7 @@ class InvestorViewSet(
         )
 
     def get_queryset(self):
-        return Investor.objects.filter(workspace=self.get_workspace()).order_by(
+        return Investor.objects.filter(workspace=self.get_workspace(), is_deleted=False).order_by(
             "planning_priority", "id"
         )
 
@@ -85,7 +85,9 @@ class DematAccountViewSet(
 
     def get_investor(self):
         return get_object_or_404(
-            Investor.objects.filter(workspace__memberships__user=self.request.user),
+            Investor.objects.filter(
+                workspace__memberships__user=self.request.user, is_deleted=False
+            ),
             pk=self.kwargs["investor_id"],
             workspace_id=self.kwargs["workspace_id"],
         )

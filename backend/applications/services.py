@@ -36,7 +36,9 @@ def start_tracking_plan(*, plan_run, actor) -> tuple[Application, ...]:
     tracked = []
     for row in plan_run.rows.all():
         ipo = IPO.objects.get(pk=row.ipo_ref)
-        applicant = Investor.objects.get(pk=row.applicant_ref, workspace=workspace)
+        applicant = Investor.objects.get(
+            pk=row.applicant_ref, workspace=workspace, is_deleted=False
+        )
         demat = DematAccount.objects.get(pk=row.demat_ref, investor__workspace=workspace)
         bank = BankAccount.objects.get(pk=row.bank_ref, workspace=workspace)
         upi = UPIHandle.objects.get(pk=row.upi_ref, bank__workspace=workspace)

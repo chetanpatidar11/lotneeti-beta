@@ -145,7 +145,7 @@ export default function PrioritySettings({
   const selectedActiveInvestors = visibleInvestors.filter((investor) => investor.active && selected.investor.includes(investor.id)).map((investor) => investor.id);
   const selectedInactiveInvestors = visibleInvestors.filter((investor) => !investor.active && selected.investor.includes(investor.id)).map((investor) => investor.id);
   const focusedInvestor = investors.find((investor) => investor.id === selectedInvestor);
-  const investorName = (id: string) => investors.find((item) => item.id === id)?.name ?? "Investor";
+  const investorName = (id: string) => investors.find((item) => item.id === id)?.name ?? "Deleted investor";
   const dematRows = Object.entries(linkedAccounts).flatMap(([owner, accounts]) => accounts.demats.map((demat) => ({
     id: demat.id, name: `${demat.depository} · ${demat.client_id_display}`, owner: investorName(owner),
     detail: demat.broker || "Broker not set", active: demat.active,
@@ -479,7 +479,7 @@ export default function PrioritySettings({
           .map(([investorId, rows]) => [investorId, kind === "bank" ? rows.filter((row) => !deleted.has(row.bank)) : rows])));
       }
       if (kind === "investor" && selectedInvestor && ids.includes(selectedInvestor)) setSelectedInvestor(null);
-      note(`${ids.length} ${labelForKind[kind]}${ids.length === 1 ? "" : "s"} ${action === "delete" ? "permanently deleted" : action === "activate" ? "activated" : "deactivated"}.`);
+      note(`${ids.length} ${labelForKind[kind]}${ids.length === 1 ? "" : "s"} ${action === "delete" ? kind === "investor" ? "removed from Investors" : "permanently deleted" : action === "activate" ? "activated" : "deactivated"}.`);
     } catch (error) {
       note(error instanceof Error ? error.message : "We could not change these items. Please try again.", true);
     } finally {
@@ -495,8 +495,8 @@ export default function PrioritySettings({
 
   const pendingCount = pendingRemoval?.ids.length ?? 0;
   const pendingName = pendingRemoval ? labelForKind[pendingRemoval.kind] : "item";
-  const confirmationDetail = pendingRemoval?.kind === "investor" || pendingRemoval?.kind === "bank"
-    ? "Linked accounts without applications will also be deleted. Bank balance history stays in Funds."
+  const confirmationDetail = pendingRemoval?.kind === "bank"
+    ? "Bank balance history stays in Funds."
     : "";
 
   return <main className="page settings-page"><div className="shell settings-shell">
@@ -581,7 +581,7 @@ export default function PrioritySettings({
       </form></Drawer>}
       {focusedInvestor && <Drawer title={focusedInvestor.name} onClose={() => setSelectedInvestor(null)}><div className="settings-investor-detail"><p><strong>PAN</strong><span>{focusedInvestor.pan_display}</span></p><p><strong>Status</strong><StatusBadge tone={!focusedInvestor.active ? "neutral" : focusedInvestor.payment_ready ? "positive" : "warning"}>{!focusedInvestor.active ? "Inactive" : focusedInvestor.payment_ready ? "Active" : "Payment needed"}</StatusBadge></p>{!focusedInvestor.payment_ready && <p><strong>UPI reference</strong><span>{focusedInvestor.payment_hint} · Complete and activate the linked bank before planning.</span></p>}</div><div className="settings-linked"><h3>Demat Account</h3>{linkedAccounts[focusedInvestor.id]?.demats.length ? linkedAccounts[focusedInvestor.id].demats.map((demat) => <p key={demat.id}>{demat.depository} · {demat.dp_id_masked} / {demat.client_id_display} <small>{demat.broker} · {demat.active ? "Active" : "Inactive"}</small></p>) : <p>No demat account yet.</p>}<h3>Bank Accounts</h3>{banks.filter((bank) => bank.owner === focusedInvestor.id).map((bank) => <p key={bank.id}>{bank.bank_name || "BANK"} · {bank.account_reference || bank.account_masked} <small>{bank.active ? "Active" : "Inactive"}</small></p>)}<h3>UPIs</h3>{linkedAccounts[focusedInvestor.id]?.upis.length ? linkedAccounts[focusedInvestor.id].upis.map((upi) => <p key={upi.id}>{upi.handle} <small>{upi.verified ? "Ready" : "Not ready"} · {upi.active ? "Active" : "Inactive"}</small></p>) : <p>No UPIs yet.</p>}</div>{focusedInvestor.active && <PreferredFunding key={focusedInvestor.id} workspaceId={workspace.id} investor={focusedInvestor} investors={activeInvestors} banks={banks.filter((bank) => bank.active)} initialPreferences={preferences[focusedInvestor.id] ?? []} canEdit={canEdit} />}</Drawer>}
       {showAddInvestor && <Drawer title="Add investor" onClose={() => setShowAddInvestor(false)}><form onSubmit={addInvestor} className="sign-in-form"><label htmlFor="investor-name">Name</label><input id="investor-name" required value={name} onChange={(event) => setName(event.target.value)} /><label htmlFor="investor-pan">PAN</label><input id="investor-pan" required maxLength={10} autoComplete="off" value={pan} onChange={(event) => setPan(event.target.value)} /><button type="submit" disabled={busy}>Add investor</button></form></Drawer>}
-      {pendingRemoval && <ConfirmationDialog title={`Permanently delete ${pendingCount} ${pendingName}${pendingCount === 1 ? "" : "s"}?`} description={`These records cannot be restored. ${pendingRemoval.kind === "bank" || pendingRemoval.kind === "investor" ? "Bank balance history stays in Funds. Accounts linked to applications cannot be deleted." : "Records linked to applications cannot be deleted."} ${confirmationDetail}`} confirmLabel={`Delete ${pendingCount === 1 ? pendingName : "selected"}`} busy={busy} onCancel={() => setPendingRemoval(null)} onConfirm={() => void updateItems(pendingRemoval.kind, pendingRemoval.ids, "delete")} />}
+      {pendingRemoval && <ConfirmationDialog title={pendingRemoval.kind === "investor" ? `Delete ${pendingCount} ${pendingName}${pendingCount === 1 ? "" : "s"}?` : `Permanently delete ${pendingCount} ${pendingName}${pendingCount === 1 ? "" : "s"}?`} description={pendingRemoval.kind === "investor" ? "The investor will leave the Investors list. Linked accounts will be deactivated, while application and balance history stay available." : `These records cannot be restored. Records linked to applications cannot be deleted. ${confirmationDetail}`} confirmLabel={`Delete ${pendingCount === 1 ? pendingName : "selected"}`} busy={busy} onCancel={() => setPendingRemoval(null)} onConfirm={() => void updateItems(pendingRemoval.kind, pendingRemoval.ids, "delete")} />}
     </>}
   </div></main>;
 }

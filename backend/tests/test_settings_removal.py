@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 import pytest
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework.test import APIClient
 from test_planner_persistence import setup_plan
@@ -19,6 +20,7 @@ from funding.models import (
 from investors.models import DematAccount, Investor
 from planner.models import PlanRun
 from planner.persistence import create_plan_run
+from planner.snapshot_builder import build_snapshot
 
 
 def create_investor(workspace, name, pan):
@@ -112,7 +114,7 @@ def test_bulk_investor_removal_archives_linked_accounts_and_can_be_restored():
 
 
 @pytest.mark.django_db
-def test_settings_deactivate_activate_and_permanent_delete_are_distinct():
+def test_settings_deactivate_activate_and_soft_delete_are_distinct():
     owner = User.objects.create_user(email="owner@example.test")
     workspace = create_workspace(name="Synthetic", owner=owner)
     investor = create_investor(workspace, "First", "TESTX0001A")
@@ -147,11 +149,24 @@ def test_settings_deactivate_activate_and_permanent_delete_are_distinct():
         url, {"kind": "investor", "action": "delete", "ids": [str(investor.pk)]}, format="json"
     )
     assert deleted.status_code == 200
-    assert not Investor.objects.filter(pk=investor.pk).exists()
-    assert not DematAccount.objects.filter(pk=demat.pk).exists()
-    assert not BankAccount.objects.filter(pk=bank.pk).exists()
-    assert not UPIHandle.objects.filter(pk=upi.pk).exists()
-    assert not BalanceChange.objects.filter(bank_id=bank.pk).exists()
+    investor.refresh_from_db()
+    assert investor.is_deleted is True and investor.active is False
+    for item in (demat, bank, upi):
+        item.refresh_from_db()
+        assert item.active is False
+    assert BalanceChange.objects.filter(bank=bank).exists()
+    assert client.get(reverse("investor-list", args=[workspace.pk])).data == []
+    assert (
+        client.get(reverse("investor-detail", args=[workspace.pk, investor.pk])).status_code == 404
+    )
+    assert (
+        client.post(
+            url,
+            {"kind": "investor", "action": "activate", "ids": [str(investor.pk)]},
+            format="json",
+        ).status_code
+        == 404
+    )
     assert AuditEvent.objects.filter(action="investor.deleted", workspace=workspace).exists()
 
 
@@ -238,7 +253,7 @@ def test_bank_with_recorded_nonzero_balance_can_be_deleted_without_losing_histor
 
 
 @pytest.mark.django_db
-def test_deleting_investor_archives_linked_bank_history():
+def test_deleting_investor_preserves_linked_bank_history():
     owner = User.objects.create_user(email="owner@example.test")
     workspace = create_workspace(name="Synthetic", owner=owner)
     investor = create_investor(workspace, "First", "TESTX0001A")
@@ -251,6 +266,14 @@ def test_deleting_investor_archives_linked_bank_history():
         new_balance=500,
         actor=owner,
     )
+    schedule = RecurringDebit.objects.create(
+        bank=bank,
+        name="Synthetic payment",
+        amount=Decimal("50.00"),
+        frequency=RecurringDebit.Frequency.MONTHLY,
+        start_date="2026-10-01",
+        next_due_date="2026-10-01",
+    )
     client = APIClient()
     client.force_authenticate(owner)
     response = client.post(
@@ -259,8 +282,13 @@ def test_deleting_investor_archives_linked_bank_history():
         format="json",
     )
     assert response.status_code == 200
-    assert not Investor.objects.filter(pk=investor.pk).exists()
-    assert not BankAccount.objects.filter(pk=bank.pk).exists()
+    investor.refresh_from_db()
+    bank.refresh_from_db()
+    assert investor.is_deleted is True and investor.active is False
+    assert bank.active is False and bank.current_balance == Decimal("500.00")
+    assert BalanceChange.objects.filter(bank=bank).count() == 1
+    schedule.refresh_from_db()
+    assert schedule.active is False
     history = client.get(reverse("bank-balance-history", args=[workspace.pk, bank.pk]))
     assert history.status_code == 200
     assert history.data[0]["balance"] == "500.00"
@@ -288,10 +316,56 @@ def test_deleting_investor_keeps_saved_plan_snapshot():
         format="json",
     )
     assert response.status_code == 200
-    assert not Investor.objects.filter(pk=investor_id).exists()
+    assert Investor.objects.get(pk=investor_id).is_deleted is True
     assert PlanRun.objects.filter(pk=run.pk).exists()
     assert run.rows.filter(applicant_ref=investor_id, bank_ref=bank_id).exists()
-    assert ArchivedBalanceChange.objects.filter(bank_ref=bank_id).exists()
+    assert BalanceChange.objects.filter(bank_id=bank_id).exists()
+
+
+@pytest.mark.django_db
+@override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="ALLOW")
+def test_delete_investor_linked_to_application_keeps_tracking_and_hides_from_list():
+    owner, workspace, snapshot = setup_plan()
+    run = create_plan_run(workspace=workspace, snapshot=snapshot, actor=owner)
+    client = APIClient()
+    client.force_authenticate(owner)
+    tracked = client.post(reverse("application-start-tracking", args=[workspace.pk, run.pk]), {})
+    assert tracked.status_code == 201
+    application = Application.objects.get()
+
+    deleted = client.post(
+        selection_url(workspace),
+        {"kind": "investor", "action": "delete", "ids": [str(application.applicant_id)]},
+        format="json",
+    )
+
+    assert deleted.status_code == 200
+    application.refresh_from_db()
+    assert application.applicant.is_deleted is True
+    assert application.applicant.active is False
+    assert application.demat.active is False
+    assert application.bank.active is False
+    assert application.upi.active is False
+    assert client.get(reverse("investor-list", args=[workspace.pk])).data == []
+    assert Application.objects.filter(pk=application.pk).exists()
+    next_snapshot = build_snapshot(workspace=workspace, as_of=snapshot.as_of)
+    assert str(application.applicant_id) not in {item.id for item in next_snapshot.applicants}
+    assert (
+        client.post(
+            reverse("application-action", args=[workspace.pk, application.pk, "cancel"])
+        ).status_code
+        == 200
+    )
+    application.refresh_from_db()
+    assert application.status == Application.Status.CANCELLED
+    assert (
+        client.post(
+            selection_url(workspace),
+            {"kind": "bank", "action": "activate", "ids": [str(application.bank_id)]},
+            format="json",
+        ).status_code
+        == 400
+    )
 
 
 @pytest.mark.django_db

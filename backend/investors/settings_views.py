@@ -43,7 +43,7 @@ OPEN_APPLICATION_STATES = (
 
 def _queryset(kind, workspace):
     if kind == "investor":
-        return Investor.objects.filter(workspace=workspace)
+        return Investor.objects.filter(workspace=workspace, is_deleted=False)
     if kind == "demat":
         return DematAccount.objects.filter(investor__workspace=workspace)
     if kind == "bank":
@@ -87,9 +87,19 @@ def _check_removal(kind, ids, workspace):
 
 
 def _check_restore(kind, ids):
-    if kind == "demat" and DematAccount.objects.filter(pk__in=ids, investor__active=False).exists():
+    if (
+        kind == "demat"
+        and DematAccount.objects.filter(pk__in=ids)
+        .filter(Q(investor__active=False) | Q(investor__is_deleted=True))
+        .exists()
+    ):
         raise ValidationError({"message": "Restore the investor first."})
-    if kind == "bank" and BankAccount.objects.filter(pk__in=ids, owner__active=False).exists():
+    if (
+        kind == "bank"
+        and BankAccount.objects.filter(pk__in=ids)
+        .filter(Q(owner__active=False) | Q(owner__is_deleted=True))
+        .exists()
+    ):
         raise ValidationError({"message": "Restore the investor first."})
     if kind == "bank" and BankAccount.objects.filter(pk__in=ids, is_placeholder=True).exists():
         raise ValidationError(
@@ -98,7 +108,12 @@ def _check_restore(kind, ids):
     if (
         kind == "upi"
         and UPIHandle.objects.filter(pk__in=ids)
-        .filter(Q(bank__active=False) | Q(holder__active=False))
+        .filter(
+            Q(bank__active=False)
+            | Q(holder__active=False)
+            | Q(bank__owner__is_deleted=True)
+            | Q(holder__is_deleted=True)
+        )
         .exists()
     ):
         raise ValidationError({"message": "Restore the investor and bank first."})
@@ -238,12 +253,7 @@ def _archive_bank_balance_history(bank, workspace):
 
 
 def _delete_item(item, kind, request, workspace):
-    if kind == "investor":
-        banks = list(BankAccount.objects.filter(owner=item).select_for_update())
-        for bank in banks:
-            _archive_bank_balance_history(bank, workspace)
-            bank.delete()
-    elif kind == "bank":
+    if kind == "bank":
         _archive_bank_balance_history(item, workspace)
     record_event(action=f"{kind}.deleted", target=item, actor=request.user, workspace=workspace)
     item.delete()
@@ -274,6 +284,45 @@ class SettingsItemsView(APIView):
             elif action in {"restore", "activate"}:
                 _check_restore(kind, ids)
             else:
+                if kind == "investor":
+                    owned_banks = BankAccount.objects.filter(workspace=workspace, owner_id__in=ids)
+                    # Keep foreign keys and financial history intact for saved applications.
+                    # Inactive children cannot enter a future plan.
+                    list(owned_banks.select_for_update())
+                    _archive_related(
+                        DematAccount.objects.filter(investor_id__in=ids),
+                        "demat",
+                        request,
+                        workspace,
+                    )
+                    _archive_related(
+                        UPIHandle.objects.filter(bank__workspace=workspace).filter(
+                            Q(bank__in=owned_banks) | Q(holder_id__in=ids)
+                        ),
+                        "upi",
+                        request,
+                        workspace,
+                    )
+                    _archive_related(owned_banks, "bank", request, workspace)
+                    _archive_related(
+                        RecurringDebit.objects.filter(
+                            bank__in=owned_banks, active=True, archived_at__isnull=True
+                        ),
+                        "recurring_debit",
+                        request,
+                        workspace,
+                    )
+                    for item in items:
+                        item.active = False
+                        item.is_deleted = True
+                        item.save(update_fields=["active", "is_deleted", "updated_at"])
+                        record_event(
+                            action="investor.deleted",
+                            target=item,
+                            actor=request.user,
+                            workspace=workspace,
+                        )
+                    return Response({"updated": len(items)})
                 _check_permanent_delete(kind, ids, workspace)
                 try:
                     for item in items:

@@ -101,7 +101,7 @@ def build_snapshot(
     if ipo_ids is not None and ipo_ids != {ipo.id for ipo in selected_ipos}:
         raise ValidationError("Requested IPOs must be published, selected and open for planning")
 
-    investors = list(Investor.objects.filter(workspace=workspace).order_by("id"))
+    investors = list(Investor.objects.filter(workspace=workspace, is_deleted=False).order_by("id"))
     demats = DematAccount.objects.filter(investor__workspace=workspace).order_by("id")
     banks = list(BankAccount.objects.filter(workspace=workspace).order_by("id"))
     upis = list(UPIHandle.objects.filter(bank__workspace=workspace).order_by("id"))

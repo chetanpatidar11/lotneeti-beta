@@ -32,15 +32,17 @@ export function applySettingsAction<
 >(state: AccountState<I, B, D, U>, kind: SettingsKind, values: string[], action: SettingsAction): AccountState<I, B, D, U> {
   const ids = new Set(values);
   if (action === "delete") {
-    const removedBankIds = new Set(state.banks.filter((bank) => kind === "investor" && ids.has(bank.owner) || kind === "bank" && ids.has(bank.id)).map((bank) => bank.id));
+    const removedBankIds = new Set(state.banks.filter((bank) => kind === "bank" && ids.has(bank.id)).map((bank) => bank.id));
+    const inactiveBankIds = new Set(state.banks.filter((bank) => kind === "investor" && ids.has(bank.owner)).map((bank) => bank.id));
     return {
       investors: kind === "investor" ? state.investors.filter((item) => !ids.has(item.id)) : state.investors,
-      banks: state.banks.filter((bank) => !removedBankIds.has(bank.id)),
+      banks: setActive(state.banks.filter((bank) => !removedBankIds.has(bank.id)), inactiveBankIds, false),
       linkedAccounts: Object.fromEntries(Object.entries(state.linkedAccounts)
         .filter(([owner]) => kind !== "investor" || !ids.has(owner))
         .map(([owner, accounts]) => [owner, {
           demats: kind === "demat" ? accounts.demats.filter((item) => !ids.has(item.id)) : accounts.demats,
-          upis: accounts.upis.filter((upi) => !(kind === "upi" && ids.has(upi.id)) && !removedBankIds.has(upi.bank_id)),
+          upis: accounts.upis.filter((upi) => !(kind === "upi" && ids.has(upi.id)) && !removedBankIds.has(upi.bank_id))
+            .map((upi) => kind === "investor" && (ids.has(upi.holder) || inactiveBankIds.has(upi.bank_id)) ? { ...upi, active: false } : upi),
         }])),
     };
   }

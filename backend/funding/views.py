@@ -186,7 +186,9 @@ class FundingPreferenceViewSet(
 
     def get_beneficiary(self):
         return get_object_or_404(
-            Investor.objects.filter(workspace__memberships__user=self.request.user),
+            Investor.objects.filter(
+                workspace__memberships__user=self.request.user, is_deleted=False
+            ),
             workspace_id=self.kwargs["workspace_id"],
             pk=self.kwargs["investor_id"],
         )
