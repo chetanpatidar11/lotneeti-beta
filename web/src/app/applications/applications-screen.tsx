@@ -102,6 +102,8 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
   const [items, setItems] = useState(initialItems);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [editError, setEditError] = useState("");
+  const [resultError, setResultError] = useState("");
   const [message, setMessage] = useState("");
   const [filter, setFilter] = useState<Filter>("ACTIVE");
   const [ipoFilter, setIpoFilter] = useState("ALL");
@@ -146,7 +148,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
     try {
       const response = await fetch(`/api/workspaces/${workspaceId}/planner/runs/${latestRun.id}/track`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
       const result = await response.json();
-      if (!response.ok) throw new Error("We could not start tracking this plan.");
+      if (!response.ok) throw new Error(await responseError(response, "We could not start tracking this plan."));
       setItems((current) => {
         const tracked = result as ApplicationItem[];
         const trackedIds = new Set(tracked.map((item) => item.id));
@@ -162,13 +164,16 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
   async function update(item: ApplicationItem, action: "submit" | "block" | "not-allotted") {
     setBusy(true);
     setError("");
+    setResultError("");
     try {
       const response = await fetch(`/api/workspaces/${workspaceId}/applications/${item.id}/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
       if (!response.ok) throw new Error(await responseError(response, "We could not update this application."));
       replaceItems([await response.json() as ApplicationItem]);
       setResultId(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "We could not update this application.");
+      const message = caught instanceof Error ? caught.message : "We could not update this application.";
+      if (resultId) setResultError(message);
+      else setError(message);
     } finally {
       setBusy(false);
     }
@@ -197,6 +202,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
     setEditUpi(item.upi);
     setEditLoading(true);
     setError("");
+    setEditError("");
     try {
       const response = await fetch(`/api/workspaces/${workspaceId}/banks`);
       if (!response.ok) throw new Error("Bank accounts could not be loaded.");
@@ -208,27 +214,27 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
       }));
       setBanks(loadedBanks);
       setUpis(upiResponses.flat());
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "Account choices could not be loaded."); }
+    } catch (caught) { setEditError(caught instanceof Error ? caught.message : "Account choices could not be loaded."); }
     finally { setEditLoading(false); }
   }
 
   async function saveEdit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editItem) return;
-    setBusy(true); setError(""); setMessage("");
+    setBusy(true); setEditError(""); setMessage("");
     try {
       const response = await fetch(`/api/workspaces/${workspaceId}/applications/${editItem.id}/edit`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ category: editCategory, lots: editLots, bank: editBank, upi: editUpi }) });
       if (!response.ok) throw new Error(await responseError(response, "We could not save this application."));
       replaceItems([await response.json() as ApplicationItem]);
       setEditId(null);
       setMessage("Application details updated.");
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "We could not save this application."); }
+    } catch (caught) { setEditError(caught instanceof Error ? caught.message : "We could not save this application."); }
     finally { setBusy(false); }
   }
 
   async function recordAllotment(item: ApplicationItem, quantity: number, actualCost: string) {
     setBusy(true);
-    setError("");
+    setResultError("");
     try {
       const response = await fetch(`/api/workspaces/${workspaceId}/applications/${item.id}/allotted`, {
         method: "POST", headers: { "content-type": "application/json" },
@@ -239,7 +245,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
       setItems((current) => current.map((entry) => entry.id === item.id ? result as ApplicationItem : entry));
       setResultId(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "We could not record this allotment.");
+      setResultError(caught instanceof Error ? caught.message : "We could not record this allotment.");
     } finally {
       setBusy(false);
     }
@@ -278,7 +284,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
             <td data-label="Actions"><div className="application-row-actions">
               {canEdit && item.status === "PLANNED" && <button type="button" disabled={busy} onClick={() => void update(item, "submit")}>Mark submitted</button>}
               {canEdit && item.status === "SUBMITTED" && <button type="button" disabled={busy} onClick={() => void update(item, "block")}>Mark blocked</button>}
-              {canEdit && item.status === "BLOCKED" && <button type="button" disabled={busy} onClick={() => setResultId(item.id)}>Record result</button>}
+              {canEdit && item.status === "BLOCKED" && <button type="button" disabled={busy} onClick={() => { setResultError(""); setResultId(item.id); }}>Record result</button>}
               {canEdit && (item.status === "PLANNED" || item.status === "SUBMITTED") && <button type="button" className="button-secondary" disabled={busy} onClick={() => void openEdit(item)}>Edit</button>}
               {canEdit && canCancel(item) && <button type="button" className="button-ghost-danger" disabled={busy} onClick={() => setPendingCancelIds([item.id])}>Cancel</button>}
               {item.status === "ALLOTTED" && <Link className="button-secondary" href="/portfolio">View holding</Link>}
@@ -294,7 +300,8 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
       {selectedItem.status === "ALLOTTED" && <Link href="/portfolio">View holding →</Link>}
     </Drawer>}
     {editItem && <Drawer title={`Edit ${editItem.applicant_name} · ${editItem.ipo_name}`} onClose={() => setEditId(null)}>
-      <p className="intro">Update the application you track here. If it was submitted through a broker or bank, update or cancel it there separately.</p>
+      <p className="intro">Update the application you track here. An earlier plan export will still show its original details. If this was submitted through a broker or bank, update or cancel it there separately.</p>
+      {editError && <div className="plan-error" role="alert">{editError}</div>}
       {editLoading ? <p>Loading bank and UPI choices…</p> : <form className="sign-in-form" onSubmit={(event) => void saveEdit(event)}>
         <label htmlFor="application-edit-category">Category</label><select id="application-edit-category" value={editCategory} onChange={(event) => { setEditCategory(event.target.value); if (event.target.value === "RETAIL") setEditLots(1); }}><option value="RETAIL">Retail</option><option value="SHNI">sHNI</option></select>
         <label htmlFor="application-edit-lots">Lots</label><input id="application-edit-lots" type="number" min="1" step="1" required value={editLots} disabled={editCategory === "RETAIL"} onChange={(event) => setEditLots(Number(event.target.value))} />
@@ -306,6 +313,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
     </Drawer>}
     {resultItem && <Drawer title="Record application result" onClose={() => setResultId(null)}>
       <p className="intro">{resultItem.applicant_name} · {resultItem.ipo_name} · {formatInr(resultItem.amount)} blocked</p>
+      {resultError && <div className="plan-error" role="alert">{resultError}</div>}
       <p>Recording the result releases the full application block. An allotment also deducts the actual cost from Balance.</p>
       <div className="result-options"><h3>Not allotted</h3><button className="button-secondary" type="button" disabled={busy} onClick={() => void update(resultItem, "not-allotted")}>Record not allotted</button></div>
       <div className="result-options"><h3>Allotted</h3><AllotmentForm item={resultItem} busy={busy} onSave={(quantity, actualCost) => void recordAllotment(resultItem, quantity, actualCost)} /></div>
