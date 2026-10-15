@@ -3,7 +3,8 @@
 ## E23 Investor deletion with application history — verified locally, 2026-10-15
 
 - Investor Delete now marks `is_deleted=true` and `active=false`, hides the investor from workspace lists and direct investor endpoints, and keeps linked applications, balances, bank history, and saved plan references. Linked demat, bank, UPI, and scheduled payment records become inactive so they cannot enter new plans or continue scheduled balance changes. Other account types retain their existing deletion rules.
-- Settings confirmation text explains this behavior. Focused tests cover deletion with an application, continued application cancellation, retained balance history, linked account deactivation, and exclusion from new planner snapshots. Full `scripts/check.sh` passed: 398 backend, 38 web, and 1 Android test plus lint, typecheck, migration and build checks. Deployment pending.
+- Settings confirmation text explains this behavior. Focused tests cover deletion with an application, continued application cancellation, retained balance history, linked account deactivation, and exclusion from new planner snapshots. Full `scripts/check.sh` passed: 398 backend, 38 web, and 1 Android test plus lint, typecheck, migration and build checks.
+- Commit `a881dea` was pushed to the working branch. This Codex task cannot read the VS Code AWS CLI login cache (filesystem permission denied), and the app denied computer control of VS Code. The live deployment is therefore pending. `deploy/release-from-vscode.sh` provides one command for the already signed-in VS Code terminal; it verifies the AWS account/server, creates a temporary SSH key, runs the encrypted backup, deploys and checks the HTTPS health endpoint. Script syntax was checked locally; it has not been executed.
 
 ## E22 Intentional cross-funding notices — deployed, 2026-10-15
 
