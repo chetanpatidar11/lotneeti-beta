@@ -1,10 +1,11 @@
 # LotNeeti execution status
 
-## B12 Import, Funds, plan and per-IPO export polish — in progress, 2026-10-15
+## B12 Import, Funds, plan and per-IPO export polish — deployed, 2026-10-15
 
 - Founder requests readable and resizable import review columns, owner choices after the rows, automatic refresh after import, a clearer Funds workflow with separate Scheduled Payments and Deleted bank history tabs, combined balance history, per-IPO demat exports with exact fields, and a compact draft application table with one Edit action.
-- Implement and verify these changes using synthetic data. Keep export files private and workspace scoped. Deployment pending.
-- Implementation complete: import review now has full text and resizable columns, refreshed success state, and owner choices below rows; Funds now has Accounts, combined paginated Bank statement, Scheduled Payments, and Deleted bank history tabs; balance actions require an explicit bank choice; drafts are grouped by IPO with one Edit drawer; each IPO exports the requested eight-column CSV with bank details blank. Full `scripts/check.sh` passed (391 backend, 37 web, 1 Android tests; lint, typecheck, migrations, builds). Live deployment pending.
+- Implemented and verified these changes using synthetic data. Export files remain private and workspace scoped.
+- Import review now has full text and resizable columns, refreshed success state, and owner choices below rows; Funds has Accounts, combined paginated Bank statement, Scheduled Payments, and Deleted bank history tabs; balance actions require an explicit bank choice; drafts are grouped by IPO with one Edit drawer; each IPO exports the requested eight-column CSV with bank details blank. Full `scripts/check.sh` passed (391 backend, 37 web, 1 Android tests; lint, typecheck, migrations, builds).
+- Encrypted production backup succeeded before deployment. Commit `dea2368` was pushed and archive SHA-256 `af6e2b7bcfb61a98f684e7076bd6d66053b7076f355b7338ce7b2fb831edb359` deployed to `https://lotneeti.dpdns.org/`. Migration `exports.0002_ipo_export_name` applied. Home, sign-in, and Funds returned HTTPS 200 with valid TLS; API health returned OK; application and infrastructure services were active. No live customer workbook was imported by the agent.
 
 ## B11 shared UPI owner choices — deployed, 2026-10-14
 
