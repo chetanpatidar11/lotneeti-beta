@@ -1,10 +1,10 @@
 # LotNeeti execution status
 
-## E23 Investor deletion with application history — verified locally, 2026-10-15
+## E23 Investor deletion with application history — deployed, 2026-10-16
 
 - Investor Delete now marks `is_deleted=true` and `active=false`, hides the investor from workspace lists and direct investor endpoints, and keeps linked applications, balances, bank history, and saved plan references. Linked demat, bank, UPI, and scheduled payment records become inactive so they cannot enter new plans or continue scheduled balance changes. Other account types retain their existing deletion rules.
 - Settings confirmation text explains this behavior. Focused tests cover deletion with an application, continued application cancellation, retained balance history, linked account deactivation, and exclusion from new planner snapshots. Full `scripts/check.sh` passed: 398 backend, 38 web, and 1 Android test plus lint, typecheck, migration and build checks.
-- Commit `a881dea` was pushed to the working branch. This Codex task cannot read the VS Code AWS CLI login cache (filesystem permission denied), and the app denied computer control of VS Code. The live deployment is therefore pending. `deploy/release-from-vscode.sh` provides one command for the already signed-in VS Code terminal; it verifies the AWS account/server, creates a temporary SSH key, runs the encrypted backup, deploys and checks the HTTPS health endpoint. Script syntax was checked locally; it has not been executed.
+- Commit `a881dea` and the one-command release helper `6101bf6` were pushed to the working branch. After a new turn, AWS CLI access returned. The workstation IP had changed, so the existing single-IP SSH rule was updated from `94.203.43.222/32` to `94.203.42.15/32`; ports 80/443 were unchanged. An encrypted pre-release backup succeeded. Release archive SHA-256 `1249eb6a27840f8565202829675ca69741a6abc6d21d1bc97bc47fb3841d5ece` deployed to `https://lotneeti.dpdns.org/`, and migration `investors.0006_investor_is_deleted` applied. Django system check passed, public home/sign-in/API health returned HTTPS 200 with valid TLS, and EC2 instance/system checks were both `ok`. No customer records were modified during release verification.
 
 ## E22 Intentional cross-funding notices — deployed, 2026-10-15
 
