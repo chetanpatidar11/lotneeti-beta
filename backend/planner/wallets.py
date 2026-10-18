@@ -25,6 +25,7 @@ def _choose_wallet(
     shni: bool,
 ) -> WalletChoice | None:
     ipo_by_id = {item.id: item for item in snapshot.ipos}
+    upi_by_id = {item.id: item for item in snapshot.upis}
     allocations = tuple(
         PlannedAllocation(
             id=f"{row.ipo_id}:{row.applicant_id}",
@@ -39,21 +40,19 @@ def _choose_wallet(
         for row in rows
         if row.ipo_id in ipo_by_id and row.amount > 0
     )
-    rolling = RollingLimitTracker(
-        snapshot.rolling_usage
-        + tuple(
-            RollingUsageInput(
-                id=f"planned:{row.ipo_id}:{row.applicant_id}",
-                bank_id=row.bank_id,
-                upi_id=row.upi_id,
-                amount=row.amount,
-                submitted_at=application_cutoff(ipo_by_id[row.ipo_id], row.category),
-                cancelled=False,
-            )
-            for row in rows
-            if row.ipo_id in ipo_by_id and row.amount > 0
+    planned_usage = tuple(
+        RollingUsageInput(
+            id=f"planned:{row.ipo_id}:{row.applicant_id}",
+            bank_id=row.bank_id,
+            upi_id=row.upi_id,
+            amount=row.amount,
+            submitted_at=application_cutoff(ipo_by_id[row.ipo_id], row.category),
+            cancelled=False,
         )
+        for row in rows
+        if row.ipo_id in ipo_by_id and row.amount > 0
     )
+    rolling = RollingLimitTracker(snapshot.rolling_usage + planned_usage)
     existing = {
         (item.ipo_id, item.applicant_id)
         for item in snapshot.existing_applications
@@ -94,6 +93,35 @@ def _choose_wallet(
         )
         if cash.raw_available < quote.amount:
             continue
+        candidate_allocation = PlannedAllocation(
+            id="candidate",
+            bank_id=bank.id,
+            amount=quote.amount,
+            cutoff_at=at,
+            release_at=release_at,
+        )
+        # An sHNI cutoff can precede Retail cutoffs on the same day. A wallet
+        # must leave enough money for rows already promised at those later times.
+        if any(
+            cash_at_cutoff(
+                bank=bank,
+                cutoff=application_cutoff(ipo_by_id[row.ipo_id], row.category),
+                blocks=snapshot.cash_blocks,
+                allocations=tuple(
+                    allocation
+                    for allocation in allocations
+                    if allocation.id != f"{row.ipo_id}:{row.applicant_id}"
+                )
+                + (candidate_allocation,),
+                recurring_debits=snapshot.recurring_debits,
+            ).raw_available
+            < row.amount
+            for row in rows
+            if row.bank_id == bank.id
+            and row.ipo_id in ipo_by_id
+            and at <= application_cutoff(ipo_by_id[row.ipo_id], row.category) < release_at
+        ):
+            continue
         owner = next((item for item in snapshot.applicants if item.id == bank.owner_id), None)
         owner_ipos = (
             tuple(
@@ -129,6 +157,38 @@ def _choose_wallet(
                 continue
             limit_check = rolling.check(upi=upi, amount=quote.amount, at=at, config=snapshot.config)
             if not limit_check.allowed:
+                continue
+            candidate_usage = RollingUsageInput(
+                id="candidate",
+                bank_id=bank.id,
+                upi_id=upi.id,
+                amount=quote.amount,
+                submitted_at=at,
+                cancelled=False,
+            )
+            if any(
+                not RollingLimitTracker(
+                    snapshot.rolling_usage
+                    + tuple(
+                        event
+                        for event in planned_usage
+                        if event.id != f"planned:{row.ipo_id}:{row.applicant_id}"
+                    )
+                    + (candidate_usage,)
+                )
+                .check(
+                    upi=upi_by_id[row.upi_id],
+                    amount=row.amount,
+                    at=application_cutoff(ipo_by_id[row.ipo_id], row.category),
+                    config=snapshot.config,
+                )
+                .allowed
+                for row in rows
+                if row.bank_id == bank.id
+                and row.ipo_id in ipo_by_id
+                and row.upi_id in upi_by_id
+                and at <= application_cutoff(ipo_by_id[row.ipo_id], row.category)
+            ):
                 continue
             upi_count_limit = (
                 upi.count_limit_override

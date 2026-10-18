@@ -1,7 +1,8 @@
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from planner.coverage import baseline_retail_coverage
+from planner.coverage import CoverageRow, baseline_retail_coverage
 from planner.dto import (
     ApplicantInput,
     BankInput,
@@ -13,7 +14,8 @@ from planner.dto import (
     RollingUsageInput,
     UPIInput,
 )
-from planner.wallets import choose_retail_wallet
+from planner.quotes import minimum_shni_quote
+from planner.wallets import choose_retail_wallet, choose_shni_wallet
 
 
 def bank(id, owner, *, balance="50000.00", active=True, policy="DEFAULT"):
@@ -144,6 +146,43 @@ def test_prior_row_reserves_cash_before_next_applicant():
     result = baseline_retail_coverage(data, choose_retail_wallet)
     assert [(row.applicant_id, row.bank_id) for row in result.rows] == [("wife", "z-own")]
     assert result.uncovered[0].applicant_id == "mother"
+
+
+def test_earlier_shni_choice_preserves_later_retail_upi_limit():
+    base = snapshot()
+    ipo = replace(
+        base.ipos[0],
+        mode="SHNI_PREFERRED",
+        shni_cutoff_at=datetime(2026, 10, 3, 16, tzinfo=UTC),
+    )
+    data = snapshot(
+        ipos=(ipo,),
+        applicants=(ApplicantInput("wife", 1, True), ApplicantInput("mother", 2, True)),
+        demats=(DematInput("wife-demat", "wife", True), DematInput("mother-demat", "mother", True)),
+        banks=(bank("z-own", "wife", balance="300000.00"),),
+        upis=(UPIInput("own-upi", "z-own", "wife", True, True, count_limit_override=1),),
+    )
+    later_retail = CoverageRow(
+        ipo_id=ipo.id,
+        applicant_id="mother",
+        category="RETAIL",
+        lots=1,
+        amount=Decimal("15000.00"),
+        demat_id="mother-demat",
+        bank_id="z-own",
+        upi_id="own-upi",
+    )
+
+    assert (
+        choose_shni_wallet(
+            data,
+            ipo,
+            data.applicants[0],
+            minimum_shni_quote(ipo.upper_price, ipo.lot_size),
+            (later_retail,),
+        )
+        is None
+    )
 
 
 def test_el008_restricted_bank_cannot_fund_the_wrong_applicant():

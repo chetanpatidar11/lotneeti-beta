@@ -132,3 +132,46 @@ def test_four_retail_rows_move_off_shni_bank_when_other_banks_can_fund_them():
     assert all(row.category == "RETAIL" and row.amount == Decimal("14650.00") for row in small_rows)
     assert all("OWNER_RESERVE_TRADEOFF" not in row.warnings for row in proposal.coverage.rows)
     assert generate_proposal(data) == proposal
+
+
+def test_earlier_shni_cutoff_does_not_spend_cash_promised_to_later_retail_rows():
+    data = PlannerSnapshot(
+        as_of=datetime(2026, 10, 19, 10, tzinfo=UTC),
+        config=PlannerConfig(PLANNER_VERSION, "ALLOW", "DEFAULT"),
+        ipos=tuple(
+            IPOInput(
+                f"ipo-{number}",
+                True,
+                Decimal(str(30 - number)),
+                Decimal("100.00"),
+                150,
+                datetime(2026, 10, 23, 17, tzinfo=UTC),
+                date(2026, 10, 29),
+                "SHNI_PREFERRED",
+                shni_cutoff_at=datetime(2026, 10, 23, 16, tzinfo=UTC),
+            )
+            for number in (1, 2)
+        ),
+        applicants=(ApplicantInput("a", 1, True), ApplicantInput("b", 2, True)),
+        demats=(DematInput("demat-a", "a", True), DematInput("demat-b", "b", True)),
+        banks=(BankInput("bank", "a", Decimal("225000.00"), True, "DEFAULT"),),
+        upis=(UPIInput("upi", "bank", "a", True, True),),
+    )
+
+    proposal = generate_proposal(data)
+
+    assert proposal.audit.valid
+    assert len(proposal.coverage.rows) == 4
+    assert all(row.category == "RETAIL" for row in proposal.coverage.rows)
+    assert not proposal.audit.issues
+
+    with_other_bank = replace(
+        data,
+        banks=(*data.banks, BankInput("small", "external", Decimal("30000.00"), True, "DEFAULT")),
+        upis=(*data.upis, UPIInput("small-upi", "small", "external", True, True)),
+    )
+    distributed = generate_proposal(with_other_bank)
+    assert distributed.audit.valid
+    assert len(distributed.coverage.rows) == 4
+    assert sum(row.category == "SHNI" for row in distributed.coverage.rows) == 1
+    assert sum(row.bank_id == "small" for row in distributed.coverage.rows) == 2

@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## E04/E13 Future-cutoff funding preservation — in progress, 2026-10-19
+
+- The founder requested that the automatic plan use money available across banks without an avoidable request to fund an overcommitted account. A read-only evaluation of the current live workspace found 32 applications for Tonbo Imaging India and Bonfiglioli Transmissions, with four cash-overdraw audit issues. The ₹4,18,398 bank was assigned two sHNI and four Retail applications totalling ₹4,70,250.
+- Wallet selection now checks that an earlier application leaves enough cash and rolling-limit room for every already planned application with a later cutoff. This closes the same-day 4 pm sHNI versus 5 pm Retail timing gap in both baseline and upgrade choices. The existing bounded Retail rehome can then move flexible rows to other usable banks.
+- A read-only run of the updated planner code against the same live workspace produced 32 covered applications, five sHNI and 27 Retail, no audit issues and no owner cash warning. The ₹4,18,398 bank carried exactly two sHNI applications and no Retail; no production records or deployed code were changed by this diagnostic. Synthetic regressions cover later cash and UPI-limit commitments. Genuine manually fixed cash failures now offer a bank change or re-plan rather than asking the member to add money. The full `scripts/check.sh` gate passed with 402 backend, 38 web and 1 Android test plus lint, format, migration, typecheck and build checks before the final copy change. Deployment remains pending.
+
 ## B04/E13/E16 Bank display and planner funding repair — validated locally, 2026-10-19
 
 - The founder reported that a newly added bank's number is masked in Funds and Settings, and that a ₹4,18,398 account is used for Retail rows instead of two minimum sHNI rows across two selected IPOs while smaller funded banks remain available. The owner cash warning can also persist after the final plan covers the owner.

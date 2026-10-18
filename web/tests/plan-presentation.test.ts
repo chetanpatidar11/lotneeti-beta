@@ -93,7 +93,7 @@ test("bank choices rank own, preferred, then fallback and disable unusable banks
 
 test("cash and limit issues have plain row messages", () => {
   assert.deepEqual(rowIssueMessages({ ...row, blocking_reasons: ["CASH_OVERSPEND", "UPI_LIMIT_EXCEEDED"] }), [
-    "This bank needs more available money.",
+    "This bank cannot cover this application. Choose another bank or re-plan.",
     "This UPI has reached its application limit.",
   ]);
 });
