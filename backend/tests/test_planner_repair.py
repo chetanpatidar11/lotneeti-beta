@@ -80,8 +80,8 @@ def test_rr002_failed_rehome_rolls_back_every_local_change():
     )
 
 
-def test_rr003_more_than_two_moves_is_outside_bound():
-    data, original = setup(rows=4, small_banks=3)
+def test_rr003_more_than_four_moves_is_outside_bound():
+    data, original = setup(rows=6, small_banks=5)
     assert (
         try_rehome_for_shni(data, original, ipo_id="ipo-1", applicant_id="applicant-1") == original
     )

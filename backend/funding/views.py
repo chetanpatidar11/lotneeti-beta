@@ -26,6 +26,11 @@ class BankAccountViewSet(
     serializer_class = BankAccountSerializer
     permission_classes = [WorkspaceDataPermission]
 
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        response["Cache-Control"] = "private, no-store"
+        return response
+
     def get_workspace(self):
         return get_object_or_404(
             Workspace.objects.filter(memberships__user=self.request.user),
@@ -48,6 +53,7 @@ class BankAccountViewSet(
             **super().get_serializer_context(),
             "workspace": workspace,
             "reveal_details": self.action == "retrieve" and can_edit,
+            "display_details": can_edit,
         }
 
     def perform_create(self, serializer):

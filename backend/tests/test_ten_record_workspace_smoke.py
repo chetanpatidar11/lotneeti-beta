@@ -62,7 +62,8 @@ def test_ten_synthetic_accounts_and_issues_cover_workspace_data_surfaces():
     assert len(investors.data) == len(banks.data) == 10
     assert all(row["pan_display"].startswith("TESTX") for row in investors.data)
     assert all(row["pan_masked"].startswith("******") for row in investors.data)
-    assert all("DEMO-ACCOUNT" not in str(row) for row in banks.data)
+    assert all(row["account_display"].startswith("DEMO-ACCOUNT") for row in banks.data)
+    assert all(row["account_masked"].startswith("••••") for row in banks.data)
 
     preview = client.post(reverse("planner-preview", args=[workspace.pk]), {}, format="json")
     assert preview.status_code == 200

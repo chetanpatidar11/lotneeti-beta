@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## B04/E13/E16 Bank display and planner funding repair — validated locally, 2026-10-19
+
+- The founder reported that a newly added bank's number is masked in Funds and Settings, and that a ₹4,18,398 account is used for Retail rows instead of two minimum sHNI rows across two selected IPOs while smaller funded banks remain available. The owner cash warning can also persist after the final plan covers the owner.
+- Bank list/create responses now include an authorized full account display for Owner/Operator only; Viewer remains masked, encrypted storage is unchanged, and responses are marked no-store. Signed-in bank labels in Settings, Funds, Home, Plan and Applications use that display field.
+- The bounded repair can rehome up to four unlocked Retail rows atomically before a minimum sHNI upgrade. Final explanations remove a provisional owner-reserve warning once the finished plan covers the owner's eligible selected IPOs. A synthetic two-IPO regression checks two ₹2,05,100 sHNI rows on the large bank, four ₹14,650 Retail rows on other banks, cash validity and deterministic output. Focused tests passed (18). The complete `scripts/check.sh` gate passed: 400 backend tests, 38 web tests, 1 Android package test, lint, format, typecheck, migration checks and production builds. Deployment remains pending.
+
 ## E23 Investor deletion with application history — deployed, 2026-10-16
 
 - Investor Delete now marks `is_deleted=true` and `active=false`, hides the investor from workspace lists and direct investor endpoints, and keeps linked applications, balances, bank history, and saved plan references. Linked demat, bank, UPI, and scheduled payment records become inactive so they cannot enter new plans or continue scheduled balance changes. Other account types retain their existing deletion rules.

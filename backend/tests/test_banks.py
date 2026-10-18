@@ -39,6 +39,7 @@ def test_bank_create_has_masked_number_balance_and_opening_history():
 
     assert response.status_code == 201
     assert response.data["account_masked"] == "••••0001"
+    assert response.data["account_display"] == "DEMO-ACCOUNT-0001"
     assert response.data["current_balance"] == "50000.00"
     assert "account_number" not in response.data
     bank = BankAccount.objects.get(pk=response.data["id"])
@@ -52,7 +53,10 @@ def test_bank_create_has_masked_number_balance_and_opening_history():
 
     detail_url = reverse("bank-detail", args=[workspace.pk, bank.pk])
     assert client.get(detail_url).data["account_number"] == "DEMO-ACCOUNT-0001"
-    assert "account_number" not in client.get(list_url).data[0]
+    listed = client.get(list_url)
+    assert "account_number" not in listed.data[0]
+    assert listed.data[0]["account_display"] == "DEMO-ACCOUNT-0001"
+    assert listed["Cache-Control"] == "private, no-store"
     assert client.patch(detail_url, {"active": False}).status_code == 200
     assert client.patch(detail_url, {"initial_balance": "70000.00"}).status_code == 400
     bank.refresh_from_db()
@@ -104,4 +108,7 @@ def test_bank_workspace_scope_and_viewer_write_denial():
     viewer_detail = client.get(detail_url)
     assert viewer_detail.status_code == 200
     assert "account_number" not in viewer_detail.data
+    assert viewer_detail.data["account_display"] == "••••0001"
+    viewer_list = client.get(reverse("bank-list", args=[workspace.pk]))
+    assert viewer_list.data[0]["account_display"] == "••••0001"
     assert client.patch(detail_url, {"active": False}).status_code == 403

@@ -6,6 +6,7 @@ from planner.coverage import CoverageResult, CoverageRow
 from planner.dto import (
     ApplicantInput,
     BankInput,
+    DematInput,
     FundingPreferenceInput,
     IPOInput,
     PlannerConfig,
@@ -75,12 +76,24 @@ def test_shni_and_owner_conflict_reasons_follow_funding_reason():
         amount=Decimal("210000.00"),
         warnings=("CROSS_FUNDING", "OWNER_RESERVE_TRADEOFF"),
     )
-    explained = explain_rows(snapshot(), CoverageResult((source,), ())).rows[0]
+    data = snapshot(demats=(DematInput("wife-demat", "wife", True),))
+    explained = explain_rows(data, CoverageResult((source,), ())).rows[0]
     assert [reason.code for reason in explained.reasons][-3:] == [
         "OWNER_CASH_CONFLICT",
         "MINIMUM_SHNI",
         "ROLLING_LIMIT_ROOM",
     ]
+
+
+def test_owner_warning_is_removed_once_final_plan_covers_owner():
+    data = snapshot(demats=(DematInput("wife-demat", "wife", True),))
+    cross_funded = row(warnings=("CROSS_FUNDING", "OWNER_RESERVE_TRADEOFF"))
+    owner_funded = row(applicant_id="wife", bank_id="wife-bank", warnings=())
+
+    explained = explain_rows(data, CoverageResult((cross_funded, owner_funded), ()))
+
+    assert "OWNER_RESERVE_TRADEOFF" not in explained.rows[0].warnings
+    assert "OWNER_CASH_PROTECTED" in [reason.code for reason in explained.rows[0].reasons]
 
 
 def test_own_funding_and_locked_row_are_handled_without_rewriting_lock():

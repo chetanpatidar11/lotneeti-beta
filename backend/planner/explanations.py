@@ -66,10 +66,34 @@ def explain_row(snapshot: PlannerSnapshot, row: CoverageRow) -> tuple[PlanReason
 
 
 def explain_rows(snapshot: PlannerSnapshot, coverage: CoverageResult) -> CoverageResult:
+    covered = {(row.ipo_id, row.applicant_id) for row in coverage.rows}
+    covered.update(
+        (item.ipo_id, item.applicant_id)
+        for item in snapshot.existing_applications
+        if not item.cancelled
+    )
+    active_owners = {item.id for item in snapshot.applicants if item.active}
+    active_demats = {item.applicant_id for item in snapshot.demats if item.active}
+    owners_still_needing_coverage = {
+        owner_id
+        for owner_id in active_owners & active_demats
+        if any(ipo.selected and (ipo.id, owner_id) not in covered for ipo in snapshot.ipos)
+    }
+    banks = {item.id: item for item in snapshot.banks}
+
+    def finalize(row: CoverageRow) -> CoverageRow:
+        if row.locked:
+            return row
+        bank = banks[row.bank_id]
+        warnings = tuple(
+            warning
+            for warning in row.warnings
+            if warning != "OWNER_RESERVE_TRADEOFF" or bank.owner_id in owners_still_needing_coverage
+        )
+        final_row = replace(row, warnings=warnings)
+        return replace(final_row, reasons=explain_row(snapshot, final_row))
+
     return CoverageResult(
-        rows=tuple(
-            row if row.locked else replace(row, reasons=explain_row(snapshot, row))
-            for row in coverage.rows
-        ),
+        rows=tuple(finalize(row) for row in coverage.rows),
         uncovered=coverage.uncovered,
     )

@@ -24,6 +24,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
     account_number = serializers.CharField(write_only=True, required=False, max_length=120)
     account_masked = serializers.CharField(read_only=True)
     account_reference = serializers.SerializerMethodField()
+    account_display = serializers.SerializerMethodField()
     initial_balance = serializers.DecimalField(
         max_digits=14, decimal_places=2, write_only=True, required=False, default=Decimal("0.00")
     )
@@ -37,6 +38,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
             "account_number",
             "account_masked",
             "account_reference",
+            "account_display",
             "is_placeholder",
             "is_imported_reference",
             "initial_balance",
@@ -51,6 +53,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
             "id",
             "account_masked",
             "account_reference",
+            "account_display",
             "is_placeholder",
             "is_imported_reference",
             "current_balance",
@@ -71,6 +74,11 @@ class BankAccountSerializer(serializers.ModelSerializer):
         if instance.is_placeholder or instance.is_imported_reference:
             return decrypt_value(instance.account_ciphertext, purpose="bank-account")
         return ""
+
+    def get_account_display(self, instance):
+        if self.context.get("display_details"):
+            return decrypt_value(instance.account_ciphertext, purpose="bank-account")
+        return instance.account_masked
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

@@ -13,7 +13,7 @@ from planner.quotes import minimum_shni_quote, retail_quote
 from planner.rolling import RollingLimitTracker
 from planner.wallets import choose_retail_wallet, choose_shni_wallet
 
-MAX_REHOME_ROWS = 2
+MAX_REHOME_ROWS = 4
 
 
 def _rows_feasible(snapshot: PlannerSnapshot, rows: tuple[CoverageRow, ...]) -> bool:
