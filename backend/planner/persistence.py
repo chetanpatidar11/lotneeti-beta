@@ -69,6 +69,32 @@ def _verify_scope(workspace, snapshot: PlannerSnapshot) -> None:
 
 
 @transaction.atomic
+def clear_plan_run(*, plan_run: PlanRun, actor) -> PlanRun:
+    run = PlanRun.objects.select_for_update().get(pk=plan_run.pk)
+    if not WorkspaceMembership.objects.filter(
+        workspace_id=run.workspace_id,
+        user=actor,
+        role__in=(WorkspaceMembership.Role.OWNER, WorkspaceMembership.Role.OPERATOR),
+    ).exists():
+        raise ValidationError("This member cannot clear the saved plan")
+    latest = PlanRun.objects.filter(workspace_id=run.workspace_id).first()
+    if latest is None or latest.pk != run.pk:
+        raise ValidationError("A newer plan exists. Refresh the page before clearing it.")
+    if run.status == PlanRun.Status.CLEARED:
+        return run
+    run.status = PlanRun.Status.CLEARED
+    run.save(update_fields=["status"])
+    record_event(
+        action="planner.run.cleared",
+        target=run,
+        actor=actor,
+        workspace=run.workspace,
+        metadata={"planned_total": str(run.planned_total)},
+    )
+    return run
+
+
+@transaction.atomic
 def create_plan_run(*, workspace, snapshot: PlannerSnapshot, actor=None) -> PlanRun:
     if (
         actor is not None

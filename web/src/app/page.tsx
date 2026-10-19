@@ -79,7 +79,7 @@ export default async function HomePage() {
       <section className="metric-grid" aria-label="Money overview">
         <MetricCard label="Total Balance" value={formatInr(capital.balance)} note="Across your banks" href="/funds" />
         <MetricCard label="Blocked" value={formatInr(capital.blocked)} note="Active mandates" tone="warning" href="/applications" />
-        <MetricCard label="Planned" value={formatInr(capital.planned)} note="Latest saved plan" href="/plan" />
+        <MetricCard label="Planned" value={formatInr(capital.planned)} note="Saved plan and pending applications" href="/plan" />
         <MetricCard label="Available" value={formatInr(capital.available)} note="Free for applications" tone="accent" href="/funds" />
       </section>
       <section className="operations-grid" aria-label="Activity overview">

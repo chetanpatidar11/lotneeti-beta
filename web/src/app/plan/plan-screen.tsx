@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Drawer } from "@/components/drawer";
 import { formatInr } from "@/lib/money";
@@ -18,6 +19,7 @@ export type PlanLookups = {
   selectedIpos: { ipo: string; mode: string }[];
   unavailableSelectedIpoCount: number;
   capital: { balance: string; blocked: string; planned: string; available: string } | null;
+  latestPlan: { id: string | null; status: "READY" | "BLOCKED" | "CLEARED" | null; planned_total: string } | null;
 };
 
 function fundingType(row: PlanRow, lookups: PlanLookups): "Own" | "Preferred" | "Cross-funded" {
@@ -31,7 +33,11 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
   lookups: PlanLookups;
   canEdit: boolean;
 }) {
+  const router = useRouter();
   const [preview, setPreview] = useState<PlanPreview | null>(null);
+  const savedPlan = lookups.latestPlan;
+  const [clearedPlanId, setClearedPlanId] = useState<string | null>(null);
+  const [clearOpen, setClearOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [validating, setValidating] = useState(false);
   const [error, setError] = useState("");
@@ -165,8 +171,32 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
       const result = await response.json() as PlanPreview;
       showPreview({ ...result, uncovered: current.uncovered });
       setMessage(result.status === "READY" ? "Plan saved and ready." : "Plan saved with blocking items to resolve.");
+      router.refresh();
     } catch { setError("We could not save this plan. Review the rows and try again."); }
     finally { setBusy(false); }
+  }
+
+  async function clearSavedPlan() {
+    if (!savedPlan?.id || !canEdit) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/workspaces/${workspaceId}/planner/runs/${savedPlan.id}/clear`, { method: "POST" });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({})) as { detail?: string };
+        throw new Error(body.detail || "The saved plan could not be cleared. Refresh and try again.");
+      }
+      setClearedPlanId(savedPlan.id);
+      previewRef.current = null;
+      setPreview(null);
+      setClearOpen(false);
+      setMessage("Saved plan cleared. Tracked applications, if any, remain in Applications.");
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The saved plan could not be cleared.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function exportCsv(ipoId: string) {
@@ -249,7 +279,8 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
             <p><span>Planned</span><strong>{formatInr(lookups.capital.planned)}</strong></p>
             <p><span>Available</span><strong>{formatInr(lookups.capital.available)}</strong></p>
           </div> : <p>Add a bank and set its Balance to see your money here.</p>}
-          <p className="plan-context-help">Available accounts for both current blocks and saved planned applications.</p>
+          <p className="plan-context-help">Planned includes saved plan rows and applications awaiting a block.</p>
+          {canEdit && savedPlan?.id && savedPlan.id !== clearedPlanId && savedPlan.status !== "CLEARED" && Number(savedPlan.planned_total) > 0 && <button className="button-secondary" type="button" disabled={busy} onClick={() => { setError(""); setClearOpen(true); }}>Clear saved plan</button>}
         </section>
       </div>
       <div className="plan-toolbar">
@@ -294,6 +325,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
           </section>)}
         </div>}
       </section>}
+      {clearOpen && <Drawer title="Clear saved plan" onClose={() => setClearOpen(false)}><div className="sign-in-form"><p>The latest saved plan will stop reserving funds. Bank balances and plan history stay as they are. Applications already being tracked keep their own reserved amounts.</p>{error && <p className="plan-error" role="alert">{error}</p>}<button type="button" disabled={busy} onClick={() => void clearSavedPlan()}>{busy ? "Clearing…" : "Clear saved plan"}</button><button className="button-secondary" type="button" disabled={busy} onClick={() => setClearOpen(false)}>Keep plan</button></div></Drawer>}
       {editDraft && editingIndex !== null && <Drawer title="Edit draft application" onClose={() => { setEditDraft(null); setEditingIndex(null); }}><form className="sign-in-form" onSubmit={(event) => { event.preventDefault(); void saveDraftEdit(); }}>
         <p className="intro">{lookups.ipos[editDraft.ipo]?.name ?? "IPO"}</p>
         <label htmlFor="draft-applicant">Applicant</label><select id="draft-applicant" value={editDraft.applicant} onChange={(event) => {

@@ -12,6 +12,7 @@ class PlanRun(models.Model):
     class Status(models.TextChoices):
         READY = "READY", "Ready"
         BLOCKED = "BLOCKED", "Blocked"
+        CLEARED = "CLEARED", "Cleared"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workspace = models.ForeignKey(

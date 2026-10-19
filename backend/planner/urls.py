@@ -3,6 +3,7 @@ from django.urls import path
 from planner.views import (
     PlannerLatestRunView,
     PlannerPreviewView,
+    PlannerRunClearView,
     PlannerRunCreateView,
     PlannerValidateView,
     WorkspaceCapitalView,
@@ -13,6 +14,11 @@ urlpatterns = [
         "workspaces/<uuid:workspace_id>/planner/runs/latest/",
         PlannerLatestRunView.as_view(),
         name="planner-latest-run",
+    ),
+    path(
+        "workspaces/<uuid:workspace_id>/planner/runs/<uuid:run_id>/clear/",
+        PlannerRunClearView.as_view(),
+        name="planner-run-clear",
     ),
     path(
         "workspaces/<uuid:workspace_id>/capital/",

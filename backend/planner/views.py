@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import Workspace, WorkspaceMembership
+from accounts.permissions import WorkspaceDataPermission
 from applications.models import Application
 from core.beta_events import record_beta_event
 from core.models import BetaEvent
@@ -17,7 +18,7 @@ from planner.dto import LockedRowInput
 from planner.engine import generate_proposal
 from planner.manual_plan import review_manual_rows
 from planner.models import PlanRun
-from planner.persistence import create_reviewed_plan_run
+from planner.persistence import clear_plan_run, create_reviewed_plan_run
 from planner.snapshot_builder import build_snapshot
 
 
@@ -283,16 +284,15 @@ class WorkspaceCapitalView(APIView):
         planned_by_bank = {}
         applications = list(Application.objects.filter(workspace=workspace))
         tracked_by_row = {item.plan_row_id: item for item in applications}
-        if latest is not None:
+        for item in applications:
+            bank_id = str(item.bank_id)
+            if item.status in {Application.Status.PLANNED, Application.Status.SUBMITTED}:
+                planned_by_bank[bank_id] = planned_by_bank.get(bank_id, 0) + item.amount
+        if latest is not None and latest.status != PlanRun.Status.CLEARED:
             for row in latest.rows.all():
-                tracked = tracked_by_row.get(row.pk)
-                if tracked is None:
-                    bank_id, amount = row.bank_ref, row.amount
-                elif tracked.status in {Application.Status.PLANNED, Application.Status.SUBMITTED}:
-                    bank_id, amount = str(tracked.bank_id), tracked.amount
-                else:
+                if row.pk in tracked_by_row:
                     continue
-                planned_by_bank[bank_id] = planned_by_bank.get(bank_id, 0) + amount
+                planned_by_bank[row.bank_ref] = planned_by_bank.get(row.bank_ref, 0) + row.amount
         blocked_by_bank = {}
         for item in applications:
             if item.status == Application.Status.BLOCKED:
@@ -340,3 +340,15 @@ class PlannerLatestRunView(APIView):
                 "planned_total": str(latest.planned_total) if latest else "0.00",
             }
         )
+
+
+class PlannerRunClearView(APIView):
+    permission_classes = [WorkspaceDataPermission]
+
+    def post(self, request, workspace_id, run_id):
+        run = get_object_or_404(PlanRun.objects.filter(workspace_id=workspace_id), pk=run_id)
+        try:
+            clear_plan_run(plan_run=run, actor=request.user)
+        except ValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=409)
+        return Response({"id": str(run.pk), "status": PlanRun.Status.CLEARED})

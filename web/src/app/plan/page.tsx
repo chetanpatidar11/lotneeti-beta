@@ -14,6 +14,7 @@ type UPI = { id: string; handle: string; holder: string; active: boolean; verifi
 type Preference = { bank: string; priority: number; enabled: boolean };
 type Decision = { ipo: string; selected: boolean; mode: string };
 type Capital = { balance: string; blocked: string; planned: string; available: string };
+type LatestPlan = { id: string | null; status: "READY" | "BLOCKED" | "CLEARED" | null; planned_total: string };
 
 async function getData(path: string, cookieHeader: string) {
   return fetch(backendUrl(path), { headers: { cookie: cookieHeader }, cache: "no-store" });
@@ -28,18 +29,20 @@ export default async function PlanPage() {
   const workspace = await selectedWorkspace(workspaces);
   if (!workspace) redirect("/settings/investors");
   const prefix = `workspaces/${workspace.id}`;
-  const [investorResponse, bankResponse, ipoResponse, decisionResponse, capitalResponse] = await Promise.all([
+  const [investorResponse, bankResponse, ipoResponse, decisionResponse, capitalResponse, latestPlanResponse] = await Promise.all([
     getData(`${prefix}/investors/`, cookieHeader),
     getData(`${prefix}/banks/`, cookieHeader),
     getData("ipos/", cookieHeader),
     getData(`${prefix}/ipo-decisions/`, cookieHeader),
     getData(`${prefix}/capital/`, cookieHeader),
+    getData(`${prefix}/planner/runs/latest/`, cookieHeader),
   ]);
   const investors = investorResponse.ok ? ((await investorResponse.json()) as Investor[]) : [];
   const banks = bankResponse.ok ? ((await bankResponse.json()) as Bank[]) : [];
   const ipos = ipoResponse.ok ? ((await ipoResponse.json()) as IPO[]) : [];
   const decisions = decisionResponse.ok ? ((await decisionResponse.json()) as Decision[]) : [];
   const capital = capitalResponse.ok ? ((await capitalResponse.json()) as Capital) : null;
+  const latestPlan = latestPlanResponse.ok ? ((await latestPlanResponse.json()) as LatestPlan) : null;
   const [dematLists, upiLists, preferenceLists] = await Promise.all([
     Promise.all(investors.map(async (investor) => {
       const response = await getData(`${prefix}/investors/${investor.id}/demats/`, cookieHeader);
@@ -68,6 +71,7 @@ export default async function PlanPage() {
     selectedIpos: selectionState.available,
     unavailableSelectedIpoCount: selectionState.unavailableCount,
     capital,
+    latestPlan,
   };
   return <PlanScreen workspaceId={workspace.id} canEdit={workspace.role !== "VIEWER"} lookups={lookups} />;
 }

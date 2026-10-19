@@ -1,5 +1,12 @@
 # LotNeeti execution status
 
+## C12 Clear saved plan reservations — verified locally, 2026-10-19
+
+- The founder sees Blocked ₹0 and Planned ₹16,16,200 while Applications is empty. Capital currently reserves every untracked row in the latest saved plan indefinitely, and the Plan screen has no way to release it.
+- Add an explicit Clear saved plan action that retains plan history and bank balances. Keep active tracked application commitments counted independently of the saved plan so clearing it cannot hide submitted or pending applications.
+- The Plan page now shows Clear saved plan when its latest saved run has rows. A confirmation panel explains that tracked Applications remain; clearing marks the run `CLEARED` and keeps rows, hashes and audit history. The latest run's old exports/tracking are no longer usable as a current plan. Capital now counts active planned/submitted Applications from every run and adds only untracked rows in the latest uncleared run.
+- Focused tests cover full release of an untracked plan, role/workspace scoping, stale-run rejection, immutable history, and preservation of older active Applications. Full `scripts/check.sh` passed: 410 backend tests, 38 web tests, 1 Android test, lint, format, migration, typecheck and production builds. Deployment pending.
+
 ## C11 Bank transfer and balance descriptions — deployed, 2026-10-19
 
 - Add a Funds Transfer action that chooses source and destination banks, records equal debit/credit history entries in one transaction, and shows both in the bank statement. Add an optional description to Add Money, Remove Money, Set Balance, and Transfer.
