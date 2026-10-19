@@ -1,11 +1,12 @@
 # LotNeeti execution status
 
-## C11 Bank transfer and balance descriptions — verified locally, 2026-10-19
+## C11 Bank transfer and balance descriptions — deployed, 2026-10-19
 
 - Add a Funds Transfer action that chooses source and destination banks, records equal debit/credit history entries in one transaction, and shows both in the bank statement. Add an optional description to Add Money, Remove Money, Set Balance, and Transfer.
 - Scope both banks to the signed-in workspace, require an editor role and sufficient source balance, and verify with synthetic tests before release. Recording a transfer tracks a movement made by the user; it does not initiate a bank payment.
 - Implemented a Transfer button after Set Balance, source/destination bank selectors, optional description on all four actions, and linked debit/credit entries visible in the combined statement and archived history. Transfers lock both bank rows in stable order and commit both balances and audit events atomically. The new API rejects inactive/placeholder banks, cross-workspace banks, same-bank transfers and insufficient balance.
-- Full `scripts/check.sh` passed: 407 backend tests, 38 web tests, 1 Android test, lint, format, migration, typecheck and production builds. Focused tests cover paired history, descriptions, scope/roles, rollback and archive preservation. Deployment pending.
+- Full `scripts/check.sh` passed: 407 backend tests, 38 web tests, 1 Android test, lint, format, migration, typecheck and production builds. Focused tests cover paired history, descriptions, scope/roles, rollback and archive preservation.
+- Commit `44bd651` was pushed to the work branch. The SSH rule was updated from the previous workstation address to the current `94.205.57.95/32` only. An encrypted pre-release backup succeeded, release archive SHA-256 `c70ea218846d029394133d5806b45d4702c4e59b62279eb2e35a078aa6bcaf3e` was deployed to `https://lotneeti.dpdns.org/`, and migration `funding.0013_archivedbalancechange_counterparty_label_and_more` applied. Django system check and API health passed. Public home, sign-in, and API health each returned HTTPS 200 with valid TLS; EC2 system and instance checks were both `ok`. No real bank balance was modified during release verification.
 
 ## E04/E13 Future-cutoff funding preservation — deployed, 2026-10-19
 
