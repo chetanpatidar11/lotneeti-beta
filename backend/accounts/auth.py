@@ -12,7 +12,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import APIException, ValidationError
 
 from accounts.models import EmailLoginToken, User
 from core.audit import record_event
@@ -23,6 +23,12 @@ MAX_CODE_ATTEMPTS = 5
 INVALID_LINK = {"token": "This link has expired or was already used."}
 INVALID_CODE = {"code": "The code is incorrect or has expired. Request a new code if needed."}
 logger = logging.getLogger(__name__)
+
+
+class EmailDeliveryUnavailable(APIException):
+    status_code = 503
+    default_detail = "Verification email is temporarily unavailable. Please try again."
+    default_code = "email_delivery_unavailable"
 
 
 def normalized_email(email: str) -> str:
@@ -50,12 +56,12 @@ def _code_hash(email: str, purpose: str, code: str) -> str:
     ).hexdigest()
 
 
-def _send_code(email: str, *, purpose: str, subject: str, password_hash: str = "") -> None:
+def _send_code(email: str, *, purpose: str, subject: str, password_hash: str = "") -> bool:
     now = timezone.now()
     if EmailLoginToken.objects.filter(
         email=email, purpose=purpose, created_at__gte=now - REQUEST_COOLDOWN
     ).exists():
-        return
+        return True
     code = f"{secrets.randbelow(1_000_000):06d}"
     record = EmailLoginToken.objects.create(
         email=email,
@@ -65,16 +71,20 @@ def _send_code(email: str, *, purpose: str, subject: str, password_hash: str = "
         expires_at=now + TOKEN_LIFETIME,
     )
     try:
-        send_mail(
+        sent = send_mail(
             subject,
             f"Your LotNeeti verification code is {code}. It expires in 15 minutes. "
             "If you did not request it, ignore this email.\n",
             settings.DEFAULT_FROM_EMAIL,
             [email],
         )
+        if sent != 1:
+            raise RuntimeError("Mail backend did not accept the verification email")
     except Exception:
         record.delete()
         logger.exception("Account code email delivery failed")
+        return False
+    return True
 
 
 def _consume_code(email: str, code: str, purpose: str) -> EmailLoginToken:
@@ -135,12 +145,14 @@ def request_registration(email: str, password: str) -> bool:
     if User.objects.filter(email=email).exists():
         return False
     _validate_password(password, User(email=email))
-    _send_code(
+    sent = _send_code(
         email,
         purpose=EmailLoginToken.Purpose.VERIFY,
         subject="Verify your LotNeeti account",
         password_hash=make_password(password),
     )
+    if not sent:
+        raise EmailDeliveryUnavailable()
     return True
 
 

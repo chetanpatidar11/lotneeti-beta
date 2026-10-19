@@ -136,6 +136,25 @@ def test_password_reset_delivery_failure_keeps_generic_response(monkeypatch):
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("send_result", [0, "error"])
+def test_registration_does_not_claim_email_sent_when_delivery_fails(monkeypatch, send_result):
+    def failed_send(*args, **kwargs):
+        if send_result == "error":
+            raise RuntimeError("mail unavailable")
+        return send_result
+
+    monkeypatch.setattr("accounts.auth.send_mail", failed_send)
+    client = APIClient(HTTP_ORIGIN=FRONTEND_ORIGIN)
+    response = client.post(
+        reverse("password-login"),
+        {"email": "new@example.test", "password": "Safe test password 284!"},
+    )
+    assert response.status_code == 503
+    assert EmailLoginToken.objects.count() == 0
+    assert User.objects.count() == 0
+
+
+@pytest.mark.django_db
 def test_password_reset_is_one_time_and_invalidates_old_password():
     user = User.objects.create_user(email="person@example.test", password="Old safe password 284!")
     user.email_verified_at = timezone.now()

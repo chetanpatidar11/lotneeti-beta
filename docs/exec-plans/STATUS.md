@@ -1,5 +1,10 @@
 # LotNeeti execution status
 
+## C13 Public transactional email — in progress, 2026-10-19
+
+- Founder wants signup and password-reset codes delivered to any customer without SES sandbox limits or a paid mailbox. The existing Django SMTP backend can use a transactional sender; Resend's free plan currently permits 100 sends/day and 3,000/month. A Resend account verification link has been sent to the founder inbox; domain authentication, credentials, server switch and real delivery checks remain pending.
+- Signup previously claimed a code was sent even when the mail backend rejected it. Registration now returns a retryable service error on immediate delivery failure and removes the unusable code; password reset keeps its generic response to avoid disclosing registered addresses. Focused email-auth tests passed (14). This change is local and not deployed yet.
+
 ## C12 Clear saved plan reservations — deployed, 2026-10-19
 
 - The founder sees Blocked ₹0 and Planned ₹16,16,200 while Applications is empty. Capital currently reserves every untracked row in the latest saved plan indefinitely, and the Plan screen has no way to release it.
