@@ -1,11 +1,12 @@
 # LotNeeti execution status
 
-## C12 Clear saved plan reservations — verified locally, 2026-10-19
+## C12 Clear saved plan reservations — deployed, 2026-10-19
 
 - The founder sees Blocked ₹0 and Planned ₹16,16,200 while Applications is empty. Capital currently reserves every untracked row in the latest saved plan indefinitely, and the Plan screen has no way to release it.
 - Add an explicit Clear saved plan action that retains plan history and bank balances. Keep active tracked application commitments counted independently of the saved plan so clearing it cannot hide submitted or pending applications.
 - The Plan page now shows Clear saved plan when its latest saved run has rows. A confirmation panel explains that tracked Applications remain; clearing marks the run `CLEARED` and keeps rows, hashes and audit history. The latest run's old exports/tracking are no longer usable as a current plan. Capital now counts active planned/submitted Applications from every run and adds only untracked rows in the latest uncleared run.
-- Focused tests cover full release of an untracked plan, role/workspace scoping, stale-run rejection, immutable history, and preservation of older active Applications. Full `scripts/check.sh` passed: 410 backend tests, 38 web tests, 1 Android test, lint, format, migration, typecheck and production builds. Deployment pending.
+- Focused tests cover full release of an untracked plan, role/workspace scoping, stale-run rejection, immutable history, and preservation of older active Applications. Full `scripts/check.sh` passed: 410 backend tests, 38 web tests, 1 Android test, lint, format, migration, typecheck and production builds.
+- Commit `a9abb37` was pushed to the work branch. The pre-release backup succeeded, release archive SHA-256 `50aa785c0d5b4dc27043dad93fa9fd8b02ded4d802a76ebc3080c1fb8e2370b4` was deployed to `https://lotneeti.dpdns.org/`, and migration `planner.0003_alter_planrun_status` applied. Django system check and API health passed. Public home, sign-in, and API health each returned HTTPS 200. No user plan, application, or bank balance was modified during release verification.
 
 ## C11 Bank transfer and balance descriptions — deployed, 2026-10-19
 
