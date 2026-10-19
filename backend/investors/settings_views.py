@@ -246,6 +246,8 @@ def _archive_bank_balance_history(bank, workspace):
             delta=change.delta,
             new_balance=change.new_balance,
             note=change.note,
+            transfer_id=change.transfer_id,
+            counterparty_label=change.counterparty_label,
             actor_id=change.actor_id,
             created_at=change.created_at,
         )

@@ -71,14 +71,18 @@ class BalanceChange(models.Model):
         ADD = "ADD", "Add Money"
         REMOVE = "REMOVE", "Remove Money"
         SET = "SET", "Set Balance"
+        TRANSFER_OUT = "TRANSFER_OUT", "Transfer out"
+        TRANSFER_IN = "TRANSFER_IN", "Transfer in"
         ALLOTMENT = "ALLOTMENT", "Allotment cost"
 
     bank = models.ForeignKey(BankAccount, on_delete=models.PROTECT, related_name="balance_changes")
-    operation = models.CharField(max_length=9, choices=Operation.choices)
+    operation = models.CharField(max_length=12, choices=Operation.choices)
     old_balance = models.DecimalField(max_digits=14, decimal_places=2)
     delta = models.DecimalField(max_digits=14, decimal_places=2)
     new_balance = models.DecimalField(max_digits=14, decimal_places=2)
     note = models.CharField(max_length=200, blank=True)
+    transfer_id = models.UUIDField(null=True, blank=True, db_index=True)
+    counterparty_label = models.CharField(max_length=180, blank=True)
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -102,11 +106,13 @@ class ArchivedBalanceChange(models.Model):
     bank_name = models.CharField(max_length=120)
     account_masked = models.CharField(max_length=20)
     source_change_id = models.PositiveBigIntegerField()
-    operation = models.CharField(max_length=9, choices=BalanceChange.Operation.choices)
+    operation = models.CharField(max_length=12, choices=BalanceChange.Operation.choices)
     old_balance = models.DecimalField(max_digits=14, decimal_places=2)
     delta = models.DecimalField(max_digits=14, decimal_places=2)
     new_balance = models.DecimalField(max_digits=14, decimal_places=2)
     note = models.CharField(max_length=200, blank=True)
+    transfer_id = models.UUIDField(null=True, blank=True, db_index=True)
+    counterparty_label = models.CharField(max_length=180, blank=True)
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
     created_at = models.DateTimeField()
 

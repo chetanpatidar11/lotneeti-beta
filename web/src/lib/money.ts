@@ -8,9 +8,11 @@ export function formatInr(value: string | number): string {
   }).format(amount);
 }
 
-export function balanceActionLabel(operation: "ADD" | "REMOVE" | "SET" | "ALLOTMENT"): string {
+export function balanceActionLabel(operation: "ADD" | "REMOVE" | "SET" | "TRANSFER_OUT" | "TRANSFER_IN" | "ALLOTMENT"): string {
   if (operation === "ADD") return "+ Add Money";
   if (operation === "REMOVE") return "- Remove Money";
   if (operation === "ALLOTMENT") return "Allotment cost";
+  if (operation === "TRANSFER_OUT") return "Transfer to bank";
+  if (operation === "TRANSFER_IN") return "Transfer from bank";
   return "Set Balance";
 }

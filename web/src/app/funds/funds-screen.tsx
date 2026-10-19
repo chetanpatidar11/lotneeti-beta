@@ -10,14 +10,14 @@ import ScheduledPayments, { type ScheduledPayment } from "./scheduled-payments";
 type Workspace = { id: string; name: string; role: string };
 type Investor = { id: string; name: string };
 type Bank = { id: string; owner: string; bank_name: string; account_masked: string; account_reference: string; account_display: string; current_balance: string; active: boolean };
-type Change = { id: number; operation: "ADD" | "REMOVE" | "SET" | "ALLOTMENT"; amount: string; balance: string; note: string; created_at: string };
+type Change = { id: number; operation: "ADD" | "REMOVE" | "SET" | "TRANSFER_OUT" | "TRANSFER_IN" | "ALLOTMENT"; amount: string; balance: string; note: string; counterparty_label: string; created_at: string };
 type StatementChange = Change & { bank_id: string; bank_name: string; owner_name: string; account_masked: string; delta: string };
 type StatementPage = { results: StatementChange[]; next_page: number | null; total: number };
 type CapitalLine = { balance: string; blocked: string; planned: string; available: string };
 type ArchivedBank = { id: string; bank_name: string; account_masked: string; last_changed: string };
-type Action = "add" | "remove" | "set";
+type Action = "add" | "remove" | "set" | "transfer";
 type Tab = "accounts" | "statement" | "payments" | "deleted";
-const actionLabel = (action: Action) => balanceActionLabel(action.toUpperCase() as "ADD" | "REMOVE" | "SET");
+const actionLabel = (action: Action) => action === "transfer" ? "Transfer" : balanceActionLabel(action.toUpperCase() as "ADD" | "REMOVE" | "SET");
 
 export default function FundsScreen({ workspace, investors, initialBanks, statementBanks, initialPayments, capitalByBank, archivedBanks }: {
   workspace: Workspace; investors: Investor[]; initialBanks: Bank[]; statementBanks: Bank[];
@@ -39,8 +39,10 @@ export default function FundsScreen({ workspace, investors, initialBanks, statem
   const [archivedChanges, setArchivedChanges] = useState<Change[]>([]);
   const [action, setAction] = useState<Action | null>(null);
   const [actionBankId, setActionBankId] = useState("");
+  const [destinationBankId, setDestinationBankId] = useState("");
   const [addBankOpen, setAddBankOpen] = useState(false);
   const [amount, setAmount] = useState("");
+  const [description, setDescription] = useState("");
   const [name, setName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [ownerId, setOwnerId] = useState(investors[0]?.id ?? "");
@@ -48,6 +50,7 @@ export default function FundsScreen({ workspace, investors, initialBanks, statem
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const actionBank = banks.find((bank) => bank.id === actionBankId);
+  const destinationBank = banks.find((bank) => bank.id === destinationBankId);
   const statementBankChoices = [...statementBanks, ...banks.filter((bank) => !statementBanks.some((item) => item.id === bank.id))];
   const canEdit = workspace.role !== "VIEWER";
   const accountLabel = (bank: Bank) => `${bank.bank_name} · ${investors.find((item) => item.id === bank.owner)?.name ?? "Owner"} · ${bank.account_display}`;
@@ -109,19 +112,28 @@ export default function FundsScreen({ workspace, investors, initialBanks, statem
 
   async function changeBalance(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!actionBank || !action) return;
+    if (action === "transfer" && (!destinationBank || destinationBank.id === actionBank.id)) {
+      setMessage("Choose two different bank accounts."); return;
+    }
     setBusy(true); setMessage("");
     try {
-      const response = await fetch(`/api/workspaces/${workspace.id}/banks/${actionBank.id}/balance-changes/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ amount }) });
+      const response = action === "transfer"
+        ? await fetch(`/api/workspaces/${workspace.id}/bank-transfers`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source_bank: actionBank.id, destination_bank: destinationBankId, amount, note: description.trim() }) })
+        : await fetch(`/api/workspaces/${workspace.id}/banks/${actionBank.id}/balance-changes/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ amount, note: description.trim() }) });
       if (!response.ok) {
-        const result = await response.json().catch(() => ({})) as { detail?: string | string[] } | string[];
-        const detail = Array.isArray(result) ? result.join(" ") : Array.isArray(result.detail) ? result.detail.join(" ") : result.detail;
+        const result = await response.json().catch(() => ({})) as { detail?: string | string[]; message?: string; non_field_errors?: string[] } | string[];
+        const detail = Array.isArray(result) ? result.join(" ") : Array.isArray(result.detail) ? result.detail.join(" ") : result.detail || result.message || result.non_field_errors?.join(" ");
         throw new Error(detail || "Check the amount and bank details, then try again.");
       }
-      const result = await response.json() as { balance: string };
-      setBanks((current) => current.map((bank) => bank.id === actionBank.id ? { ...bank, current_balance: result.balance } : bank));
+      const result = await response.json() as { balance?: string; source_balance?: string; destination_balance?: string };
+      setBanks((current) => current.map((bank) => {
+        if (bank.id === actionBank.id) return { ...bank, current_balance: action === "transfer" ? result.source_balance! : result.balance! };
+        if (action === "transfer" && bank.id === destinationBankId) return { ...bank, current_balance: result.destination_balance! };
+        return bank;
+      }));
       await refreshCapital();
-      setAmount(""); setAction(null); setActionBankId(""); setStatementVersion((value) => value + 1);
-      setMessage("Balance updated.");
+      setAmount(""); setDescription(""); setAction(null); setActionBankId(""); setDestinationBankId(""); setStatementVersion((value) => value + 1);
+      setMessage(action === "transfer" ? "Transfer recorded in both bank statements." : "Balance updated.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Check the amount and try again."); }
     finally { setBusy(false); }
   }
@@ -133,13 +145,13 @@ export default function FundsScreen({ workspace, investors, initialBanks, statem
       {([["accounts", "Accounts"], ["statement", "Bank statement"], ["payments", "Scheduled Payments / EMI"], ["deleted", "Deleted bank history"]] as const).map(([key, label]) => <button type="button" key={key} className={tab === key ? "settings-tab active" : "settings-tab"} aria-current={tab === key ? "page" : undefined} onClick={() => setTab(key)}>{label}</button>)}
     </nav>
     {tab === "accounts" && <>
-      {canEdit && banks.length > 0 && <div className="funds-actions" role="group" aria-label="Balance actions">{(["add", "remove", "set"] as Action[]).map((item) => <button key={item} className={item === "add" ? "" : "button-secondary"} type="button" onClick={() => { setAction(item); setActionBankId(""); setAmount(""); }}>{actionLabel(item)}</button>)}</div>}
+      {canEdit && banks.length > 0 && <div className="funds-actions" role="group" aria-label="Balance actions">{(["add", "remove", "set", "transfer"] as Action[]).map((item) => <button key={item} className={item === "add" ? "" : "button-secondary"} type="button" disabled={item === "transfer" && banks.length < 2} title={item === "transfer" && banks.length < 2 ? "Add another active bank to record a transfer" : undefined} onClick={() => { setAction(item); setActionBankId(""); setDestinationBankId(""); setAmount(""); setDescription(""); }}>{actionLabel(item)}</button>)}</div>}
       {banks.length === 0 ? <EmptyState title="No active bank accounts" detail={investors.length === 0 ? "Add or activate an investor, then link a bank." : "Add a bank or activate an account in Settings."} action={<Link href="/settings/investors">Investor settings</Link>} /> :
         <div className="compact-table-wrap funds-table-wrap"><table className="compact-table funds-table"><thead><tr><th>Owner / bank</th><th>Balance</th><th>Blocked</th><th>Planned</th><th>Available</th><th>State</th></tr></thead><tbody>{banks.map((bank) => { const line = capitalLines[bank.id]; return <tr key={bank.id}><th scope="row" className="funds-owner-cell"><strong>{bank.bank_name}</strong><span>{investors.find((item) => item.id === bank.owner)?.name ?? "Owner"} · {bank.account_display}</span></th><td>{formatInr(bank.current_balance)}</td><td>{line ? formatInr(line.blocked) : "—"}</td><td>{line ? formatInr(line.planned) : "—"}</td><td className="positive-cell">{line ? formatInr(line.available) : "—"}</td><td><StatusBadge tone={bank.active ? "positive" : "neutral"}>{bank.active ? "Active" : "Paused"}</StatusBadge></td></tr>; })}</tbody></table></div>}
     </>}
     {tab === "statement" && <section className="section-panel funds-statement"><SectionHeading title="Bank statement" detail={`${statementTotal} recorded movement${statementTotal === 1 ? "" : "s"} across your banks`} />
       <label className="funds-filter">Bank account<select value={statementBankId} onChange={(event) => setStatementBankId(event.target.value)}><option value="">All banks</option>{statementBankChoices.map((bank) => <option key={bank.id} value={bank.id}>{bank.bank_name} · {bank.account_display}</option>)}</select></label>
-      {statement.length === 0 && !statementLoading ? <EmptyState title="No balance changes yet." /> : <div className="compact-table-wrap"><table className="compact-table funds-statement-table"><thead><tr><th>Date</th><th>Bank / owner</th><th>Transaction</th><th>Debit</th><th>Credit</th><th>Balance after</th></tr></thead><tbody>{statement.map((change) => <tr key={change.id}><td>{new Date(change.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</td><th scope="row"><strong>{change.bank_name}</strong><span>{change.owner_name} · {change.account_masked}</span></th><td>{balanceActionLabel(change.operation)}{change.note && <small>{change.note}</small>}</td><td>{Number(change.delta) < 0 ? formatInr(Math.abs(Number(change.delta))) : "—"}</td><td>{Number(change.delta) > 0 ? formatInr(change.delta) : "—"}</td><td>{formatInr(change.balance)}</td></tr>)}</tbody></table></div>}
+      {statement.length === 0 && !statementLoading ? <EmptyState title="No balance changes yet." /> : <div className="compact-table-wrap"><table className="compact-table funds-statement-table"><thead><tr><th>Date</th><th>Bank / owner</th><th>Transaction</th><th>Debit</th><th>Credit</th><th>Balance after</th></tr></thead><tbody>{statement.map((change) => <tr key={change.id}><td>{new Date(change.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</td><th scope="row"><strong>{change.bank_name}</strong><span>{change.owner_name} · {change.account_masked}</span></th><td>{balanceActionLabel(change.operation)}{change.counterparty_label && <small>{change.counterparty_label}</small>}{change.note && <small>{change.note}</small>}</td><td>{Number(change.delta) < 0 ? formatInr(Math.abs(Number(change.delta))) : "—"}</td><td>{Number(change.delta) > 0 ? formatInr(change.delta) : "—"}</td><td>{formatInr(change.balance)}</td></tr>)}</tbody></table></div>}
       {statementNext && <button type="button" className="button-secondary" disabled={statementLoading} onClick={() => void loadStatement(statementBankId, statementNext, true)}>{statementLoading ? "Loading…" : "Load more"}</button>}
     </section>}
     {tab === "payments" && <section className="section-panel funds-scheduled"><SectionHeading title="Scheduled Payments / EMI" detail="Upcoming debits for the selected bank" />
@@ -147,9 +159,9 @@ export default function FundsScreen({ workspace, investors, initialBanks, statem
     </section>}
     {tab === "deleted" && <section className="section-panel archived-bank-history" aria-label="Deleted bank history"><SectionHeading title="Deleted bank history" detail="Balance changes remain available after a bank is deleted." />
       {archivedBanks.length === 0 ? <EmptyState title="No deleted bank history." /> : <div className="settings-funding-list">{archivedBanks.map((bank) => <button key={bank.id} type="button" className="settings-funding-row" aria-pressed={archivedBankId === bank.id} onClick={() => void loadArchivedHistory(bank.id)}><span><strong>{bank.bank_name}</strong><small>{bank.account_masked}</small></span><span>View history</span></button>)}</div>}
-      {archivedBankId && <ul className="change-list">{archivedChanges.map((change) => <li key={change.id}><span><strong>{balanceActionLabel(change.operation)}</strong><br /><small>{new Date(change.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" })}</small></span><span>{formatInr(change.amount)}<br /><small>Balance {formatInr(change.balance)}</small></span></li>)}</ul>}
+      {archivedBankId && <ul className="change-list">{archivedChanges.map((change) => <li key={change.id}><span><strong>{balanceActionLabel(change.operation)}</strong><br />{change.counterparty_label && <small>{change.counterparty_label}<br /></small>}{change.note && <small>{change.note}<br /></small>}<small>{new Date(change.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" })}</small></span><span>{formatInr(change.amount)}<br /><small>Balance {formatInr(change.balance)}</small></span></li>)}</ul>}
     </section>}
-    {action && <Drawer title={actionLabel(action)} onClose={() => { setAction(null); setActionBankId(""); }}><form onSubmit={changeBalance} className="sign-in-form"><label htmlFor="balance-bank">Bank account</label><select id="balance-bank" value={actionBankId} required onChange={(event) => setActionBankId(event.target.value)}><option value="">Choose a bank account</option>{banks.map((bank) => <option key={bank.id} value={bank.id}>{accountLabel(bank)}</option>)}</select>{actionBank && <p className="intro">Current balance: <strong>{formatInr(actionBank.current_balance)}</strong></p>}<label htmlFor="balance-amount">{action === "set" ? "New balance" : "Amount"} (₹)</label><input id="balance-amount" type="number" min={action === "set" ? "0" : "0.01"} step="0.01" required value={amount} onChange={(event) => setAmount(event.target.value)} /><button type="submit" disabled={busy || !actionBank}>{actionLabel(action)}</button></form></Drawer>}
+    {action && <Drawer title={actionLabel(action)} onClose={() => { setAction(null); setActionBankId(""); setDestinationBankId(""); }}><form onSubmit={changeBalance} className="sign-in-form"><label htmlFor="balance-bank">{action === "transfer" ? "From bank account" : "Bank account"}</label><select id="balance-bank" value={actionBankId} required onChange={(event) => { setActionBankId(event.target.value); if (destinationBankId === event.target.value) setDestinationBankId(""); }}><option value="">Choose a bank account</option>{banks.map((bank) => <option key={bank.id} value={bank.id}>{accountLabel(bank)}</option>)}</select>{actionBank && <p className="intro">Current balance: <strong>{formatInr(actionBank.current_balance)}</strong></p>}{action === "transfer" && <><label htmlFor="transfer-destination">To bank account</label><select id="transfer-destination" value={destinationBankId} required onChange={(event) => setDestinationBankId(event.target.value)}><option value="">Choose a bank account</option>{banks.filter((bank) => bank.id !== actionBankId).map((bank) => <option key={bank.id} value={bank.id}>{accountLabel(bank)}</option>)}</select><p className="intro">Record money moved between your banks. This does not send money through your bank.</p></>}<label htmlFor="balance-amount">{action === "set" ? "New balance" : "Amount"} (₹)</label><input id="balance-amount" type="number" min={action === "set" ? "0" : "0.01"} step="0.01" required value={amount} onChange={(event) => setAmount(event.target.value)} /><label htmlFor="balance-description">Description (optional)</label><input id="balance-description" maxLength={200} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Add a note for this change" /><button type="submit" disabled={busy || !actionBank || (action === "transfer" && !destinationBank)}>{action === "transfer" ? "Record transfer" : actionLabel(action)}</button></form></Drawer>}
     {addBankOpen && <Drawer title="Add bank account" onClose={() => setAddBankOpen(false)}><form onSubmit={createBank} className="sign-in-form"><label htmlFor="bank-owner">Owner</label><select id="bank-owner" value={ownerId} onChange={(event) => setOwnerId(event.target.value)}>{investors.map((investor) => <option key={investor.id} value={investor.id}>{investor.name}</option>)}</select><label htmlFor="bank-name">Bank name</label><input id="bank-name" required value={name} onChange={(event) => setName(event.target.value)} /><label htmlFor="account-number">Account number</label><input id="account-number" required autoComplete="off" value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} /><label htmlFor="opening-balance">Opening Balance (₹)</label><input id="opening-balance" type="number" min="0" step="0.01" required value={openingBalance} onChange={(event) => setOpeningBalance(event.target.value)} /><button type="submit" disabled={busy}>Add bank</button></form></Drawer>}
   </div></main>;
 }

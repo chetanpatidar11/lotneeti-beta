@@ -1,6 +1,7 @@
 from decimal import Decimal
 from uuid import UUID
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.paginator import Paginator
 from django.db.models import Max
 from django.shortcuts import get_object_or_404
@@ -11,7 +12,7 @@ from rest_framework.views import APIView
 
 from accounts.permissions import WorkspaceDataPermission
 from funding.models import ArchivedBalanceChange, BalanceChange, BankAccount
-from funding.services import add_money, remove_money, set_balance
+from funding.services import add_money, remove_money, set_balance, transfer_money
 
 
 class BalanceAmountSerializer(serializers.Serializer):
@@ -69,6 +70,50 @@ class SetBalanceView(BalanceActionView):
     serializer_class = SetBalanceSerializer
 
 
+class TransferSerializer(serializers.Serializer):
+    source_bank = serializers.UUIDField()
+    destination_bank = serializers.UUIDField()
+    amount = serializers.DecimalField(max_digits=14, decimal_places=2, min_value=Decimal("0.01"))
+    note = serializers.CharField(max_length=200, required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if attrs["source_bank"] == attrs["destination_bank"]:
+            raise ValidationError("Choose two different bank accounts.")
+        return attrs
+
+
+class BankTransferView(APIView):
+    permission_classes = [WorkspaceDataPermission]
+
+    def post(self, request, workspace_id):
+        serializer = TransferSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        details = serializer.validated_data
+        banks = BankAccount.objects.filter(workspace_id=workspace_id)
+        source = get_object_or_404(banks, pk=details["source_bank"])
+        destination = get_object_or_404(banks, pk=details["destination_bank"])
+        try:
+            from_change, to_change = transfer_money(
+                source=source,
+                destination=destination,
+                amount=details["amount"],
+                actor=request.user,
+                note=details.get("note", "").strip(),
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.messages) from exc
+        response = Response(
+            {
+                "transfer_id": str(from_change.transfer_id),
+                "source_balance": str(from_change.new_balance),
+                "destination_balance": str(to_change.new_balance),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+
 class RecentBalanceChangesView(APIView):
     permission_classes = [WorkspaceDataPermission]
 
@@ -94,6 +139,8 @@ class RecentBalanceChangesView(APIView):
                     ),
                     "balance": str(change.new_balance),
                     "note": change.note,
+                    "transfer_id": str(change.transfer_id) if change.transfer_id else None,
+                    "counterparty_label": change.counterparty_label,
                     "created_at": change.created_at.isoformat(),
                 }
                 for change in changes
@@ -145,6 +192,8 @@ class WorkspaceBalanceStatementView(APIView):
                         ),
                         "balance": str(change.new_balance),
                         "note": change.note,
+                        "transfer_id": str(change.transfer_id) if change.transfer_id else None,
+                        "counterparty_label": change.counterparty_label,
                         "created_at": change.created_at.isoformat(),
                     }
                     for change in page.object_list

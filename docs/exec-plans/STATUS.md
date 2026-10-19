@@ -1,5 +1,12 @@
 # LotNeeti execution status
 
+## C11 Bank transfer and balance descriptions — verified locally, 2026-10-19
+
+- Add a Funds Transfer action that chooses source and destination banks, records equal debit/credit history entries in one transaction, and shows both in the bank statement. Add an optional description to Add Money, Remove Money, Set Balance, and Transfer.
+- Scope both banks to the signed-in workspace, require an editor role and sufficient source balance, and verify with synthetic tests before release. Recording a transfer tracks a movement made by the user; it does not initiate a bank payment.
+- Implemented a Transfer button after Set Balance, source/destination bank selectors, optional description on all four actions, and linked debit/credit entries visible in the combined statement and archived history. Transfers lock both bank rows in stable order and commit both balances and audit events atomically. The new API rejects inactive/placeholder banks, cross-workspace banks, same-bank transfers and insufficient balance.
+- Full `scripts/check.sh` passed: 407 backend tests, 38 web tests, 1 Android test, lint, format, migration, typecheck and production builds. Focused tests cover paired history, descriptions, scope/roles, rollback and archive preservation. Deployment pending.
+
 ## E04/E13 Future-cutoff funding preservation — deployed, 2026-10-19
 
 - The founder requested that the automatic plan use money available across banks without an avoidable request to fund an overcommitted account. A read-only evaluation of the current live workspace found 32 applications for Tonbo Imaging India and Bonfiglioli Transmissions, with four cash-overdraw audit issues. The ₹4,18,398 bank was assigned two sHNI and four Retail applications totalling ₹4,70,250.
