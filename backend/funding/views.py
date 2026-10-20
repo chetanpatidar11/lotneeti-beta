@@ -7,6 +7,7 @@ from accounts.models import Workspace, WorkspaceMembership
 from accounts.permissions import WorkspaceDataPermission
 from core.audit import record_event
 from funding.models import BankAccount, FundingPreference, RecurringDebit, UPIHandle
+from funding.restrictions import restricted_bank_names
 from funding.serializers import (
     BankAccountSerializer,
     FundingPreferenceSerializer,
@@ -54,6 +55,7 @@ class BankAccountViewSet(
             "workspace": workspace,
             "reveal_details": self.action == "retrieve" and can_edit,
             "display_details": can_edit,
+            "restricted_bank_names": restricted_bank_names(),
         }
 
     def perform_create(self, serializer):

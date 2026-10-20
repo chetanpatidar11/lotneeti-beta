@@ -16,6 +16,7 @@ from funding.models import (
     UPIHandle,
     upi_hash_for_workspace,
 )
+from funding.restrictions import restricted_bank_names
 from investors.models import DematAccount, Investor
 from ipos.gmp_effective import latest_selection_gmp
 from ipos.models import IPOUserDecision
@@ -116,6 +117,7 @@ def build_snapshot(
     investors = list(Investor.objects.filter(workspace=workspace, is_deleted=False).order_by("id"))
     demats = DematAccount.objects.filter(investor__workspace=workspace).order_by("id")
     banks = list(BankAccount.objects.filter(workspace=workspace).order_by("id"))
+    restricted_names = restricted_bank_names()
     upis = list(UPIHandle.objects.filter(bank__workspace=workspace).order_by("id"))
     own_active_banks = {
         bank.pk: bank.owner_id for bank in banks if bank.active and not bank.is_placeholder
@@ -174,7 +176,7 @@ def build_snapshot(
                 owner_id=str(item.owner_id),
                 balance=item.current_balance,
                 active=item.active and not item.is_placeholder,
-                cross_funding_policy=bank_policy(item, at=now),
+                cross_funding_policy=bank_policy(item, at=now, restricted_names=restricted_names),
                 restricted_applicant_id=(
                     str(item.restricted_investor_id) if item.restricted_investor_id else None
                 ),

@@ -17,6 +17,7 @@ from exports.models import PlanExport
 from exports.services import export_saved_plan
 from exports.storage import DOWNLOAD_TTL_SECONDS
 from ipos.models import IPO
+from planner.export_readiness import assert_current_bank_funding_rules
 
 
 def _can_export(workspace, actor) -> bool:
@@ -73,6 +74,7 @@ def generate_plan_export(
 def signed_export_download(*, record: PlanExport, actor, storage) -> tuple[str, int]:
     if not _can_export(record.plan_run.workspace, actor):
         raise ValidationError("This member cannot download the export")
+    assert_current_bank_funding_rules(record.plan_run, ipo_id=record.ipo_ref or None)
     filename = (
         record.download_filename
         or f"lotneeti-plan-{record.plan_run_id}.{record.object_key.rsplit('.', 1)[-1]}"

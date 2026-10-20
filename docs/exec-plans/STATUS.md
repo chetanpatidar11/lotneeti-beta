@@ -1,5 +1,9 @@
 # LotNeeti execution status
 
+## C18 Bank-name cross-funding restrictions — in progress, 2026-10-20
+
+- Founder wants IDFC and BOI accounts excluded from cross-funding across workspaces, with a list editable later without deployment. Keep own-account applications available. The MFA-protected founder list is seeded with IDFC/IDFC FIRST and BOI/Bank of India names; exact normalized aliases can be added or deactivated in staff admin. The planner reads the current list for every snapshot, a matching bank returns an effective DISALLOW policy even over workspace/plan ALLOW, Settings shows Own account only, and a previously saved cross-funded plan cannot be newly exported or newly tracked after its bank becomes restricted. Application editing and new submission also reject newly restricted cross-funding while preserving historical records. Full `scripts/check.sh` passed: 426 backend tests, 39 web tests, one Android test, lint, typecheck, migrations and builds. Deployment pending.
+
 ## C17 Public GMP, one-step investor setup, IPO timing and plan clarity — deployed, 2026-10-20
 
 - Founder requested eight connected usability and planning corrections: public GMP before sign-in, optional linked account setup with a new investor, timestamps only inside GMP history, percentage in each history row, no closed IPO in Home's active list, automatic IPO timing for fund reuse, saving on CSV export, and a clear explanation of cumulative draft amounts versus available capital.

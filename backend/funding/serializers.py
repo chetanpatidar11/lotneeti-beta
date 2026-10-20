@@ -25,6 +25,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
     account_masked = serializers.CharField(read_only=True)
     account_reference = serializers.SerializerMethodField()
     account_display = serializers.SerializerMethodField()
+    effective_cross_funding_policy = serializers.SerializerMethodField()
     initial_balance = serializers.DecimalField(
         max_digits=14, decimal_places=2, write_only=True, required=False, default=Decimal("0.00")
     )
@@ -44,6 +45,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
             "initial_balance",
             "current_balance",
             "cross_funding_policy",
+            "effective_cross_funding_policy",
             "restricted_investor",
             "active",
             "created_at",
@@ -79,6 +81,11 @@ class BankAccountSerializer(serializers.ModelSerializer):
         if self.context.get("display_details"):
             return decrypt_value(instance.account_ciphertext, purpose="bank-account")
         return instance.account_masked
+
+    def get_effective_cross_funding_policy(self, instance):
+        from planner.policies import bank_policy
+
+        return bank_policy(instance, restricted_names=self.context.get("restricted_bank_names"))
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

@@ -2,10 +2,13 @@
 
 from django.core.exceptions import ValidationError
 
+from funding.models import BankAccount
+from funding.restrictions import restricted_bank_names
 from planner.models import PlanRun
+from planner.policies import bank_policy
 
 
-def assert_exportable_plan(plan_run: PlanRun) -> None:
+def assert_exportable_plan(plan_run: PlanRun, *, ipo_id: str | None = None) -> None:
     if (
         plan_run.status != PlanRun.Status.READY
         or plan_run.audit_issues
@@ -14,3 +17,30 @@ def assert_exportable_plan(plan_run: PlanRun) -> None:
         .exists()
     ):
         raise ValidationError("Resolve blocking plan issues before export")
+    assert_current_bank_funding_rules(plan_run, ipo_id=ipo_id)
+
+
+def assert_current_bank_funding_rules(plan_run: PlanRun, *, ipo_id: str | None = None) -> None:
+    """Reject new use of saved cross-funded mappings after a bank rule changes."""
+    rows = plan_run.rows.all()
+    if ipo_id is not None:
+        rows = rows.filter(ipo_ref=ipo_id)
+    mappings = list(rows.values_list("bank_ref", "applicant_ref"))
+    banks = {
+        str(bank.pk): bank
+        for bank in BankAccount.objects.filter(
+            workspace=plan_run.workspace, pk__in={bank_id for bank_id, _ in mappings}
+        )
+    }
+    restricted_names = restricted_bank_names()
+    for bank_id, applicant_id in mappings:
+        bank = banks.get(bank_id)
+        if bank is None:
+            continue
+        if (
+            str(bank.owner_id) != applicant_id
+            and bank_policy(bank, restricted_names=restricted_names) == "DISALLOW"
+        ):
+            raise ValidationError(
+                "This bank no longer allows cross-funding. Re-plan before exporting."
+            )

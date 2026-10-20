@@ -9,6 +9,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from core.audit import record_event
+from funding.restrictions import bank_name_restricted
 from planner.models import PlannerPolicy
 
 POLICY_VALUES = frozenset(PlannerPolicy.Policy.values)
@@ -33,7 +34,9 @@ def platform_policy(*, at=None):
     return configured
 
 
-def bank_policy(bank, *, at=None):
+def bank_policy(bank, *, at=None, restricted_names: frozenset[str] | None = None):
+    if bank_name_restricted(bank.bank_name, names=restricted_names):
+        return "DISALLOW"
     current = _active_queryset(scope=PlannerPolicy.Scope.BANK, bank=bank, at=at).first()
     return current.policy if current is not None else bank.cross_funding_policy
 

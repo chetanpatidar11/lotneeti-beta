@@ -19,7 +19,7 @@ from accounts.models import User, Workspace, WorkspaceMembership
 from applications.models import Application
 from core.audit import record_event
 from core.models import AuditEvent, BetaEvent
-from funding.models import BankAccount
+from funding.models import BankAccount, BankFundingRestriction
 from ipos.content import publish_content_revision
 from ipos.gmp_effective import effective_observation_value, resolve_gmp
 from ipos.gmp_overrides import resume_observation_auto, set_observation_override
@@ -601,6 +601,41 @@ class FounderAdminSite(AdminSite):
 
 
 founder_admin_site = FounderAdminSite(name="founder_admin")
+
+
+@admin.register(BankFundingRestriction, site=founder_admin_site)
+class BankFundingRestrictionAdmin(ModelAdmin):
+    list_display = ("name", "active", "reason", "updated_at")
+    list_filter = ("active",)
+    list_editable = ("active",)
+    search_fields = ("name", "aliases")
+    fields = ("name", "aliases", "active", "reason")
+
+    def has_module_permission(self, request):
+        return founder_admin_site.has_permission(request)
+
+    def has_view_permission(self, request, obj=None):
+        return founder_admin_site.has_permission(request)
+
+    def has_add_permission(self, request):
+        return founder_admin_site.has_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return founder_admin_site.has_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        record_event(
+            action="funding.bank_restriction.updated"
+            if change
+            else "funding.bank_restriction.created",
+            target=obj,
+            actor=request.user,
+            metadata={"rule_name": obj.name, "active": obj.active},
+        )
 
 
 class ReadOnlyModelAdmin(ModelAdmin):

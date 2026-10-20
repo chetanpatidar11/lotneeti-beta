@@ -30,7 +30,7 @@ def export_saved_plan(
         role__in=(WorkspaceMembership.Role.OWNER, WorkspaceMembership.Role.OPERATOR),
     ).exists():
         raise ValidationError("This member cannot export the plan")
-    assert_exportable_plan(plan_run)
+    assert_exportable_plan(plan_run, ipo_id=ipo_id)
     plan_rows = list(plan_run.rows.all())
     if ipo_id is not None:
         plan_rows = [row for row in plan_rows if row.ipo_ref == ipo_id]

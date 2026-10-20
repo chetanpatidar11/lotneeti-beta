@@ -153,7 +153,7 @@ export default function PrioritySettings({
   })));
   const bankRows = banks.map((bank) => ({
     id: bank.id, name: `${bank.bank_name || "BANK"} · ${bank.account_display}`, owner: bank.is_placeholder ? "Choose owner" : investorName(bank.owner),
-    detail: `Balance ${formatInr(bank.current_balance)}`, active: bank.active, isPlaceholder: bank.is_placeholder,
+    detail: `Balance ${formatInr(bank.current_balance)}${bank.effective_cross_funding_policy === "DISALLOW" ? " · Own account only" : ""}`, active: bank.active, isPlaceholder: bank.is_placeholder,
     statusLabel: bank.is_placeholder ? "Choose owner" : undefined,
   }));
   const upiRows = Object.values(linkedAccounts).flatMap((accounts) => accounts.upis.map((upi) => {

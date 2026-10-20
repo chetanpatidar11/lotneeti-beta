@@ -13,6 +13,7 @@ export type BankOption = {
   is_imported_reference: boolean;
   current_balance: string;
   active: boolean;
+  effective_cross_funding_policy: string;
 };
 
 export type FundingPreference = {

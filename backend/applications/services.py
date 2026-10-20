@@ -17,6 +17,7 @@ from funding.models import BalanceChange, BankAccount, UPIHandle
 from investors.models import DematAccount, Investor
 from ipos.models import IPO
 from planner.export_readiness import assert_exportable_plan
+from planner.policies import bank_policy
 
 
 def _require_writer(workspace, actor):
@@ -104,6 +105,8 @@ def edit_application(
     ).first()
     if bank is None:
         raise ValidationError("Choose an active bank account in this workspace")
+    if bank.owner_id != item.applicant_id and bank_policy(bank) == "DISALLOW":
+        raise ValidationError("This bank cannot fund another investor's application")
     upi = UPIHandle.objects.filter(pk=upi_id, bank=bank, active=True, verified=True).first()
     if upi is None:
         raise ValidationError("Choose an active UPI linked to that bank")
@@ -186,6 +189,8 @@ def mark_submitted(*, application: Application, actor) -> Application:
     _require_writer(item.workspace, actor)
     if item.status != Application.Status.PLANNED:
         raise ValidationError("Only a planned application can be marked submitted")
+    if item.bank.owner_id != item.applicant_id and bank_policy(item.bank) == "DISALLOW":
+        raise ValidationError("This bank cannot fund another investor's application")
     item.status = Application.Status.SUBMITTED
     item.submitted_at = timezone.now()
     item.save(update_fields=["status", "submitted_at"])
