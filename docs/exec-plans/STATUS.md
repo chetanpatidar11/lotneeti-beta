@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## C15 Preferred funding swap and blue verification email — release ready, 2026-10-20
+
+- A live plan preview exposed two equal-sized, unlocked cross-funded applications whose bank/UPI assignments could be swapped without changing coverage or cash use. The existing cleanup only accepted swaps that increased own-bank funding, missing a configured preferred-bank improvement.
+- Cleanup now compares own-bank coverage first, then enabled preferred-bank coverage and preference order. It still requires matching amounts and timelines and passes cash, policy, rolling-limit, and independent audit checks before accepting a swap. Synthetic sHNI regression tests cover the improvement and preserve own-bank priority.
+- Verification and password-reset email HTML accents changed from green to blue. Focused planner/auth tests passed (22). The complete `scripts/check.sh` gate passed (414 backend tests, 38 web tests, 1 Android test, planner matrix, lint, typecheck, migrations, and production builds). Production verification remains.
+
 ## C14 Verification email presentation — deployed, 2026-10-20
 
 - Signup and password-reset emails now place the six-digit code first in the subject and display it prominently in both a selectable HTML panel and a plain-text version. Gmail decides whether to show its own “Copy code” card; the email itself cannot force that interface. Focused auth tests passed (14), and the complete `scripts/check.sh` gate passed (412 backend tests, 38 web tests, 1 Android test, lint, typecheck, migration and production builds). Commit `6b8743d` was pushed; the pre-release backup and production deployment succeeded with no new migrations. Public sign-in and API health returned HTTPS 200. Production delivery remains on the verified Gmail sender through Brevo pending branded-sender deliverability remediation; the founder should check whether Gmail renders its native copy-code card on a newly requested code.

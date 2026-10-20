@@ -7,6 +7,7 @@ from planner.dto import (
     ApplicantInput,
     BankInput,
     DematInput,
+    FundingPreferenceInput,
     IPOInput,
     PlannerConfig,
     PlannerSnapshot,
@@ -130,6 +131,64 @@ def test_rr005_locked_row_prevents_owner_affinity_swap():
     snapshot, original = affinity_case()
     locked = replace(original, rows=(replace(original.rows[0], locked=True), original.rows[1]))
     assert owner_affinity_cleanup(snapshot, locked) == locked
+
+
+def test_preferred_cross_funding_swap_improves_one_applicant_without_losing_coverage():
+    snapshot, original = affinity_case()
+    snapshot = replace(
+        snapshot,
+        applicants=snapshot.applicants
+        + (ApplicantInput("external-1", 3, False), ApplicantInput("external-2", 4, False)),
+        banks=(
+            replace(snapshot.banks[0], owner_id="external-1", balance=Decimal("210000.00")),
+            replace(snapshot.banks[1], owner_id="external-2", balance=Decimal("210000.00")),
+        ),
+        funding_preferences=(FundingPreferenceInput("applicant-1", "bank-2", 1, True),),
+    )
+    original = replace(
+        original,
+        rows=(
+            replace(
+                original.rows[0],
+                category="SHNI",
+                lots=14,
+                amount=Decimal("210000.00"),
+                bank_id="bank-1",
+                upi_id="upi-1",
+            ),
+            replace(
+                original.rows[1],
+                category="SHNI",
+                lots=14,
+                amount=Decimal("210000.00"),
+                bank_id="bank-2",
+                upi_id="upi-2",
+            ),
+        ),
+    )
+    cleaned = owner_affinity_cleanup(snapshot, original)
+    assert [(row.applicant_id, row.bank_id, row.upi_id) for row in cleaned.rows] == [
+        ("applicant-1", "bank-2", "upi-2"),
+        ("applicant-2", "bank-1", "upi-1"),
+    ]
+    assert all("CROSS_FUNDING" in row.warnings for row in cleaned.rows)
+    assert owner_affinity_cleanup(snapshot, cleaned) == cleaned
+
+
+def test_preferred_cross_funding_does_not_replace_two_own_bank_assignments():
+    snapshot, original = affinity_case()
+    snapshot = replace(
+        snapshot,
+        funding_preferences=(FundingPreferenceInput("applicant-1", "bank-2", 1, True),),
+    )
+    own_rows = replace(
+        original,
+        rows=(
+            replace(original.rows[0], bank_id="bank-1", upi_id="upi-1"),
+            replace(original.rows[1], bank_id="bank-2", upi_id="upi-2"),
+        ),
+    )
+    assert owner_affinity_cleanup(snapshot, own_rows) == own_rows
 
 
 def test_rr004_swap_rolls_back_when_new_bank_mapping_is_restricted():

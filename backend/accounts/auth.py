@@ -78,16 +78,16 @@ def _send_code(email: str, *, purpose: str, subject: str, password_hash: str = "
             "If you did not request it, ignore this email.\n"
         )
         html_message = (
-            '<!doctype html><html><body style="margin:0;padding:24px;background:#f3f7f5;'
-            'font-family:Arial,sans-serif;color:#183128">'
+            '<!doctype html><html><body style="margin:0;padding:24px;background:#f3f7fc;'
+            'font-family:Arial,sans-serif;color:#172b4d">'
             '<div style="max-width:520px;margin:0 auto;padding:32px;background:#ffffff;'
-            'border:1px solid #dce8e1;border-radius:16px">'
-            '<p style="margin:0 0 24px;font-size:18px;font-weight:700;color:#087451">LotNeeti</p>'
+            'border:1px solid #d8e4f5;border-radius:16px">'
+            '<p style="margin:0 0 24px;font-size:18px;font-weight:700;color:#1d4ed8">LotNeeti</p>'
             f'<h1 style="margin:0 0 12px;font-size:24px">{subject}</h1>'
             '<p style="margin:0 0 20px;line-height:1.5">Enter this code to continue:</p>'
-            f'<p style="margin:0 0 20px;padding:18px;background:#edf7f1;border-radius:10px;'
+            f'<p style="margin:0 0 20px;padding:18px;background:#eaf2ff;border-radius:10px;'
             f'font-size:36px;font-weight:700;letter-spacing:8px;text-align:center">{code}</p>'
-            '<p style="margin:0;line-height:1.5;color:#52675c">This code expires in 15 minutes. '
+            '<p style="margin:0;line-height:1.5;color:#52647a">This code expires in 15 minutes. '
             "If you did not request it, ignore this email.</p>"
             "</div></body></html>"
         )

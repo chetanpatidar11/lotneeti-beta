@@ -225,10 +225,28 @@ def repair_shni_upgrades(snapshot: PlannerSnapshot, coverage: CoverageResult) ->
 
 
 def owner_affinity_cleanup(snapshot: PlannerSnapshot, coverage: CoverageResult) -> CoverageResult:
-    """Swap equal-timeline wallets only when more applicants use their own bank."""
+    """Swap equal-timeline wallets to improve own or preferred funding."""
     rows = list(coverage.rows)
     ipos = {ipo.id: ipo for ipo in snapshot.ipos}
     banks = {bank.id: bank for bank in snapshot.banks}
+    preference_rank = {}
+    for preference in snapshot.funding_preferences:
+        if preference.enabled:
+            key = (preference.beneficiary_id, preference.bank_id)
+            preference_rank[key] = min(
+                preference.priority, preference_rank.get(key, preference.priority)
+            )
+
+    def affinity(left: CoverageRow, right: CoverageRow) -> tuple[int, int, int]:
+        pair = (left, right)
+        own_count = sum(banks[row.bank_id].owner_id == row.applicant_id for row in pair)
+        preferred_ranks = [
+            preference_rank[(row.applicant_id, row.bank_id)]
+            for row in pair
+            if banks[row.bank_id].owner_id != row.applicant_id
+            and (row.applicant_id, row.bank_id) in preference_rank
+        ]
+        return own_count, len(preferred_ranks), -sum(preferred_ranks)
 
     def timeline(row: CoverageRow):
         ipo = ipos[row.ipo_id]
@@ -256,14 +274,6 @@ def owner_affinity_cleanup(snapshot: PlannerSnapshot, coverage: CoverageResult) 
                 or timeline(left) != timeline(right)
             ):
                 continue
-            before = int(banks[left.bank_id].owner_id == left.applicant_id) + int(
-                banks[right.bank_id].owner_id == right.applicant_id
-            )
-            after = int(banks[right.bank_id].owner_id == left.applicant_id) + int(
-                banks[left.bank_id].owner_id == right.applicant_id
-            )
-            if after <= before:
-                continue
             candidate = rows.copy()
             candidate[first] = replace(
                 left, bank_id=right.bank_id, upi_id=right.upi_id, warnings=()
@@ -271,6 +281,8 @@ def owner_affinity_cleanup(snapshot: PlannerSnapshot, coverage: CoverageResult) 
             candidate[second] = replace(
                 right, bank_id=left.bank_id, upi_id=left.upi_id, warnings=()
             )
+            if affinity(candidate[first], candidate[second]) <= affinity(left, right):
+                continue
             if not _rows_feasible(snapshot, tuple(candidate)):
                 continue
             reviewed, audit = review_manual_rows(
