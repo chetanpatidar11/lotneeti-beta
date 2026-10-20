@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## C16 Blue product theme and API loading — release ready, 2026-10-20
+
+- Replace green brand and neutral tints throughout the public, authentication, and signed-in pages with a coordinated blue palette in both light and dark themes; keep amber warnings and red errors distinct. The GMP history line now follows the theme accent instead of a fixed green.
+- A shared loading indicator now appears during browser API requests, excluding the background session refresh. The existing route skeleton also shows a spinner. The IPO mode control explains how Retail + sHNI differs from sHNI Preferred.
+- Local sign-in was visually inspected in light and dark blue themes; the dark-theme eyebrow contrast was corrected. The complete `scripts/check.sh` gate passed (415 backend tests, 38 web tests, 1 Android test, planner matrix, lint, typecheck, migrations, and production builds). Deployment and public verification remain.
+
 ## C15 Preferred funding swap and blue verification email — deployed, 2026-10-20
 
 - A live plan preview exposed two equal-sized, unlocked cross-funded applications whose bank/UPI assignments could be swapped without changing coverage or cash use. The existing cleanup only accepted swaps that increased own-bank funding, missing a configured preferred-bank improvement.

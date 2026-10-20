@@ -60,14 +60,17 @@ export default function IPOChoice({ workspaceId, ipoId, initial, canEdit }: {
       <button type="button" disabled={busy} aria-pressed={choice.decision === "APPLY"} onClick={() => save({ decision: choice.decision === "APPLY" ? "SKIP" : "APPLY" })}>{choice.decision === "APPLY" ? "Unselect" : "Select"}</button>
       <button type="button" disabled={busy} aria-pressed={choice.decision === "SKIP"} onClick={() => save({ decision: "SKIP" })}>Skip</button>
     </div>}
-    {choice.selected && <label className="ipo-mode">IPO mode
+    {choice.selected && <div className="ipo-mode-stack"><label className="ipo-mode">IPO mode
       <select value={choice.mode} disabled={!canEdit || busy} onChange={(event) => save({ mode: event.target.value as IPOSelection["mode"] })}>
         <option value="RETAIL_ONLY">Retail Only</option>
         <option value="RETAIL_PLUS_SHNI">Retail + sHNI</option>
         <option value="SHNI_PREFERRED">sHNI Preferred</option>
         <option value="CUSTOM">Custom</option>
       </select>
-    </label>}
+    </label>
+    {(choice.mode === "RETAIL_PLUS_SHNI" || choice.mode === "SHNI_PREFERRED") && <p className="ipo-mode-help">{choice.mode === "RETAIL_PLUS_SHNI"
+      ? "Start with Retail coverage, then try an sHNI upgrade pass where funds allow."
+      : "Start with Retail coverage, then repeat upgrades to fit as many minimum sHNI applications as possible."}</p>}</div>}
     {message && <p role="status">{message}</p>}
   </div>;
 }

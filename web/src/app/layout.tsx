@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/session";
 import { localPreviewEnabled } from "@/lib/local-preview";
 import { selectedWorkspace } from "@/lib/workspace";
 import AppNav from "./app-nav";
+import ApiActivityIndicator from "./api-activity-indicator";
 import SessionKeeper from "./session-keeper";
 import "./globals.css";
 import "./theme.css";
@@ -38,6 +39,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     <html lang="en" data-theme={theme}>
       <head><meta name="referrer" content="no-referrer" /></head>
       <body>
+        <ApiActivityIndicator />
         <a className="skip-link" href="#main-content">Skip to content</a>
         {user ? <div className="app-layout"><SessionKeeper /><AppNav email={user.email} workspaces={workspaces} selectedId={workspace?.id} founderAdmin={founderAdmin} theme={theme} localPreview={localPreviewEnabled() && user.email === "local-preview@lotneeti.test"} /><div className="app-main" id="main-content" tabIndex={-1}>{children}</div></div> : <div id="main-content" tabIndex={-1}>{children}</div>}
       </body>

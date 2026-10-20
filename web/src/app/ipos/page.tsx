@@ -34,7 +34,7 @@ function Trend({ history }: { history: Observation[] }) {
   const low = Math.min(...values);
   const span = Math.max(...values) - low || 1;
   const coordinates = values.map((value, index) => `${10 + (index * 280) / (values.length - 1)},${35 - ((value - low) / span) * 27}`).join(" ");
-  return <svg className="gmp-trend" viewBox="0 0 300 45" role="img" aria-label="GMP history trend"><polyline points={coordinates} fill="none" stroke="#49bd86" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  return <svg className="gmp-trend" viewBox="0 0 300 45" role="img" aria-label="GMP history trend"><polyline points={coordinates} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 export default async function IPOsPage({ searchParams }: { searchParams: Promise<{ filter?: string; q?: string; view?: string }> }) {
   const cookieHeader = (await cookies()).toString();
