@@ -29,6 +29,9 @@ def test_one_form_verifies_new_account_then_signs_in_for_30_days():
     assert client.get(reverse("me")).status_code == 403
     assert len(mail.outbox) == 1
     code = token_from_email()
+    assert mail.outbox[-1].subject.startswith(code)
+    assert mail.outbox[-1].alternatives[0].mimetype == "text/html"
+    assert code in mail.outbox[-1].alternatives[0].content
     assert credentials["password"] not in mail.outbox[-1].body
     assert code not in EmailLoginToken.objects.get().token_hash
     assert (
@@ -108,6 +111,8 @@ def test_password_reset_response_does_not_disclose_account_and_recovers_old_magi
     assert missing.data == present.data
     assert len(mail.outbox) == 1
     token = token_from_email()
+    assert mail.outbox[-1].subject.startswith(token)
+    assert "password" in mail.outbox[-1].subject.lower()
     assert (
         client.post(
             reverse("password-reset-complete"),
