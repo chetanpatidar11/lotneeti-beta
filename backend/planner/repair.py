@@ -225,7 +225,7 @@ def repair_shni_upgrades(snapshot: PlannerSnapshot, coverage: CoverageResult) ->
 
 
 def owner_affinity_cleanup(snapshot: PlannerSnapshot, coverage: CoverageResult) -> CoverageResult:
-    """Swap equal-timeline wallets to improve own or preferred funding."""
+    """Rotate equal-timeline wallets to improve own or preferred funding."""
     rows = list(coverage.rows)
     ipos = {ipo.id: ipo for ipo in snapshot.ipos}
     banks = {bank.id: bank for bank in snapshot.banks}
@@ -237,12 +237,11 @@ def owner_affinity_cleanup(snapshot: PlannerSnapshot, coverage: CoverageResult) 
                 preference.priority, preference_rank.get(key, preference.priority)
             )
 
-    def affinity(left: CoverageRow, right: CoverageRow) -> tuple[int, int, int]:
-        pair = (left, right)
-        own_count = sum(banks[row.bank_id].owner_id == row.applicant_id for row in pair)
+    def affinity(assigned: tuple[CoverageRow, ...]) -> tuple[int, int, int]:
+        own_count = sum(banks[row.bank_id].owner_id == row.applicant_id for row in assigned)
         preferred_ranks = [
             preference_rank[(row.applicant_id, row.bank_id)]
-            for row in pair
+            for row in assigned
             if banks[row.bank_id].owner_id != row.applicant_id
             and (row.applicant_id, row.bank_id) in preference_rank
         ]
@@ -252,6 +251,42 @@ def owner_affinity_cleanup(snapshot: PlannerSnapshot, coverage: CoverageResult) 
         ipo = ipos[row.ipo_id]
         cutoff = application_cutoff(ipo, row.category)
         return cutoff, expected_release_at(ipo.allotment_date, cutoff.tzinfo)
+
+    def try_rotation(targets: tuple[int, ...], sources: tuple[int, ...]):
+        candidate = rows.copy()
+        for target, source in zip(targets, sources, strict=True):
+            candidate[target] = replace(
+                rows[target],
+                bank_id=rows[source].bank_id,
+                upi_id=rows[source].upi_id,
+                warnings=(),
+            )
+        before = tuple(rows[index] for index in targets)
+        after = tuple(candidate[index] for index in targets)
+        if affinity(after) <= affinity(before) or not _rows_feasible(snapshot, tuple(candidate)):
+            return None
+        reviewed, audit = review_manual_rows(
+            snapshot,
+            [
+                {
+                    "ipo": row.ipo_id,
+                    "applicant": row.applicant_id,
+                    "category": row.category,
+                    "lots": row.lots,
+                    "amount": row.amount,
+                    "demat": row.demat_id,
+                    "bank": row.bank_id,
+                    "upi": row.upi_id,
+                    "locked": row.locked,
+                }
+                for row in candidate
+            ],
+        )
+        if not audit.valid:
+            return None
+        return [
+            replace(row, warnings=reviewed[index].warnings) for index, row in enumerate(candidate)
+        ]
 
     while True:
         changed = False
@@ -274,41 +309,30 @@ def owner_affinity_cleanup(snapshot: PlannerSnapshot, coverage: CoverageResult) 
                 or timeline(left) != timeline(right)
             ):
                 continue
-            candidate = rows.copy()
-            candidate[first] = replace(
-                left, bank_id=right.bank_id, upi_id=right.upi_id, warnings=()
-            )
-            candidate[second] = replace(
-                right, bank_id=left.bank_id, upi_id=left.upi_id, warnings=()
-            )
-            if affinity(candidate[first], candidate[second]) <= affinity(left, right):
+            rotated = try_rotation((first, second), (second, first))
+            if rotated is None:
                 continue
-            if not _rows_feasible(snapshot, tuple(candidate)):
-                continue
-            reviewed, audit = review_manual_rows(
-                snapshot,
-                [
-                    {
-                        "ipo": row.ipo_id,
-                        "applicant": row.applicant_id,
-                        "category": row.category,
-                        "lots": row.lots,
-                        "amount": row.amount,
-                        "demat": row.demat_id,
-                        "bank": row.bank_id,
-                        "upi": row.upi_id,
-                        "locked": row.locked,
-                    }
-                    for row in candidate
-                ],
-            )
-            if not audit.valid:
-                continue
-            rows = [
-                replace(row, warnings=reviewed[index].warnings)
-                for index, row in enumerate(candidate)
-            ]
+            rows = rotated
             changed = True
             break
+        if changed:
+            continue
+        for first, second, third in combinations(indices, 3):
+            group = (rows[first], rows[second], rows[third])
+            if (
+                any(row.locked for row in group)
+                or len({row.bank_id for row in group}) != 3
+                or len({row.amount for row in group}) != 1
+                or len({timeline(row) for row in group}) != 1
+            ):
+                continue
+            for sources in ((second, third, first), (third, first, second)):
+                rotated = try_rotation((first, second, third), sources)
+                if rotated is not None:
+                    rows = rotated
+                    changed = True
+                    break
+            if changed:
+                break
         if not changed:
             return CoverageResult(tuple(rows), coverage.uncovered)

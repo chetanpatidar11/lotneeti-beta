@@ -191,6 +191,46 @@ def test_preferred_cross_funding_does_not_replace_two_own_bank_assignments():
     assert owner_affinity_cleanup(snapshot, own_rows) == own_rows
 
 
+def test_three_way_rotation_frees_preferred_bank_without_losing_owner_funding():
+    snapshot, original = setup(rows=3)
+    snapshot = replace(
+        snapshot,
+        applicants=snapshot.applicants + (ApplicantInput("external-owner", 4, False),),
+        banks=(
+            BankInput("bank-1", "applicant-1", Decimal("210000.00"), True, "DEFAULT"),
+            BankInput("bank-2", "applicant-1", Decimal("210000.00"), True, "DEFAULT"),
+            BankInput("bank-3", "external-owner", Decimal("210000.00"), True, "DEFAULT"),
+        ),
+        upis=(
+            UPIInput("upi-1", "bank-1", "applicant-1", True, True),
+            UPIInput("upi-2", "bank-2", "applicant-1", True, True),
+            UPIInput("upi-3", "bank-3", "external-owner", True, True),
+        ),
+        funding_preferences=(FundingPreferenceInput("applicant-3", "bank-1", 1, True),),
+    )
+    original = replace(
+        original,
+        rows=tuple(
+            replace(
+                row,
+                category="SHNI",
+                lots=14,
+                amount=Decimal("210000.00"),
+                bank_id=f"bank-{index}",
+                upi_id=f"upi-{index}",
+            )
+            for index, row in enumerate(original.rows, start=1)
+        ),
+    )
+    cleaned = owner_affinity_cleanup(snapshot, original)
+    assert [(row.applicant_id, row.bank_id) for row in cleaned.rows] == [
+        ("applicant-1", "bank-2"),
+        ("applicant-2", "bank-3"),
+        ("applicant-3", "bank-1"),
+    ]
+    assert owner_affinity_cleanup(snapshot, cleaned) == cleaned
+
+
 def test_rr004_swap_rolls_back_when_new_bank_mapping_is_restricted():
     snapshot, original = affinity_case()
     restricted = replace(
