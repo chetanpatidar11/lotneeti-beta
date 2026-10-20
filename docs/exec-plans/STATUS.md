@@ -1,10 +1,10 @@
 # LotNeeti execution status
 
-## C16 Blue product theme and API loading — release ready, 2026-10-20
+## C16 Blue product theme and API loading — deployed, 2026-10-20
 
 - Replace green brand and neutral tints throughout the public, authentication, and signed-in pages with a coordinated blue palette in both light and dark themes; keep amber warnings and red errors distinct. The GMP history line now follows the theme accent instead of a fixed green.
 - A shared loading indicator now appears during browser API requests, excluding the background session refresh. The existing route skeleton also shows a spinner. The IPO mode control explains how Retail + sHNI differs from sHNI Preferred.
-- Local sign-in was visually inspected in light and dark blue themes; the dark-theme eyebrow contrast was corrected. The complete `scripts/check.sh` gate passed (415 backend tests, 38 web tests, 1 Android test, planner matrix, lint, typecheck, migrations, and production builds). Deployment and public verification remain.
+- Local sign-in was visually inspected in light and dark blue themes; the dark-theme eyebrow contrast was corrected. The complete `scripts/check.sh` gate passed (415 backend tests, 38 web tests, 1 Android test, planner matrix, lint, typecheck, migrations, and production builds). Commit `3a01556` was deployed after a successful pre-release backup with release archive SHA-256 `b13c21a4080cb362722887ee894a6648d8fc829e0168eba8e3e0946df42251c9`. The public sign-in returned HTTPS 200 and the API health endpoint returned `ok`.
 
 ## C15 Preferred funding swap and blue verification email — deployed, 2026-10-20
 
