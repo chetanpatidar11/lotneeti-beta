@@ -1,8 +1,8 @@
 # LotNeeti execution status
 
-## C14 Verification email presentation — ready to deploy, 2026-10-20
+## C14 Verification email presentation — deployed, 2026-10-20
 
-- Signup and password-reset emails now place the six-digit code first in the subject and display it prominently in both a selectable HTML panel and a plain-text version. Gmail decides whether to show its own “Copy code” card; the email itself cannot force that interface. Focused auth tests passed (14), and the complete `scripts/check.sh` gate passed (412 backend tests, 38 web tests, 1 Android test, lint, typecheck, migration and production builds). Production delivery remains on the verified Gmail sender through Brevo pending branded-sender deliverability remediation.
+- Signup and password-reset emails now place the six-digit code first in the subject and display it prominently in both a selectable HTML panel and a plain-text version. Gmail decides whether to show its own “Copy code” card; the email itself cannot force that interface. Focused auth tests passed (14), and the complete `scripts/check.sh` gate passed (412 backend tests, 38 web tests, 1 Android test, lint, typecheck, migration and production builds). Commit `6b8743d` was pushed; the pre-release backup and production deployment succeeded with no new migrations. Public sign-in and API health returned HTTPS 200. Production delivery remains on the verified Gmail sender through Brevo pending branded-sender deliverability remediation; the founder should check whether Gmail renders its native copy-code card on a newly requested code.
 
 ## C13 Public transactional email — deployed, 2026-10-20
 
