@@ -1,11 +1,12 @@
 # LotNeeti execution status
 
-## C15 Preferred funding swap and blue verification email — three-way refinement in progress, 2026-10-20
+## C15 Preferred funding swap and blue verification email — deployed, 2026-10-20
 
 - A live plan preview exposed two equal-sized, unlocked cross-funded applications whose bank/UPI assignments could be swapped without changing coverage or cash use. The existing cleanup only accepted swaps that increased own-bank funding, missing a configured preferred-bank improvement.
 - Cleanup now compares own-bank coverage first, then enabled preferred-bank coverage and preference order. It still requires matching amounts and timelines and passes cash, policy, rolling-limit, and independent audit checks before accepting a swap. Synthetic sHNI regression tests cover the improvement and preserve own-bank priority.
 - Verification and password-reset email HTML accents changed from green to blue. Focused planner/auth tests passed (22). The complete `scripts/check.sh` gate passed (414 backend tests, 38 web tests, 1 Android test, planner matrix, lint, typecheck, migrations, and production builds). Commit `2d81b4a` was deployed after a successful pre-release backup.
-- Live verification showed that the beneficiary's preferred bank was held by a third applicant, so a direct two-row swap could not improve the score. A read-only three-way rotation passed cash/policy/limit checks and the independent audit. Cleanup now also tries bounded three-way rotations after pair swaps, preserving own-bank priority. A synthetic sHNI regression covers this exact shape. The full gate passed again (415 backend tests, 38 web tests, 1 Android test, planner matrix, lint, typecheck, migrations, and production builds). Live verification is pending for this refinement.
+- Live verification showed that the beneficiary's preferred bank was held by a third applicant, so a direct two-row swap could not improve the score. A read-only three-way rotation passed cash/policy/limit checks and the independent audit. Cleanup now also tries bounded three-way rotations after pair swaps, preserving own-bank priority. A synthetic sHNI regression covers this exact shape. The full gate passed again (415 backend tests, 38 web tests, 1 Android test, planner matrix, lint, typecheck, migrations, and production builds).
+- Commit `e8a18ec` was pushed and deployed after a successful pre-release backup; release archive SHA-256 `e4f77aae1d6989872e8c74ea749db6e4ded18574ba1a1a778a5f7fe6daf06c29`. The live Jio-only preview passed its final audit with 16 rows. The beneficiary now uses the enabled priority-one preferred funding bank, the other cross-funded applicant uses the alternate bank, and the bank owner retains own-bank funding. No plan was saved or changed during verification. Public sign-in and API health returned HTTPS 200.
 
 ## C14 Verification email presentation — deployed, 2026-10-20
 
