@@ -141,6 +141,7 @@ class EditedRowSerializer(serializers.Serializer):
 
 class ValidateRequestSerializer(serializers.Serializer):
     rows = EditedRowSerializer(many=True)
+    reserve_ipo_id = serializers.UUIDField(required=False)
     plan_cross_funding_override = serializers.ChoiceField(
         choices=["DEFAULT", "ALLOW", "WARN", "DISALLOW"], default="DEFAULT"
     )
@@ -225,8 +226,59 @@ class PlannerRunCreateView(APIView):
                 ],
             )
             rows, audit = review_manual_rows(snapshot, serializer.validated_data["rows"])
+            reserve_ipo_id = serializer.validated_data.get("reserve_ipo_id")
+            reserved_ipo_ids = None
+            if reserve_ipo_id is not None:
+                target = str(reserve_ipo_id)
+                if target not in {row.ipo_id for row in rows}:
+                    raise ValidationError("The IPO to export is not in this plan")
+                reserved_ipo_ids = []
+                previous = PlanRun.objects.filter(workspace=workspace).first()
+                if previous and previous.status == PlanRun.Status.READY:
+                    if previous.reserved_ipo_ids is None:
+                        reserved_ipo_ids = None
+                    else:
+                        current_by_ipo = {}
+                        for row in rows:
+                            current_by_ipo.setdefault(row.ipo_id, []).append(
+                                (
+                                    row.applicant_id,
+                                    row.category,
+                                    row.lots,
+                                    row.amount,
+                                    row.demat_id,
+                                    row.bank_id,
+                                    row.upi_id,
+                                )
+                            )
+                        for ipo_id in previous.reserved_ipo_ids:
+                            if ipo_id not in current_by_ipo:
+                                continue
+                            if ipo_id == target:
+                                continue
+                            prior_rows = list(
+                                previous.rows.filter(ipo_ref=ipo_id).values_list(
+                                    "applicant_ref",
+                                    "category",
+                                    "lots",
+                                    "amount",
+                                    "demat_ref",
+                                    "bank_ref",
+                                    "upi_ref",
+                                )
+                            )
+                            if sorted(prior_rows) != sorted(current_by_ipo[ipo_id]):
+                                raise ValidationError(
+                                    "An already exported IPO changed. Export that IPO again first."
+                                )
+                            reserved_ipo_ids.append(ipo_id)
             run = create_reviewed_plan_run(
-                workspace=workspace, snapshot=snapshot, rows=rows, audit=audit, actor=request.user
+                workspace=workspace,
+                snapshot=snapshot,
+                rows=rows,
+                audit=audit,
+                actor=request.user,
+                reserved_ipo_ids=reserved_ipo_ids,
             )
         except ImproperlyConfigured:
             return Response({"detail": "Planner policy has not been configured."}, status=503)
@@ -290,6 +342,11 @@ class WorkspaceCapitalView(APIView):
                 planned_by_bank[bank_id] = planned_by_bank.get(bank_id, 0) + item.amount
         if latest is not None and latest.status != PlanRun.Status.CLEARED:
             for row in latest.rows.all():
+                if (
+                    latest.reserved_ipo_ids is not None
+                    and row.ipo_ref not in latest.reserved_ipo_ids
+                ):
+                    continue
                 if row.pk in tracked_by_row:
                     continue
                 planned_by_bank[row.bank_ref] = planned_by_bank.get(row.bank_ref, 0) + row.amount

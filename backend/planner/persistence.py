@@ -159,6 +159,7 @@ def create_reviewed_plan_run(
     rows: tuple[CoverageRow, ...],
     audit: AuditResult,
     actor,
+    reserved_ipo_ids: list[str] | None = None,
 ) -> PlanRun:
     if not WorkspaceMembership.objects.filter(
         workspace=workspace,
@@ -188,6 +189,7 @@ def create_reviewed_plan_run(
         input_snapshot=input_text,
         status=PlanRun.Status.READY if audit.valid else PlanRun.Status.BLOCKED,
         planned_total=audit.planned_total,
+        reserved_ipo_ids=reserved_ipo_ids,
         audit_issues=[asdict(issue) for issue in audit.issues],
         uncovered=[],
     )

@@ -2,7 +2,7 @@ from django.urls import path
 
 from investors.import_views import AccountImportListView, AccountImportPreviewView
 from investors.settings_views import SettingsItemsView
-from investors.views import DematAccountViewSet, InvestorViewSet
+from investors.views import DematAccountViewSet, InvestorSetupView, InvestorViewSet
 
 investor_list = InvestorViewSet.as_view({"get": "list", "post": "create"})
 investor_detail = InvestorViewSet.as_view(
@@ -28,6 +28,11 @@ urlpatterns = [
         "workspaces/<uuid:workspace_id>/account-imports/<uuid:pk>/",
         AccountImportPreviewView.as_view(),
         name="account-import-preview",
+    ),
+    path(
+        "workspaces/<uuid:workspace_id>/investors/setup/",
+        InvestorSetupView.as_view(),
+        name="investor-setup",
     ),
     path("workspaces/<uuid:workspace_id>/investors/", investor_list, name="investor-list"),
     path(

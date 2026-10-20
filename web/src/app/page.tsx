@@ -56,7 +56,7 @@ export default async function HomePage() {
   const paymentLists = await Promise.all((banks ?? []).map((bank) => getData<Payment[]>(`${prefix}/banks/${bank.id}/recurring-debits/`, cookieHeader)));
   const payments = paymentLists.flatMap((items) => items ?? []);
   const selected = new Map((decisions ?? []).map((item) => [item.ipo, item]));
-  const featured = (ipos ?? []).filter((ipo) => ipo.status === "OPEN" || selected.get(ipo.id)?.selected).slice(0, 6);
+  const featured = (ipos ?? []).filter((ipo) => ["OPEN", "UPCOMING"].includes(ipo.status) && (ipo.status === "OPEN" || selected.get(ipo.id)?.selected)).slice(0, 6);
   const actions: { title: string; detail: string; href: string; tone: "warning" | "danger" | "info" }[] = [];
   for (const ipo of ipos ?? []) {
     const days = daysUntil(ipo.close_date);
@@ -74,7 +74,7 @@ export default async function HomePage() {
 
   return <main className="page"><div className="shell home-shell">
     <PageHeader eyebrow="Overview" title="Operations dashboard" description={workspace.name} action={<Link className="button-link" href="/plan">Review plan <span aria-hidden="true">↗</span></Link>} />
-    <div className="market-feed-status"><div><strong>IPO market data</strong><small>{feed?.last_success_at ? `Last synced ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(new Date(feed.last_success_at))} IST` : "Waiting for the first successful sync"}{feed?.status === "ERROR" ? " · Latest attempt failed" : ""}</small></div>{feed?.can_sync ? <LiveSyncButton /> : feed?.founder ? <a href="/admin/login/?next=/">Verify as founder to enable Live sync</a> : null}</div>
+    <div className="market-feed-status"><div><strong>IPO market data</strong>{feed?.status === "ERROR" && <small>Latest update failed</small>}</div>{feed?.can_sync ? <LiveSyncButton /> : feed?.founder ? <a href="/admin/login/?next=/">Verify as founder to enable Live sync</a> : null}</div>
     {!capital || !operations ? <div className="plan-error" role="alert">Dashboard data is temporarily unavailable. <Link href="/">Retry</Link></div> : <>
       <section className="metric-grid" aria-label="Money overview">
         <MetricCard label="Total Balance" value={formatInr(capital.balance)} note="Across your banks" href="/funds" />
@@ -84,7 +84,7 @@ export default async function HomePage() {
       </section>
       <section className="operations-grid" aria-label="Activity overview">
         <MetricCard label="Open IPOs" value={operations.active_ipos} href="/ipos" />
-        <MetricCard label="Selected IPOs" value={(decisions ?? []).filter((item) => item.selected).length} href="/ipos" />
+        <MetricCard label="Selected IPOs" value={(ipos ?? []).filter((ipo) => ["OPEN", "UPCOMING"].includes(ipo.status) && selected.get(ipo.id)?.selected).length} href="/ipos" />
         <MetricCard label="Applications" value={operations.applications} href="/applications" />
         <MetricCard label="Pending Mandates" value={operations.pending_mandates} tone="warning" href="/applications" />
         <MetricCard label="Allotment Wins" value={operations.allotment_wins} href="/applications" />

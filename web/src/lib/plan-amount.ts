@@ -33,3 +33,19 @@ export function amountForLots(upperPrice: string, lotSize: number, lots: number)
 export function sumAmounts(values: string[]): string {
   return centsToString(values.reduce((sum, value) => sum + parseCents(value), 0n));
 }
+
+export function peakConcurrentAmount(rows: { amount: string; closeDate: string; allotmentDate: string; category: string }[]): string {
+  const events = rows.flatMap((row) => {
+    const cutoff = Date.parse(`${row.closeDate}T${row.category === "SHNI" ? "16" : "17"}:00:00+05:30`);
+    const release = Date.parse(`${row.allotmentDate}T00:00:00+05:30`) + 86400000;
+    const amount = parseCents(row.amount);
+    return [{ at: cutoff, delta: amount }, { at: release, delta: -amount }];
+  }).sort((a, b) => a.at - b.at || (a.delta < b.delta ? -1 : a.delta > b.delta ? 1 : 0));
+  let active = 0n;
+  let peak = 0n;
+  for (const event of events) {
+    active += event.delta;
+    if (active > peak) peak = active;
+  }
+  return centsToString(peak);
+}

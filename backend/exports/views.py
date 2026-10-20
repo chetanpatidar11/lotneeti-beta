@@ -50,6 +50,9 @@ class PlanExportCreateView(APIView):
             return Response({"detail": "Private export storage is not configured."}, status=503)
         except ValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=409)
+        if ipo_id and run.reserved_ipo_ids is not None:
+            run.reserved_ipo_ids = sorted(set(run.reserved_ipo_ids) | {ipo_id})
+            run.save(update_fields=["reserved_ipo_ids"])
         return Response(
             {
                 "id": str(record.pk),

@@ -28,6 +28,8 @@ class PlanRun(models.Model):
     input_snapshot = models.TextField()
     status = models.CharField(max_length=7, choices=Status.choices)
     planned_total = models.DecimalField(max_digits=14, decimal_places=2)
+    # None reserves every row (manual Save); a list reserves only exported IPOs.
+    reserved_ipo_ids = models.JSONField(null=True, blank=True, default=None)
     audit_issues = models.JSONField(default=list)
     uncovered = models.JSONField(default=list)
     generated_at = models.DateTimeField(auto_now_add=True)

@@ -15,6 +15,7 @@ function autoSelectionReason(choice: IPOSelection) {
   switch (choice.reason) {
     case "ISSUE_TYPE_EXCLUDED": return "This IPO type is off in automatic selection.";
     case "OPEN_IPO_AVAILABLE": return "An IPO is open, so upcoming IPOs wait for automatic selection.";
+    case "WAITING_FOR_FUND_REUSE": return "Automatic selection is waiting for funds from an earlier IPO.";
     case "IPO_NOT_OPEN": return "This IPO is not open for automatic selection.";
     case "THRESHOLD_NOT_SET": return "Set a GMP threshold to turn on automatic selection.";
     case "GMP_UNAVAILABLE": return "No GMP is available for automatic selection.";

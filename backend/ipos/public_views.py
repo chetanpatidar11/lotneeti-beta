@@ -52,6 +52,8 @@ class MarketPreviewView(APIView):
                         "status",
                         "current_gmp",
                         "current_gmp_percent",
+                        "last_stale_gmp",
+                        "last_stale_gmp_percent",
                     )
                 }
             )

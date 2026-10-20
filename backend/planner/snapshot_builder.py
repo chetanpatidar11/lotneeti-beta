@@ -21,7 +21,7 @@ from ipos.gmp_effective import latest_selection_gmp
 from ipos.models import IPOUserDecision
 from ipos.overrides import effective_ipo_values, published_ipos
 from ipos.public_serializers import gmp_percent
-from ipos.selection import has_open_auto_ipo, select_ipo, selection_status
+from ipos.selection import resolve_ipo_choices
 from planner.cash import expected_release_at
 from planner.dto import (
     ApplicantInput,
@@ -60,24 +60,36 @@ def build_snapshot(
     ipos = list(published_ipos().order_by("id"))
     effective_values = {ipo.pk: effective_ipo_values(ipo) for ipo in ipos}
     issue_types = tuple(workspace.auto_select_issue_types or ["MAINBOARD"])
-    has_open = has_open_auto_ipo(list(effective_values.values()), issue_types=issue_types, at=now)
-    selected_ipos = []
+    selection_candidates = []
+    current_gmp_by_ipo = {}
     for ipo in ipos:
         effective = effective_values[ipo.pk]
         latest = latest_selection_gmp(ipo, at=now)
         current_gmp = (
             gmp_percent(latest.value_per_share, effective["upper_price"]) if latest else None
         )
+        current_gmp_by_ipo[str(ipo.pk)] = current_gmp
         decision = decisions.get(str(ipo.pk))
-        selected, _ = select_ipo(
-            decision=decision.decision if decision else IPOUserDecision.Decision.DEFAULT,
-            gmp_percent=current_gmp,
-            threshold=workspace.auto_select_gmp_percent,
-            issue_type=effective["issue_type"],
-            auto_issue_types=issue_types,
-            status=selection_status(effective, at=now),
-            allow_upcoming=not has_open,
+        selection_candidates.append(
+            (
+                str(ipo.pk),
+                effective,
+                decision.decision if decision else IPOUserDecision.Decision.DEFAULT,
+                current_gmp,
+            )
         )
+    choices = resolve_ipo_choices(
+        candidates=selection_candidates,
+        threshold=workspace.auto_select_gmp_percent,
+        issue_types=issue_types,
+        at=now,
+    )
+    selected_ipos = []
+    for ipo in ipos:
+        effective = effective_values[ipo.pk]
+        current_gmp = current_gmp_by_ipo[str(ipo.pk)]
+        decision = decisions.get(str(ipo.pk))
+        selected, _ = choices[str(ipo.pk)]
         if not selected:
             continue
         retail_cutoff = datetime.combine(effective["close_date"], time(17), tzinfo=zone)

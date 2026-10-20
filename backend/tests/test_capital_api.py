@@ -78,3 +78,18 @@ def test_ba007_add_money_after_plan_updates_live_available_amount():
     assert totals["balance"] == "30000.00"
     assert totals["planned"] == "15000.00"
     assert totals["available"] == "15000.00"
+
+
+@pytest.mark.django_db
+def test_export_only_reserves_its_ipo_until_export_succeeds():
+    owner, workspace, snapshot = setup_plan()
+    run = create_plan_run(workspace=workspace, snapshot=snapshot, actor=owner)
+    run.reserved_ipo_ids = []
+    run.save(update_fields=["reserved_ipo_ids"])
+    client = APIClient()
+    client.force_authenticate(owner)
+    url = reverse("workspace-capital", args=[workspace.pk])
+    assert client.get(url).data["planned"] == "0.00"
+    run.reserved_ipo_ids = [run.rows.get().ipo_ref]
+    run.save(update_fields=["reserved_ipo_ids"])
+    assert client.get(url).data["planned"] == "15000.00"

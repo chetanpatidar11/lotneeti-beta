@@ -173,3 +173,49 @@ def test_reviewed_manual_plan_saves_exact_rows_and_blocks_stale_amount_export(mo
     WorkspaceMembership.objects.create(workspace=workspace, user=viewer, role="VIEWER")
     client.force_authenticate(viewer)
     assert client.post(save_url, {"rows": [row]}, format="json").status_code == 403
+
+
+@pytest.mark.django_db
+@override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="ALLOW")
+def test_ipo_export_reserves_funds_without_manual_save(monkeypatch):
+    owner, workspace, snapshot = setup_plan()
+    ipo = IPO.objects.get(pk=snapshot.ipos[0].id)
+    today = timezone.localdate()
+    ipo.open_date = today - timedelta(days=1)
+    ipo.close_date = today + timedelta(days=2)
+    ipo.allotment_date = today + timedelta(days=5)
+    ipo.save(update_fields=["open_date", "close_date", "allotment_date"])
+    IPOUserDecision.objects.create(workspace=workspace, ipo=ipo, decision="APPLY")
+    row = {
+        "ipo": str(ipo.pk),
+        "applicant": snapshot.applicants[0].id,
+        "category": "RETAIL",
+        "lots": 1,
+        "amount": "15000.00",
+        "demat": snapshot.demats[0].id,
+        "bank": snapshot.banks[0].id,
+        "upi": snapshot.upis[0].id,
+    }
+    storage = FakeStorage()
+    monkeypatch.setattr("exports.views.get_export_storage", lambda: storage)
+    client = APIClient()
+    client.force_authenticate(owner)
+    saved = client.post(
+        reverse("planner-run-create", args=[workspace.pk]),
+        {"rows": [row], "reserve_ipo_id": str(ipo.pk)},
+        format="json",
+    )
+    assert saved.status_code == 201
+    run = PlanRun.objects.get(pk=saved.data["id"])
+    assert run.reserved_ipo_ids == []
+    capital_url = reverse("workspace-capital", args=[workspace.pk])
+    assert client.get(capital_url).data["planned"] == "0.00"
+    exported = client.post(
+        reverse("plan-export-create", args=[workspace.pk, run.pk]),
+        {"format_id": "demat_csv", "ipo_id": str(ipo.pk)},
+        format="json",
+    )
+    assert exported.status_code == 201
+    run.refresh_from_db()
+    assert run.reserved_ipo_ids == [str(ipo.pk)]
+    assert client.get(capital_url).data["planned"] == "15000.00"

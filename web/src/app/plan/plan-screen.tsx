@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Drawer } from "@/components/drawer";
 import { formatInr } from "@/lib/money";
-import { amountForLots, minimumShniLots, sumAmounts } from "@/lib/plan-amount";
+import { amountForLots, minimumShniLots, peakConcurrentAmount, sumAmounts } from "@/lib/plan-amount";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/ui";
 import { canExportPlan, issueMessage, lockedMappings, planStatus, rankedBanks, reviewedMappings, rowIssueMessages, selectableApplicants, selectableDemats, selectableUpis, type BankLookup, type DematLookup, type FundingPreference, type PlanPreview, type PlanRow, type UpiLookup } from "@/lib/plan-presentation";
 
 export type PlanLookups = {
-  ipos: Record<string, { name: string; upperPrice: string; lotSize: number; gmpPercent: string | null; closeDate: string }>;
+  ipos: Record<string, { name: string; upperPrice: string; lotSize: number; gmpPercent: string | null; closeDate: string; allotmentDate: string }>;
   applicants: Record<string, { name: string; priority: number; active: boolean }>;
   demats: Record<string, DematLookup>;
   banks: Record<string, BankLookup>;
@@ -208,7 +208,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
       const savedResponse = await fetch(`/api/workspaces/${workspaceId}/planner/runs`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ rows: reviewedMappings(current.rows) }),
+        body: JSON.stringify({ rows: reviewedMappings(current.rows), reserve_ipo_id: ipoId }),
       });
       const saved = await savedResponse.json();
       if (!savedResponse.ok) throw new Error("We could not save this plan for export.");
@@ -226,7 +226,14 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
       const downloadResponse = await fetch(`/api/workspaces/${workspaceId}/planner/runs/${saved.id}/exports/${exportRecord.id}/download`);
       const download = await downloadResponse.json();
       if (!downloadResponse.ok) throw new Error("We could not prepare the download.");
-      window.location.assign(download.download_url);
+      setMessage("IPO exported. Its planned funds are now reserved.");
+      router.refresh();
+      const link = document.createElement("a");
+      link.href = download.download_url;
+      link.rel = "noopener noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "We could not export this plan.");
     } finally {
@@ -279,7 +286,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
             <p><span>Planned</span><strong>{formatInr(lookups.capital.planned)}</strong></p>
             <p><span>Available</span><strong>{formatInr(lookups.capital.available)}</strong></p>
           </div> : <p>Add a bank and set its Balance to see your money here.</p>}
-          <p className="plan-context-help">Planned includes saved plan rows and applications awaiting a block.</p>
+          <p className="plan-context-help">Planned above counts saved reservations. The draft below is not reserved until saved or exported.</p>
           {canEdit && savedPlan?.id && savedPlan.id !== clearedPlanId && savedPlan.status !== "CLEARED" && Number(savedPlan.planned_total) > 0 && <button className="button-secondary" type="button" disabled={busy} onClick={() => { setError(""); setClearOpen(true); }}>Clear saved plan</button>}
         </section>
       </div>
@@ -292,12 +299,16 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
       {validating && <p role="status">Checking your changes…</p>}
       {preview && <section aria-live="polite">
         <div className="plan-summary">
-          <div><span>Planned</span><strong>{formatInr(preview.planned_total)}</strong></div>
+          <div><span>Total applications</span><strong>{formatInr(preview.planned_total)}</strong></div>
           <div><span>Applications</span><strong>{preview.rows.length}</strong></div>
           <div><span>Applicants covered</span><strong>{new Set(preview.rows.map((row) => row.applicant)).size}</strong></div>
           <div><span>Retail / sHNI</span><strong>{preview.rows.filter((row) => row.category === "RETAIL").length} / {preview.rows.filter((row) => row.category === "SHNI").length}</strong></div>
           <div><span>Status</span><strong>{validating ? "Checking" : planStatus(preview)}</strong></div>
         </div>
+        <p className="plan-note">Highest amount needed at one time in this draft: <strong>{formatInr(peakConcurrentAmount(preview.rows.flatMap((row) => {
+          const ipo = lookups.ipos[row.ipo];
+          return ipo ? [{ amount: row.amount, closeDate: ipo.closeDate, allotmentDate: ipo.allotmentDate, category: row.category }] : [];
+        })))}</strong>. Total applications can exceed today’s Balance when money from an earlier IPO is reused after allotment. Each bank is checked at its application cutoff.</p>
         {!validating && <p className="plan-note" role="status">{!canExportPlan(preview) ? "⚠ Blocking: Resolve issues before export." : planStatus(preview) === "Warning" ? "Ready to export. Review the highlighted issues first." : "Ready to export."}</p>}
         {preview.audit_issues.length > 0 && <div className="plan-error" role="alert">
           <strong>⚠ Blocking: Resolve these issues before export</strong>

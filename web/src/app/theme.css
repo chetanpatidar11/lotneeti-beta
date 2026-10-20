@@ -612,6 +612,10 @@ html:not([data-theme="dark"]) .settings-funding-row:hover:not(:disabled) > span:
 .landing-hero-card span { color: #6e98d3; font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
 .landing-hero-card strong { margin-bottom: 24px; font-size: clamp(19px, 2vw, 25px); line-height: 1.2; }
 .landing-hero-card strong:last-child { margin-bottom: 0; }
+.landing-gmp-spotlight { display: inline-flex; flex-direction: column; gap: 4px; max-width: 100%; margin-top: 24px; padding: 13px 17px; border: 1px solid #5576a5; border-radius: 12px; background: #1d2a3d; color: #f2f6fc; text-decoration: none; }
+.landing-gmp-spotlight span { color: #aac4e8; font-size: 12px; font-weight: 750; }
+.landing-gmp-spotlight strong { font-size: 19px; }
+.landing-gmp-spotlight:hover { border-color: #a6c8f2; color: #fff; }
 .landing-market { padding: 36px 0 78px; border-top: 1px solid #2a303a; }
 .landing-section-heading { display: flex; justify-content: space-between; align-items: end; gap: 30px; margin-bottom: 24px; }
 .landing-section-heading h2, .landing-how h2 { font-size: clamp(26px, 3vw, 39px); letter-spacing: -.04em; }

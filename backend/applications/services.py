@@ -35,6 +35,8 @@ def start_tracking_plan(*, plan_run, actor) -> tuple[Application, ...]:
     assert_exportable_plan(plan_run)
     tracked = []
     for row in plan_run.rows.all():
+        if plan_run.reserved_ipo_ids is not None and row.ipo_ref not in plan_run.reserved_ipo_ids:
+            continue
         ipo = IPO.objects.get(pk=row.ipo_ref)
         applicant = Investor.objects.get(
             pk=row.applicant_ref, workspace=workspace, is_deleted=False

@@ -25,10 +25,8 @@ async function accountError(response: Response, fallback: string): Promise<strin
   const body = await response.json().catch(() => null) as Record<string, unknown> | null;
   if (typeof body?.detail === "string") return body.detail;
   if (typeof body?.message === "string") return body.message;
-  const messages = Object.values(body ?? {}).flatMap((value) =>
-    typeof value === "string" ? [value] : Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [],
-  );
-  return messages[0] ?? fallback;
+  const messages = (value: unknown): string[] => typeof value === "string" ? [value] : Array.isArray(value) ? value.flatMap(messages) : value && typeof value === "object" ? Object.values(value).flatMap(messages) : [];
+  return messages(body)[0] ?? fallback;
 }
 
 const labelForKind: Record<SettingsKind, string> = {
@@ -124,6 +122,9 @@ export default function PrioritySettings({
   const [workspaceName, setWorkspaceName] = useState("");
   const [name, setName] = useState("");
   const [pan, setPan] = useState("");
+  const [includeNewDemat, setIncludeNewDemat] = useState(false);
+  const [includeNewBank, setIncludeNewBank] = useState(false);
+  const [includeNewUpi, setIncludeNewUpi] = useState(false);
   const [message, setMessage] = useState("");
   const [messageError, setMessageError] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -214,18 +215,28 @@ export default function PrioritySettings({
     if (!workspace) return;
     setBusy(true);
     try {
-      const response = await fetch(`/api/workspaces/${workspace.id}/investors`, {
+      const response = await fetch(`/api/workspaces/${workspace.id}/investors/setup`, {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, pan, planning_priority: Math.max(0, ...investors.map((item) => item.planning_priority)) + 1 }),
+        body: JSON.stringify({
+          name, pan, planning_priority: Math.max(0, ...investors.map((item) => item.planning_priority)) + 1,
+          ...(includeNewDemat ? { demat: { depository, dp_id: dpId, client_id: clientId, broker } } : {}),
+          ...(includeNewBank ? { bank: { bank_name: bankName, account_number: accountNumber, initial_balance: openingBalance, ...(includeNewUpi ? { upi_handle: upiHandle } : {}) } } : {}),
+        }),
       });
-      if (!response.ok) throw new Error("Create failed");
-      const investor = (await response.json()) as Investor;
-      setInvestors(sortByPriority([...investors, investor]));
-      setName(""); setPan(""); setShowAddInvestor(false);
-      note("Investor added.");
-    } catch {
-      note("Check the investor details and try again.", true);
+      if (!response.ok) throw new Error(await accountError(response, "Check the investor and account details and try again."));
+      try { sessionStorage.setItem(`lotneeti-import-success:${workspace.id}`, "Investor and selected accounts added."); } catch { /* The save succeeded. */ }
+      window.location.reload();
+    } catch (error) {
+      note(error instanceof Error ? error.message : "Check the investor and account details and try again.", true);
     } finally { setBusy(false); }
+  }
+
+  function openAddInvestor() {
+    setName(""); setPan("");
+    setIncludeNewDemat(false); setIncludeNewBank(false); setIncludeNewUpi(false);
+    setDepository("CDSL"); setDpId(""); setClientId(""); setBroker("");
+    setBankName(""); setAccountNumber(""); setOpeningBalance("0"); setUpiHandle("");
+    setShowAddInvestor(true);
   }
 
   function openAddAccount(kind: AddAccountKind) {
@@ -515,7 +526,7 @@ export default function PrioritySettings({
           {selectedActiveInvestors.length > 0 && <button type="button" className="button-secondary" disabled={busy} onClick={() => itemAction("investor", selectedActiveInvestors, "deactivate")}>Deactivate selected ({selectedActiveInvestors.length})</button>}
           {selectedInactiveInvestors.length > 0 && <button type="button" className="button-secondary" disabled={busy} onClick={() => itemAction("investor", selectedInactiveInvestors, "activate")}>Activate selected ({selectedInactiveInvestors.length})</button>}
           {selected.investor.length > 0 && <button type="button" className="button-danger" disabled={busy} onClick={() => itemAction("investor", selected.investor, "delete")}>Delete selected ({selected.investor.length})</button>}
-          <button type="button" className="button-secondary" disabled={busy || activeInvestors.length === 0} onClick={() => void savePriority()}>Save priority</button><button type="button" onClick={() => setShowAddInvestor(true)}>+ Add investor</button>
+          <button type="button" className="button-secondary" disabled={busy || activeInvestors.length === 0} onClick={() => void savePriority()}>Save priority</button><button type="button" onClick={openAddInvestor}>+ Add investor</button>
         </div>} />
         {visibleInvestors.length === 0 ? <EmptyState title="No investors yet" detail="Add an investor to begin planning IPO applications." /> : <div className="settings-table-wrap"><table className="settings-table"><thead><tr>
           {canEdit && <th scope="col" className="settings-select-cell"><label><input type="checkbox" aria-label="Select all investors" checked={visibleInvestors.every((investor) => selected.investor.includes(investor.id))} disabled={busy} onChange={(event) => selectAll("investor", visibleInvestors.map((investor) => investor.id), event.target.checked)} /></label></th>}
@@ -580,7 +591,12 @@ export default function PrioritySettings({
         <button type="submit" disabled={busy}>Save UPI</button>
       </form></Drawer>}
       {focusedInvestor && <Drawer title={focusedInvestor.name} onClose={() => setSelectedInvestor(null)}><div className="settings-investor-detail"><p><strong>PAN</strong><span>{focusedInvestor.pan_display}</span></p><p><strong>Status</strong><StatusBadge tone={!focusedInvestor.active ? "neutral" : focusedInvestor.payment_ready ? "positive" : "warning"}>{!focusedInvestor.active ? "Inactive" : focusedInvestor.payment_ready ? "Active" : "Payment needed"}</StatusBadge></p>{!focusedInvestor.payment_ready && <p><strong>UPI reference</strong><span>{focusedInvestor.payment_hint} · Complete and activate the linked bank before planning.</span></p>}</div><div className="settings-linked"><h3>Demat Account</h3>{linkedAccounts[focusedInvestor.id]?.demats.length ? linkedAccounts[focusedInvestor.id].demats.map((demat) => <p key={demat.id}>{demat.depository} · {demat.dp_id_masked} / {demat.client_id_display} <small>{demat.broker} · {demat.active ? "Active" : "Inactive"}</small></p>) : <p>No demat account yet.</p>}<h3>Bank Accounts</h3>{banks.filter((bank) => bank.owner === focusedInvestor.id).map((bank) => <p key={bank.id}>{bank.bank_name || "BANK"} · {bank.account_display} <small>{bank.active ? "Active" : "Inactive"}</small></p>)}<h3>UPIs</h3>{linkedAccounts[focusedInvestor.id]?.upis.length ? linkedAccounts[focusedInvestor.id].upis.map((upi) => <p key={upi.id}>{upi.handle} <small>{upi.verified ? "Ready" : "Not ready"} · {upi.active ? "Active" : "Inactive"}</small></p>) : <p>No UPIs yet.</p>}</div>{focusedInvestor.active && <PreferredFunding key={focusedInvestor.id} workspaceId={workspace.id} investor={focusedInvestor} investors={activeInvestors} banks={banks.filter((bank) => bank.active)} initialPreferences={preferences[focusedInvestor.id] ?? []} canEdit={canEdit} />}</Drawer>}
-      {showAddInvestor && <Drawer title="Add investor" onClose={() => setShowAddInvestor(false)}><form onSubmit={addInvestor} className="sign-in-form"><label htmlFor="investor-name">Name</label><input id="investor-name" required value={name} onChange={(event) => setName(event.target.value)} /><label htmlFor="investor-pan">PAN</label><input id="investor-pan" required maxLength={10} autoComplete="off" value={pan} onChange={(event) => setPan(event.target.value)} /><button type="submit" disabled={busy}>Add investor</button></form></Drawer>}
+      {showAddInvestor && <Drawer title="Add investor" onClose={() => setShowAddInvestor(false)}><form onSubmit={addInvestor} className="sign-in-form"><label htmlFor="investor-name">Name</label><input id="investor-name" required value={name} onChange={(event) => setName(event.target.value)} /><label htmlFor="investor-pan">PAN</label><input id="investor-pan" required maxLength={10} autoComplete="off" value={pan} onChange={(event) => setPan(event.target.value)} /><p className="intro">Add linked accounts now, or add them later in Settings.</p>
+        <label htmlFor="investor-add-demat">Demat account</label><select id="investor-add-demat" value={includeNewDemat ? "yes" : "no"} onChange={(event) => setIncludeNewDemat(event.target.value === "yes")}><option value="no">Add later</option><option value="yes">Add now</option></select>
+        {includeNewDemat && <><label htmlFor="investor-depository">Depository</label><select id="investor-depository" value={depository} onChange={(event) => setDepository(event.target.value as "CDSL" | "NSDL")}><option value="CDSL">CDSL</option><option value="NSDL">NSDL</option></select>{depository === "NSDL" && <><label htmlFor="investor-dpid">DP ID</label><input id="investor-dpid" required value={dpId} onChange={(event) => setDpId(event.target.value)} /></>}<label htmlFor="investor-client-id">Client ID</label><input id="investor-client-id" required value={clientId} onChange={(event) => setClientId(event.target.value)} /><label htmlFor="investor-broker">Broker (optional)</label><input id="investor-broker" value={broker} onChange={(event) => setBroker(event.target.value)} /></>}
+        <label htmlFor="investor-add-bank">Bank account</label><select id="investor-add-bank" value={includeNewBank ? "yes" : "no"} onChange={(event) => { const add = event.target.value === "yes"; setIncludeNewBank(add); if (!add) setIncludeNewUpi(false); }}><option value="no">Add later</option><option value="yes">Add now</option></select>
+        {includeNewBank && <><label htmlFor="investor-bank-name">Bank name</label><input id="investor-bank-name" required value={bankName} onChange={(event) => setBankName(event.target.value)} /><label htmlFor="investor-account-number">Account number</label><input id="investor-account-number" required autoComplete="off" value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} /><label htmlFor="investor-opening-balance">Opening Balance (₹)</label><input id="investor-opening-balance" type="number" min="0" step="0.01" required value={openingBalance} onChange={(event) => setOpeningBalance(event.target.value)} /><label htmlFor="investor-add-upi">UPI ID</label><select id="investor-add-upi" value={includeNewUpi ? "yes" : "no"} onChange={(event) => setIncludeNewUpi(event.target.value === "yes")}><option value="no">Add later</option><option value="yes">Add now</option></select>{includeNewUpi && <><label htmlFor="investor-upi-id">UPI ID</label><input id="investor-upi-id" required autoComplete="off" placeholder="name@provider" value={upiHandle} onChange={(event) => setUpiHandle(event.target.value)} /></>}</>}
+        <button type="submit" disabled={busy}>{busy ? "Adding…" : "Add investor"}</button></form></Drawer>}
       {pendingRemoval && <ConfirmationDialog title={pendingRemoval.kind === "investor" ? `Delete ${pendingCount} ${pendingName}${pendingCount === 1 ? "" : "s"}?` : `Permanently delete ${pendingCount} ${pendingName}${pendingCount === 1 ? "" : "s"}?`} description={pendingRemoval.kind === "investor" ? "The investor will leave the Investors list. Linked accounts will be deactivated, while application and balance history stay available." : `These records cannot be restored. Records linked to applications cannot be deleted. ${confirmationDetail}`} confirmLabel={`Delete ${pendingCount === 1 ? pendingName : "selected"}`} busy={busy} onCancel={() => setPendingRemoval(null)} onConfirm={() => void updateItems(pendingRemoval.kind, pendingRemoval.ids, "delete")} />}
     </>}
   </div></main>;

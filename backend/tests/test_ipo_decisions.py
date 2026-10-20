@@ -1,5 +1,6 @@
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.urls import reverse
@@ -9,7 +10,7 @@ from rest_framework.test import APIClient
 from accounts.models import User, WorkspaceMembership
 from accounts.services import create_workspace
 from ipos.models import IPO, GMPObservation, IPOUserDecision
-from ipos.selection import select_ipo
+from ipos.selection import resolve_ipo_choices, select_ipo
 
 
 def make_ipo():
@@ -67,6 +68,49 @@ def test_manual_choices_outrank_threshold_and_unset_values_are_not_selected():
 def test_matrix_selection_cases(case, decision, gmp, expected):
     selected, _ = select_ipo(decision=decision, gmp_percent=Decimal(gmp), threshold=Decimal("20"))
     assert selected is expected, case
+
+
+def test_automatic_selection_waits_for_earlier_funding_window_but_manual_choice_wins():
+    india = ZoneInfo("Asia/Kolkata")
+    first = {
+        "issue_type": "MAINBOARD",
+        "status": "OPEN",
+        "open_date": date(2026, 10, 20),
+        "close_date": date(2026, 10, 23),
+        "allotment_date": date(2026, 10, 26),
+    }
+    next_ipo = {
+        "issue_type": "MAINBOARD",
+        "status": "UPCOMING",
+        "open_date": date(2026, 10, 22),
+        "close_date": date(2026, 10, 29),
+        "allotment_date": date(2026, 10, 31),
+    }
+    candidates = [
+        ("first", first, "APPLY", Decimal("25")),
+        ("next", next_ipo, "DEFAULT", Decimal("25")),
+    ]
+    waiting = resolve_ipo_choices(
+        candidates=candidates,
+        threshold=Decimal("20"),
+        issue_types=("MAINBOARD",),
+        at=datetime(2026, 10, 23, 16, 59, tzinfo=india),
+    )
+    assert waiting["next"] == (False, "WAITING_FOR_FUND_REUSE")
+    after_close = resolve_ipo_choices(
+        candidates=candidates,
+        threshold=Decimal("20"),
+        issue_types=("MAINBOARD",),
+        at=datetime(2026, 10, 23, 17, 1, tzinfo=india),
+    )
+    assert after_close["next"] == (True, "GMP_THRESHOLD")
+    manual = resolve_ipo_choices(
+        candidates=[candidates[0], ("next", next_ipo, "APPLY", None)],
+        threshold=Decimal("20"),
+        issue_types=("MAINBOARD",),
+        at=datetime(2026, 10, 23, 16, 59, tzinfo=india),
+    )
+    assert manual["next"] == (True, "MANUAL_APPLY")
 
 
 @pytest.mark.django_db

@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## C17 Public GMP, one-step investor setup, IPO timing and plan clarity — tested, release pending, 2026-10-20
+
+- Founder requested eight connected usability and planning corrections: public GMP before sign-in, optional linked account setup with a new investor, timestamps only inside GMP history, percentage in each history row, no closed IPO in Home's active list, automatic IPO timing for fund reuse, saving on CSV export, and a clear explanation of cumulative draft amounts versus available capital.
+- The anonymous landing page now shows available GMP and last recorded GMP; timestamps are confined to GMP history, where each observation shows amount and percentage. Home excludes closed IPOs from its active list and count. Add investor can optionally save a demat, bank and UPI in one transaction. Automatic choices wait for an earlier selected issue's funding window when dates overlap, while manual decisions still win; the IPO list and planner use the same rule. Per-IPO CSV export now saves the reviewed plan and reserves that IPO's funds on successful export. Plan summary distinguishes the sum of all applications from the maximum simultaneous commitment, explaining why a valid draft can exceed today's total balance across non-overlapping IPO windows.
+- Full `scripts/check.sh` passed with 421 backend tests, 39 web tests, one Android test, lint, typecheck, migration checks and production builds. Synthetic tests cover atomic investor setup, automatic timing, and reservation after export. Production release pending.
+
 ## C16 Blue product theme and API loading — deployed, 2026-10-20
 
 - Replace green brand and neutral tints throughout the public, authentication, and signed-in pages with a coordinated blue palette in both light and dark themes; keep amber warnings and red errors distinct. The GMP history line now follows the theme accent instead of a fixed green.
