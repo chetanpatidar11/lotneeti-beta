@@ -1,8 +1,8 @@
 # LotNeeti execution status
 
-## C19 Applications IPO chooser and bulk selection — in progress, 2026-10-20
+## C19 Applications IPO chooser and bulk selection — deployed, 2026-10-21
 
-- Founder wants Applications to show one IPO at a time, with a large IPO selector before search, latest closing IPO first, no All IPOs option, and a one-click select-all checkbox aligned with Settings tables. The selector starts empty, counts and rows stay scoped to the chosen IPO, and the table header selects all visible actionable applications; mobile keeps an equivalent select-all control above the cards. Full `scripts/check.sh` passed: 426 backend tests, 40 web tests, one Android test, lint, typecheck, migrations and production builds. Deployment pending.
+- Founder wants Applications to show one IPO at a time, with a large IPO selector before search, latest closing IPO first, no All IPOs option, and a one-click select-all checkbox aligned with Settings tables. The selector starts empty, counts and rows stay scoped to the chosen IPO, and the table header selects all visible actionable applications; mobile keeps an equivalent select-all control above the cards. Full `scripts/check.sh` passed: 426 backend tests, 40 web tests, one Android test, lint, typecheck, migrations and production builds; final web tests/typecheck/lint/build passed again after the ordering simplification. Commit `cc1f0d8` was pushed. Pre-release backup succeeded and release archive SHA-256 `227ea05470b871fee8c3f9128b1e6de44a2aee8d58e66aea527d3fcc8683ae83` deployed to `https://lotneeti.dpdns.org/` with no new migrations. Public Home, sign-in and API health returned HTTPS 200; the protected Applications route responded with its sign-in redirect for an anonymous request. No production application records were changed.
 
 ## C18 Bank-name cross-funding restrictions — deployed, 2026-10-20
 
