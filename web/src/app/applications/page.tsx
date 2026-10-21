@@ -5,7 +5,7 @@ import { selectedWorkspace } from "@/lib/workspace";
 import ApplicationsScreen, { type ApplicationItem } from "./applications-screen";
 
 type Workspace = { id: string; role: string };
-type LatestRun = { id: string | null; status: "READY" | "BLOCKED" | null };
+type LatestRun = { id: string | null; status: "READY" | "BLOCKED" | "CLEARED" | null };
 
 export default async function ApplicationsPage() {
   const cookieHeader = (await cookies()).toString();

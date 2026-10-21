@@ -22,6 +22,8 @@ from applications.services import (
     mark_submitted,
     start_tracking_plan,
 )
+from funding.models import BankAccount, UPIHandle
+from investors.models import Investor
 from ipos.models import IPO
 from ipos.overrides import published_ipos
 from planner.models import PlanRun
@@ -50,6 +52,8 @@ def _result(item):
         sold_quantity = item.sales.aggregate(total=Sum("quantity", default=0))["total"]
     return {
         "id": str(item.pk),
+        "plan_row_id": str(item.plan_row_id),
+        "is_plan_row": False,
         "ipo": str(item.ipo_id),
         "ipo_name": item.ipo.issuer_name,
         "applicant": str(item.applicant_id),
@@ -77,6 +81,86 @@ def _result(item):
     }
 
 
+def _saved_plan_rows(workspace, tracked):
+    """Show current reserved plan rows before they become tracked applications."""
+    latest = PlanRun.objects.filter(workspace=workspace).first()
+    if latest is None or latest.status != PlanRun.Status.READY:
+        return []
+    rows = list(latest.rows.all())
+    if latest.reserved_ipo_ids is not None:
+        rows = [row for row in rows if row.ipo_ref in latest.reserved_ipo_ids]
+    linked_rows = {item.plan_row_id for item in tracked}
+    active_keys = {
+        (str(item.ipo_id), str(item.applicant_id))
+        for item in tracked
+        if item.status != Application.Status.CANCELLED
+    }
+    rows = [
+        row
+        for row in rows
+        if row.pk not in linked_rows and (row.ipo_ref, row.applicant_ref) not in active_keys
+    ]
+    ipos = {str(item.pk): item for item in IPO.objects.filter(pk__in={r.ipo_ref for r in rows})}
+    investors = {
+        str(item.pk): item
+        for item in Investor.objects.filter(
+            pk__in={r.applicant_ref for r in rows}, workspace=workspace, is_deleted=False
+        )
+    }
+    banks = {
+        str(item.pk): item
+        for item in BankAccount.objects.filter(
+            pk__in={r.bank_ref for r in rows}, workspace=workspace
+        )
+    }
+    upis = {
+        str(item.pk): item
+        for item in UPIHandle.objects.filter(
+            pk__in={r.upi_ref for r in rows}, bank__workspace=workspace
+        )
+    }
+    result = []
+    for row in rows:
+        ipo = ipos.get(row.ipo_ref)
+        investor = investors.get(row.applicant_ref)
+        bank = banks.get(row.bank_ref)
+        upi = upis.get(row.upi_ref)
+        if not all((ipo, investor, bank, upi)):
+            continue
+        result.append(
+            {
+                "id": str(row.pk),
+                "plan_row_id": str(row.pk),
+                "is_plan_row": True,
+                "ipo": row.ipo_ref,
+                "ipo_name": ipo.issuer_name,
+                "applicant": row.applicant_ref,
+                "applicant_name": investor.name,
+                "bank": row.bank_ref,
+                "bank_label": f"{bank.bank_name} {bank.account_masked}",
+                "upi": row.upi_ref,
+                "upi_label": upi.handle,
+                "close_date": ipo.close_date,
+                "allotment_date": ipo.allotment_date,
+                "sold_quantity": 0,
+                "category": row.category,
+                "lots": row.lots,
+                "max_quantity": row.lots * ipo.lot_size,
+                "amount": str(row.amount),
+                "status": Application.Status.PLANNED,
+                "planned_at": latest.generated_at,
+                "submitted_at": None,
+                "blocked_at": None,
+                "result_at": None,
+                "edited_at": None,
+                "cancelled_at": None,
+                "allotted_quantity": None,
+                "actual_cost": None,
+            }
+        )
+    return result
+
+
 class AllotmentSerializer(serializers.Serializer):
     quantity = serializers.IntegerField(min_value=1)
     actual_cost = serializers.DecimalField(
@@ -101,17 +185,28 @@ class ApplicationBulkSerializer(serializers.Serializer):
         return value
 
 
+class TrackingRowsSerializer(serializers.Serializer):
+    row_ids = serializers.ListField(
+        child=serializers.UUIDField(), min_length=1, max_length=100, required=False
+    )
+
+    def validate_row_ids(self, value):
+        if len(set(value)) != len(value):
+            raise serializers.ValidationError("Choose each planned application only once.")
+        return value
+
+
 class ApplicationListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, workspace_id):
         workspace = _workspace(request, workspace_id)
-        items = (
+        items = list(
             Application.objects.filter(workspace=workspace)
             .select_related("ipo", "applicant", "bank", "upi")
             .annotate(sold_quantity=Sum("sales__quantity", default=0))
         )
-        return Response([_result(item) for item in items])
+        return Response(_saved_plan_rows(workspace, items) + [_result(item) for item in items])
 
 
 class StartTrackingView(APIView):
@@ -121,8 +216,21 @@ class StartTrackingView(APIView):
         workspace = _workspace(request, workspace_id)
         _writer(workspace, request.user)
         run = get_object_or_404(PlanRun.objects.filter(workspace=workspace), pk=run_id)
+        serializer = TrackingRowsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if (
+            "row_ids" in serializer.validated_data
+            and PlanRun.objects.filter(workspace=workspace).first() != run
+        ):
+            return Response(
+                {"detail": "This plan is no longer current. Refresh Applications."}, status=409
+            )
         try:
-            tracked = start_tracking_plan(plan_run=run, actor=request.user)
+            tracked = start_tracking_plan(
+                plan_run=run,
+                actor=request.user,
+                row_ids=serializer.validated_data.get("row_ids"),
+            )
         except ValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=409)
         return Response([_result(item) for item in tracked], status=201)

@@ -30,13 +30,22 @@ def _require_writer(workspace, actor):
 
 
 @transaction.atomic
-def start_tracking_plan(*, plan_run, actor) -> tuple[Application, ...]:
+def start_tracking_plan(*, plan_run, actor, row_ids=None) -> tuple[Application, ...]:
     workspace = Workspace.objects.select_for_update().get(pk=plan_run.workspace_id)
     _require_writer(workspace, actor)
     assert_exportable_plan(plan_run)
+    rows = list(plan_run.rows.all())
+    requested = set(row_ids) if row_ids is not None else None
+    eligible = [
+        row
+        for row in rows
+        if plan_run.reserved_ipo_ids is None or row.ipo_ref in plan_run.reserved_ipo_ids
+    ]
+    if requested is not None and requested != {row.pk for row in eligible if row.pk in requested}:
+        raise ValidationError("One or more planned applications are unavailable")
     tracked = []
-    for row in plan_run.rows.all():
-        if plan_run.reserved_ipo_ids is not None and row.ipo_ref not in plan_run.reserved_ipo_ids:
+    for row in eligible:
+        if requested is not None and row.pk not in requested:
             continue
         ipo = IPO.objects.get(pk=row.ipo_ref)
         applicant = Investor.objects.get(

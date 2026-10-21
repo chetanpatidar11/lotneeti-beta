@@ -6,6 +6,8 @@ import ApplicationsScreen, { type ApplicationItem } from "../src/app/application
 
 const item: ApplicationItem = {
   id: "application-1",
+  plan_row_id: "plan-row-1",
+  is_plan_row: false,
   ipo: "ipo-1",
   ipo_name: "Synthetic Industries",
   applicant_name: "Synthetic Investor",
@@ -45,6 +47,7 @@ test("applications require an IPO choice before showing rows and have no all-IPO
   assert.match(page, /Choose an IPO to see its applications/);
   assert.match(page, /Select an IPO/);
   assert.doesNotMatch(page, /All IPOs/);
+  assert.doesNotMatch(page, /Track latest plan/);
   assert.doesNotMatch(page, /Mark submitted/);
   assert.doesNotMatch(page, /Select all visible applications/);
   assert.doesNotMatch(render("PLANNED", false), /Mark submitted/);

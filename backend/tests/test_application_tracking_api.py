@@ -24,6 +24,52 @@ def assert_single_bank_capital(response, *, bank, balance, blocked, planned, ava
 
 
 @pytest.mark.django_db
+def test_saved_plan_appears_as_planned_and_materializes_only_when_acted_on():
+    owner, workspace, snapshot = setup_plan()
+    run = create_plan_run(workspace=workspace, snapshot=snapshot, actor=owner)
+    row = run.rows.get()
+    client = APIClient()
+    client.force_authenticate(owner)
+    list_url = reverse("application-list", args=[workspace.pk])
+
+    planned = client.get(list_url)
+    assert planned.status_code == 200
+    assert [(item["id"], item["status"], item["is_plan_row"]) for item in planned.data] == [
+        (str(row.pk), "PLANNED", True)
+    ]
+    assert Application.objects.count() == 0
+
+    track_url = reverse("application-start-tracking", args=[workspace.pk, run.pk])
+    tracked = client.post(track_url, {"row_ids": [str(row.pk)]}, format="json")
+    assert tracked.status_code == 201
+    assert len(tracked.data) == 1
+    assert tracked.data[0]["plan_row_id"] == str(row.pk)
+    assert tracked.data[0]["is_plan_row"] is False
+    assert Application.objects.count() == 1
+    assert [(item["id"], item["is_plan_row"]) for item in client.get(list_url).data] == [
+        (tracked.data[0]["id"], False)
+    ]
+
+
+@pytest.mark.django_db
+def test_saved_plan_projection_clears_and_foreign_rows_cannot_be_materialized():
+    owner, workspace, snapshot = setup_plan()
+    run = create_plan_run(workspace=workspace, snapshot=snapshot, actor=owner)
+    client = APIClient()
+    client.force_authenticate(owner)
+    list_url = reverse("application-list", args=[workspace.pk])
+    track_url = reverse("application-start-tracking", args=[workspace.pk, run.pk])
+
+    import uuid
+
+    rejected = client.post(track_url, {"row_ids": [str(uuid.uuid4())]}, format="json")
+    assert rejected.status_code == 409
+    assert Application.objects.count() == 0
+    assert client.post(reverse("planner-run-clear", args=[workspace.pk, run.pk])).status_code == 200
+    assert client.get(list_url).data == []
+
+
+@pytest.mark.django_db
 def test_submitted_then_blocked_updates_capital_without_changing_balance():
     owner, workspace, snapshot = setup_plan()
     run = create_plan_run(workspace=workspace, snapshot=snapshot, actor=owner)

@@ -10,6 +10,8 @@ import { EmptyState, PageHeader, StatusBadge } from "@/components/ui";
 
 export type ApplicationItem = ApplicationHistoryInput & {
   id: string;
+  plan_row_id: string;
+  is_plan_row: boolean;
   ipo: string;
   ipo_name: string;
   applicant_name: string;
@@ -30,7 +32,7 @@ export type ApplicationItem = ApplicationHistoryInput & {
 type BankOption = { id: string; bank_name: string; account_display: string; active: boolean; is_placeholder: boolean };
 type UpiOption = { id: string; bank: string; handle: string; active: boolean; verified: boolean };
 type BulkAction = "submit" | "block" | "not-allotted" | "cancel";
-type Filter = "ACTIVE" | "ALL" | "PLANNED" | "SUBMITTED" | "BLOCKED" | "RESULTS" | "CANCELLED";
+type Filter = "ALL" | ApplicationItem["status"];
 
 function displayTime(value: string): string {
   return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
@@ -69,8 +71,6 @@ function canCancel(item: ApplicationItem): boolean {
 
 function filterMatches(item: ApplicationItem, filter: Filter): boolean {
   if (filter === "ALL") return true;
-  if (filter === "ACTIVE") return canCancel(item);
-  if (filter === "RESULTS") return item.status === "ALLOTTED" || item.status === "NOT_ALLOTTED";
   return item.status === filter;
 }
 
@@ -96,7 +96,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
   workspaceId: string;
   canEdit: boolean;
   initialItems: ApplicationItem[];
-  latestRun: { id: string | null; status: "READY" | "BLOCKED" | null };
+  latestRun: { id: string | null; status: "READY" | "BLOCKED" | "CLEARED" | null };
   initialLoadError?: boolean;
 }) {
   const [items, setItems] = useState(initialItems);
@@ -105,7 +105,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
   const [editError, setEditError] = useState("");
   const [resultError, setResultError] = useState("");
   const [message, setMessage] = useState("");
-  const [filter, setFilter] = useState<Filter>("ACTIVE");
+  const [filter, setFilter] = useState<Filter>("ALL");
   const [ipoFilter, setIpoFilter] = useState("");
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -143,24 +143,20 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
     setSelectedIds((current) => checked ? [...new Set([...current, ...ids])] : current.filter((id) => !ids.includes(id)));
   }
 
-  async function startTracking() {
-    if (!latestRun.id || latestRun.status !== "READY") return;
-    setBusy(true);
-    setError("");
-    try {
-      const response = await fetch(`/api/workspaces/${workspaceId}/planner/runs/${latestRun.id}/track`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
-      const result = await response.json();
-      if (!response.ok) throw new Error(await responseError(response, "We could not start tracking this plan."));
-      setItems((current) => {
-        const tracked = result as ApplicationItem[];
-        const trackedIds = new Set(tracked.map((item) => item.id));
-        return [...tracked, ...current.filter((item) => !trackedIds.has(item.id))];
-      });
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "We could not start tracking this plan.");
-    } finally {
-      setBusy(false);
-    }
+  async function materializePlanned(chosen: ApplicationItem[]): Promise<Map<string, ApplicationItem>> {
+    const drafts = chosen.filter((item) => item.is_plan_row);
+    if (drafts.length === 0) return new Map();
+    if (!latestRun.id || latestRun.status !== "READY") throw new Error("This plan is no longer available. Refresh Applications.");
+    const response = await fetch(`/api/workspaces/${workspaceId}/planner/runs/${latestRun.id}/track`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ row_ids: drafts.map((item) => item.plan_row_id) }),
+    });
+    if (!response.ok) throw new Error(await responseError(response, "We could not use these planned applications."));
+    const tracked = await response.json() as ApplicationItem[];
+    const byRow = new Map(tracked.map((item) => [item.plan_row_id, item]));
+    setItems((current) => [...tracked, ...current.filter((item) => !byRow.has(item.plan_row_id))]);
+    return byRow;
   }
 
   async function update(item: ApplicationItem, action: "submit" | "block" | "not-allotted") {
@@ -168,7 +164,8 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
     setError("");
     setResultError("");
     try {
-      const response = await fetch(`/api/workspaces/${workspaceId}/applications/${item.id}/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const tracked = (await materializePlanned([item])).get(item.plan_row_id) ?? item;
+      const response = await fetch(`/api/workspaces/${workspaceId}/applications/${tracked.id}/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
       if (!response.ok) throw new Error(await responseError(response, "We could not update this application."));
       replaceItems([await response.json() as ApplicationItem]);
       setResultId(null);
@@ -184,7 +181,10 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
   async function bulkUpdate(action: BulkAction, ids: string[]) {
     setBusy(true); setError(""); setMessage("");
     try {
-      const response = await fetch(`/api/workspaces/${workspaceId}/applications/bulk`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, ids }) });
+      const chosen = items.filter((item) => ids.includes(item.id));
+      const tracked = await materializePlanned(chosen);
+      const applicationIds = chosen.map((item) => tracked.get(item.plan_row_id)?.id ?? item.id);
+      const response = await fetch(`/api/workspaces/${workspaceId}/applications/bulk`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, ids: applicationIds }) });
       if (!response.ok) throw new Error(await responseError(response, "No applications were changed. Review the selection and try again."));
       replaceItems(await response.json() as ApplicationItem[]);
       setSelectedIds([]);
@@ -225,7 +225,9 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
     if (!editItem) return;
     setBusy(true); setEditError(""); setMessage("");
     try {
-      const response = await fetch(`/api/workspaces/${workspaceId}/applications/${editItem.id}/edit`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ category: editCategory, lots: editLots, bank: editBank, upi: editUpi }) });
+      const tracked = (await materializePlanned([editItem])).get(editItem.plan_row_id) ?? editItem;
+      if (tracked.id !== editItem.id) setEditId(tracked.id);
+      const response = await fetch(`/api/workspaces/${workspaceId}/applications/${tracked.id}/edit`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ category: editCategory, lots: editLots, bank: editBank, upi: editUpi }) });
       if (!response.ok) throw new Error(await responseError(response, "We could not save this application."));
       replaceItems([await response.json() as ApplicationItem]);
       setEditId(null);
@@ -254,26 +256,26 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
   }
 
   return <main className="page"><div className="shell applications-shell">
-    <PageHeader eyebrow="Execution" title="Applications" description="Manage applications by IPO, then track submission and results." action={canEdit && latestRun.id ? <button type="button" disabled={busy || latestRun.status !== "READY"} onClick={() => void startTracking()}>Track latest plan</button> : undefined} />
+    <PageHeader eyebrow="Execution" title="Applications" description="Manage planned applications by IPO, then record submission and results." />
     {error && <div className="plan-error" role="alert">{error}</div>}
     {message && <p className="plan-success" role="status">{message}</p>}
-    {initialLoadError ? <div className="plan-error" role="alert">Applications could not be loaded. <button className="button-ghost" type="button" onClick={() => window.location.reload()}>Retry</button></div> : items.length === 0 ? <EmptyState title="No applications are being tracked yet." detail="Save a ready plan, then track it here." action={<Link href="/plan">Review plan →</Link>} /> : <>
+    {initialLoadError ? <div className="plan-error" role="alert">Applications could not be loaded. <button className="button-ghost" type="button" onClick={() => window.location.reload()}>Retry</button></div> : items.length === 0 ? <EmptyState title="No planned applications yet." detail="Save a ready plan to see its applications here." action={<Link href="/plan">Review plan →</Link>} /> : <>
       <section className="application-ipo-picker" aria-label="Choose an IPO to view applications">
         <div><span className="application-picker-eyebrow">Your applications</span><label htmlFor="application-ipo-choice">Choose an IPO</label><p>Select one IPO to review its applications and update their progress.</p></div>
-        <select id="application-ipo-choice" value={ipoFilter} onChange={(event) => { setIpoFilter(event.target.value); setSearch(""); setFilter("ACTIVE"); setSelectedIds([]); }}><option value="">Select an IPO</option>{ipoOptions.map(([id, option]) => <option key={id} value={id}>{option.name} · closes {dateLabel(option.closeDate)}</option>)}</select>
+        <select id="application-ipo-choice" value={ipoFilter} onChange={(event) => { setIpoFilter(event.target.value); setSearch(""); setFilter("ALL"); setSelectedIds([]); }}><option value="">Select an IPO</option>{ipoOptions.map(([id, option]) => <option key={id} value={id}>{option.name} · closes {dateLabel(option.closeDate)}</option>)}</select>
       </section>
       {!ipoFilter && <EmptyState title="Choose an IPO to see its applications." detail="Each IPO has its own application list and bulk actions." />}
       {ipoFilter && <>
       <div className="application-summary" aria-label="Application status summary for selected IPO">
-        <span><strong>{ipoItems.filter(canCancel).length}</strong> Active</span>
-        <span><strong>{ipoItems.filter((item) => item.status === "PLANNED").length}</strong> To submit</span>
+        <span><strong>{ipoItems.length}</strong> Total</span>
+        <span><strong>{ipoItems.filter((item) => item.status === "PLANNED").length}</strong> Planned</span>
         <span><strong>{ipoItems.filter((item) => item.status === "SUBMITTED").length}</strong> Mandates pending</span>
         <span><strong>{ipoItems.filter((item) => item.status === "BLOCKED").length}</strong> Results pending</span>
         <span><strong>{ipoItems.filter((item) => item.status === "CANCELLED").length}</strong> Cancelled</span>
       </div>
       <div className="application-filters">
         <label>Search<input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setSelectedIds([]); }} placeholder="Applicant or UPI" /></label>
-        <label>Status<select value={filter} onChange={(event) => { setFilter(event.target.value as Filter); setSelectedIds([]); }}><option value="ACTIVE">Active</option><option value="ALL">All</option><option value="PLANNED">Planned</option><option value="SUBMITTED">Submitted</option><option value="BLOCKED">Blocked</option><option value="RESULTS">Results</option><option value="CANCELLED">Cancelled</option></select></label>
+        <label>Status<select value={filter} onChange={(event) => { setFilter(event.target.value as Filter); setSelectedIds([]); }}><option value="ALL">All</option><option value="PLANNED">Planned</option><option value="SUBMITTED">Submitted</option><option value="BLOCKED">Blocked</option><option value="ALLOTTED">Allotted</option><option value="NOT_ALLOTTED">Not allotted</option><option value="CANCELLED">Cancelled</option></select></label>
       </div>
       {canEdit && selectedItems.length > 0 && <div className="application-bulk" role="group" aria-label="Selected application actions"><strong>{selectedItems.length} selected</strong><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "PLANNED")} onClick={() => void bulkUpdate("submit", selectedIds)}>Mark submitted</button><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "SUBMITTED")} onClick={() => void bulkUpdate("block", selectedIds)}>Mark blocked</button><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "BLOCKED")} onClick={() => void bulkUpdate("not-allotted", selectedIds)}>Not allotted</button><button type="button" className="button-danger" disabled={busy || !selectedItems.every(canCancel)} onClick={() => setPendingCancelIds(selectedIds)}>Cancel selected</button><button type="button" className="button-ghost" onClick={() => setSelectedIds([])}>Clear</button></div>}
       {groups.length === 0 ? <EmptyState title="No applications match these filters." detail="Try a different IPO, status or search." /> : groups.map(([ipoId, group]) => {

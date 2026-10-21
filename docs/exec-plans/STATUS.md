@@ -1,5 +1,10 @@
 # LotNeeti execution status
 
+## C21 Applications planned rows and status filters — locally verified, 2026-10-21
+
+- The founder asked to remove the “Track latest plan” step, show planned IPO applications under the normal status filter, remove the non-status “Active” choice, and default to All. Applications now reads the latest ready plan's reserved rows as Planned alongside tracked applications, scoped to the workspace and without creating application records on a GET. Clearing a saved plan removes its untracked rows from this view; tracked history remains. A row becomes a tracked application only when the user marks it submitted, edits, or cancels it. Bulk actions convert only selected saved rows before applying their transition. The IPO chooser remains explicit and sorted by latest close date.
+- The status choices are All (default), Planned, Submitted, Blocked, Allotted, Not allotted, and Cancelled. The summary uses Total and Planned instead of “Active.” The page-level tracking button is gone. Focused API tests verified saved-row visibility, no duplicate after conversion, rejection of unknown row IDs, and clearing behavior. Full `scripts/check.sh` passed: 428 backend tests, 40 web tests, one Android test, lint, typecheck, migrations, and builds. Production deployment pending.
+
 ## C20 Restore the intended production site — deployed, 2026-10-21
 
 - A separate checkout deployed an older/different frontend to the existing EC2 host and changed Nginx plus protected app URLs to `54-208-70-218.sslip.io`. The intended `lotneeti.dpdns.org` domain then failed TLS hostname validation; the alternate hostname's claimed `/login` route returned 404. The instance, database services, and existing `lotneeti.dpdns.org` certificate remained available.
