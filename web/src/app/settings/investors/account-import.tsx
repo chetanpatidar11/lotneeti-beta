@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, PointerEvent, useRef, useState } from "react";
+import { emptyImageRow, ImageImportRow, importFields, rowsFromImageTsv } from "./image-ocr";
 
 type ImportRow = {
   row_number: number; name: string; pan_masked: string; pan_display: string; type: string;
@@ -23,6 +24,9 @@ export default function AccountImport({ workspaceId, canEdit, investors }: { wor
   const [upiOwners, setUpiOwners] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [imageRows, setImageRows] = useState<ImageImportRow[] | null>(null);
+  const [imageName, setImageName] = useState("");
+  const [ocrProgress, setOcrProgress] = useState("");
   const [columnWidths, setColumnWidths] = useState(initialColumnWidths);
   const resize = useRef<{ index: number; startX: number; startWidth: number } | null>(null);
 
@@ -42,7 +46,36 @@ export default function AccountImport({ workspaceId, canEdit, investors }: { wor
   async function upload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    setBusy(true); setMessage(""); setPreview(null); setUpiOwners({});
+    setBusy(true); setMessage(""); setPreview(null); setUpiOwners({}); setImageRows(null); setImageName("");
+    if (/\.(png|jpe?g|webp)$/i.test(file.name)) {
+      try {
+        if (file.size > 10 * 1024 * 1024) throw new Error("Choose an image smaller than 10 MB.");
+        setOcrProgress("Reading image on this device…");
+        const { createWorker } = await import("tesseract.js");
+        const worker = await createWorker("eng", 1, {
+          workerPath: "/ocr/worker.min.js",
+          corePath: "/ocr/tesseract-core-lstm.wasm.js",
+          langPath: "/ocr",
+          logger: (progress) => {
+            if (progress.status === "recognizing text") {
+              setOcrProgress(`Reading image… ${Math.round(progress.progress * 100)}%`);
+            }
+          },
+        });
+        try {
+          const result = await worker.recognize(file, {}, { tsv: true });
+          const rows = rowsFromImageTsv(result.data.tsv ?? "");
+          setImageRows(rows.length ? rows : [emptyImageRow()]);
+          setImageName(file.name);
+          setMessage(rows.length
+            ? "Check every extracted field below. Image text can be misread; correct it before importing."
+            : "No complete row was found. Enter the details from the image below, then review the import.");
+        } finally { await worker.terminate(); }
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "The image could not be read.");
+      } finally { setBusy(false); setOcrProgress(""); event.target.value = ""; }
+      return;
+    }
     const body = new FormData(); body.append("file", file);
     try {
       const response = await fetch(`/api/workspaces/${workspaceId}/account-imports`, { method: "POST", body });
@@ -57,6 +90,35 @@ export default function AccountImport({ workspaceId, canEdit, investors }: { wor
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "We could not read that workbook.");
     } finally { setBusy(false); event.target.value = ""; }
+  }
+
+  async function reviewImage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!imageRows?.length || !imageName) return;
+    setBusy(true); setMessage("");
+    const body = new FormData();
+    body.append("source_filename", imageName);
+    body.append("image_rows", JSON.stringify(imageRows));
+    try {
+      const response = await fetch(`/api/workspaces/${workspaceId}/account-imports`, { method: "POST", body });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({})) as { detail?: string };
+        throw new Error(result.detail ?? "The image rows could not be reviewed.");
+      }
+      const data = await response.json() as ImportPreview;
+      setPreview(data);
+      if (data.error_count === 0) setImageRows(null);
+      setSelected(data.rows.filter(selectable).map((row) => row.row_number));
+      if (data.error_count > 0) setMessage("Some extracted details need correction. Edit the rows above and review again, or import only the ready rows below.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "The image rows could not be reviewed.");
+    } finally { setBusy(false); }
+  }
+
+  function updateImageRow(index: number, field: keyof ImageImportRow, value: string) {
+    setPreview(null);
+    setImageRows((current) => current?.map((row, position) =>
+      position === index ? { ...row, [field]: value } : row) ?? null);
   }
 
   async function confirm(event: FormEvent<HTMLFormElement>) {
@@ -97,10 +159,24 @@ export default function AccountImport({ workspaceId, canEdit, investors }: { wor
 
   return <section className="account-import" aria-labelledby="account-import-heading">
     <h2 id="account-import-heading">Import accounts</h2>
-    <p>Upload one workbook to set up investors, demats, UPIs and active bank accounts. Missing bank details default to BANK with the UPI ID as the account number. Every account starts with ₹0 Balance. You can replace these details later.</p>
-    {canEdit && <label className="file-picker">Choose workbook
-      <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={busy} onChange={upload} />
+    <p>Upload an Excel file or a clear table image to set up investors, demats, UPIs and active bank accounts. Account Number and Bank Name columns are optional. Missing details default to BANK with the UPI ID as the account number. Every account starts with ₹0 Balance.</p>
+    {canEdit && <label className="file-picker">Choose Excel file or image
+      <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" disabled={busy} onChange={upload} />
     </label>}
+    {ocrProgress && <p role="status">{ocrProgress}</p>}
+    {imageRows && <form onSubmit={reviewImage} className="image-import-review">
+      <h3>Check details from {imageName}</h3>
+      <p>The image stays on your device. Check PAN, client ID and UPI carefully before continuing.</p>
+      <div className="plan-table-wrap"><table className="plan-table image-import-table">
+        <caption>Extracted image rows</caption>
+        <thead><tr>{importFields.map((field) => <th key={field} scope="col">{field}</th>)}<th scope="col">Remove</th></tr></thead>
+        <tbody>{imageRows.map((row, index) => <tr key={index}>
+          {importFields.map((field) => <td key={field}><input aria-label={`${field} for row ${index + 1}`} value={row[field]} disabled={busy} onChange={(event) => updateImageRow(index, field, event.target.value)} /></td>)}
+          <td><button type="button" disabled={busy || imageRows.length === 1} onClick={() => { setPreview(null); setImageRows((current) => current?.filter((_, position) => position !== index) ?? null); }}>Remove</button></td>
+        </tr>)}</tbody>
+      </table></div>
+      <div className="form-actions"><button type="button" disabled={busy || imageRows.length >= 100} onClick={() => { setPreview(null); setImageRows((current) => [...(current ?? []), emptyImageRow()]); }}>+ Add row</button><button type="submit" disabled={busy}>Review import rows</button></div>
+    </form>}
     {preview && <form onSubmit={confirm}>
       <p><strong>{preview.source_filename}</strong> · {preview.row_count} row(s), {preview.error_count} with errors</p>
       <div className="plan-table-wrap"><table className="plan-table account-import-table" style={{ width: columnWidths.reduce((total, width) => total + width, 0) }}>

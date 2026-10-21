@@ -1,3 +1,5 @@
+import json
+
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers, status
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -10,6 +12,7 @@ from accounts.permissions import WorkspaceDataPermission
 from investors.account_imports import (
     AccountImportError,
     confirm_batch,
+    create_image_preview,
     create_preview,
     preview_payload,
 )
@@ -51,12 +54,27 @@ class AccountImportListView(APIView):
             Workspace.objects.filter(memberships__user=request.user), pk=workspace_id
         )
         uploaded_file = request.FILES.get("file")
-        if uploaded_file is None:
-            return Response({"file": "Upload the approved .xlsx workbook."}, status=400)
         try:
-            batch = create_preview(
-                workspace=workspace, actor=request.user, uploaded_file=uploaded_file
-            )
+            if uploaded_file is not None:
+                batch = create_preview(
+                    workspace=workspace, actor=request.user, uploaded_file=uploaded_file
+                )
+            elif "image_rows" in request.data:
+                raw_rows = request.data["image_rows"]
+                if not isinstance(raw_rows, str) or len(raw_rows) > 128 * 1024:
+                    raise AccountImportError("The extracted image rows are too large.")
+                try:
+                    extracted_rows = json.loads(raw_rows)
+                except (TypeError, ValueError) as exc:
+                    raise AccountImportError("The extracted image rows are invalid.") from exc
+                batch = create_image_preview(
+                    workspace=workspace,
+                    actor=request.user,
+                    source_filename=request.data.get("source_filename", ""),
+                    extracted_rows=extracted_rows,
+                )
+            else:
+                return Response({"file": "Choose an .xlsx workbook or image."}, status=400)
         except AccountImportError as exc:
             payload = {"detail": str(exc)}
             if exc.errors:

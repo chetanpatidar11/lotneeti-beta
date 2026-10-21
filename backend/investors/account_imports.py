@@ -38,6 +38,9 @@ EXPECTED_HEADERS = (
     "Account Number",
     "Bank Name",
 )
+REQUIRED_HEADERS = EXPECTED_HEADERS[:6]
+OPTIONAL_HEADERS = EXPECTED_HEADERS[6:]
+MAX_EXTRACTED_ROWS = 100
 PAN_PATTERN = re.compile(r"^[A-Z]{5}[0-9]{4}[A-Z]$")
 UPI_PATTERN = re.compile(r"^[a-z0-9._-]+@[a-z0-9._-]+$")
 MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -152,17 +155,24 @@ def _read_rows(workbook_bytes: bytes) -> list[dict[str, str]]:
     if rows[0]["row_number"] != 1:
         raise AccountImportError("The approved column headers must be in row 1.")
     headers = tuple(rows[0]["values"].get(index, "").strip() for index in range(1, 9))
-    if headers != EXPECTED_HEADERS:
+    optional = [header for header in headers[6:] if header]
+    if (
+        headers[:6] != REQUIRED_HEADERS
+        or any(header not in OPTIONAL_HEADERS for header in optional)
+        or len(optional) != len(set(optional))
+    ):
         raise AccountImportError(
-            "Use the approved AccountImportTemplate.xlsx column order: "
-            + ", ".join(EXPECTED_HEADERS)
+            "Use these first six columns: "
+            + ", ".join(REQUIRED_HEADERS)
+            + ". Account Number and Bank Name are optional columns."
         )
+    columns = {header: index for index, header in enumerate(headers, start=1) if header}
     return [
         {
             "row_number": row["row_number"],
             **{
-                header: row["values"].get(index, "").strip()
-                for index, header in enumerate(EXPECTED_HEADERS, start=1)
+                header: row["values"].get(columns[header], "").strip() if header in columns else ""
+                for header in EXPECTED_HEADERS
             },
         }
         for row in rows[1:]
@@ -189,8 +199,26 @@ def _validate_row(row: dict[str, str]) -> list[str]:
     upi = row["UPI ID"].lower()
     if not UPI_PATTERN.fullmatch(upi):
         errors.append("UPI ID must look like name@provider.")
+    elif len(upi) > 120:
+        errors.append("UPI ID is too long.")
     row["UPI ID"] = upi
+    if len(row["Account Number"]) > 40:
+        errors.append("Account Number is too long.")
+    if len(row["Bank Name"]) > 120:
+        errors.append("Bank Name is too long.")
     return errors
+
+
+def _validate_rows(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    pan_counts = {}
+    for row in rows:
+        row["errors"] = _validate_row(row)
+        if PAN_PATTERN.fullmatch(row["PAN"]):
+            pan_counts[row["PAN"]] = pan_counts.get(row["PAN"], 0) + 1
+    for row in rows:
+        if pan_counts.get(row["PAN"], 0) > 1:
+            row["errors"].append("PAN appears more than once in this workbook.")
+    return rows
 
 
 def parse_workbook(uploaded_file) -> tuple[str, list[dict[str, str]]]:
@@ -203,15 +231,33 @@ def parse_workbook(uploaded_file) -> tuple[str, list[dict[str, str]]]:
     if len(data) > MAX_WORKBOOK_BYTES:
         raise AccountImportError("The workbook must be 5 MB or smaller.")
     rows = _read_rows(data)
-    pan_counts = {}
-    for row in rows:
-        row["errors"] = _validate_row(row)
-        if PAN_PATTERN.fullmatch(row["PAN"]):
-            pan_counts[row["PAN"]] = pan_counts.get(row["PAN"], 0) + 1
-    for row in rows:
-        if pan_counts.get(row["PAN"], 0) > 1:
-            row["errors"].append("PAN appears more than once in this workbook.")
-    return hashlib.sha256(data).hexdigest(), rows
+    return hashlib.sha256(data).hexdigest(), _validate_rows(rows)
+
+
+def parse_image_rows(
+    source_filename: str, extracted_rows: list
+) -> tuple[str, list[dict[str, str]]]:
+    if not isinstance(source_filename, str) or not source_filename.lower().endswith(
+        (".png", ".jpg", ".jpeg", ".webp")
+    ):
+        raise AccountImportError("Upload a PNG, JPG, or WebP image.")
+    if not isinstance(extracted_rows, list) or not 1 <= len(extracted_rows) <= MAX_EXTRACTED_ROWS:
+        raise AccountImportError("Review between 1 and 100 rows from the image.")
+    rows = []
+    for index, extracted in enumerate(extracted_rows, start=2):
+        if not isinstance(extracted, dict):
+            raise AccountImportError("The image contains an invalid row.")
+        fields = {}
+        for header in EXPECTED_HEADERS:
+            value = extracted.get(header, "")
+            if not isinstance(value, str) or len(value) > 500:
+                raise AccountImportError("An image row contains an invalid or oversized field.")
+            fields[header] = value.strip()
+        rows.append({"row_number": index, **fields})
+    canonical = json.dumps(rows, sort_keys=True).encode("utf-8")
+    if len(canonical) > 128 * 1024:
+        raise AccountImportError("The extracted image rows are too large.")
+    return hashlib.sha256(canonical).hexdigest(), _validate_rows(rows)
 
 
 def _mask(value: str, prefix: str = "••••") -> str:
@@ -270,8 +316,7 @@ def preview_payload(batch: AccountImportBatch, *, reveal_details: bool = False) 
     }
 
 
-def create_preview(*, workspace, actor, uploaded_file) -> AccountImportBatch:
-    source_hash, rows = parse_workbook(uploaded_file)
+def _create_preview(*, workspace, actor, source_filename, source_hash, rows):
     for row in rows:
         if (
             PAN_PATTERN.fullmatch(row["PAN"])
@@ -284,7 +329,7 @@ def create_preview(*, workspace, actor, uploaded_file) -> AccountImportBatch:
     batch = AccountImportBatch.objects.create(
         workspace=workspace,
         created_by=actor,
-        source_filename=uploaded_file.name[:255],
+        source_filename=source_filename[:255],
         source_hash=source_hash,
         rows_ciphertext=encrypt_value(json.dumps(rows), purpose="account-import"),
         row_count=len(rows),
@@ -298,6 +343,32 @@ def create_preview(*, workspace, actor, uploaded_file) -> AccountImportBatch:
         metadata={"row_count": batch.row_count, "error_count": batch.error_count},
     )
     return batch
+
+
+def create_preview(*, workspace, actor, uploaded_file) -> AccountImportBatch:
+    source_hash, rows = parse_workbook(uploaded_file)
+    return _create_preview(
+        workspace=workspace,
+        actor=actor,
+        source_filename=uploaded_file.name,
+        source_hash=source_hash,
+        rows=rows,
+    )
+
+
+def create_image_preview(
+    *, workspace, actor, source_filename, extracted_rows
+) -> AccountImportBatch:
+    if isinstance(source_filename, str):
+        source_filename = source_filename.replace("\\", "/").rsplit("/", 1)[-1]
+    source_hash, rows = parse_image_rows(source_filename, extracted_rows)
+    return _create_preview(
+        workspace=workspace,
+        actor=actor,
+        source_filename=source_filename,
+        source_hash=source_hash,
+        rows=rows,
+    )
 
 
 def _find_or_create_demat(investor, row):

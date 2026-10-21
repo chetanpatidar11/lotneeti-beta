@@ -1,5 +1,10 @@
 # LotNeeti execution status
 
+## C22 Account image import and optional bank columns — locally verified, 2026-10-22
+
+- The founder requested PNG/JPG/WebP account-table import and Excel files without Account Number or Bank Name columns. Image text is extracted in the browser with locally served OCR assets and must be reviewed and editable before submission. Only the reviewed text reaches the existing encrypted import preview; the image itself stays on the device. Missing bank fields use BANK and the UPI ID as the provisional account reference, with ₹0 opening Balance. This extends B07/B08 without changing the import confirmation rules.
+- Synthetic browser OCR confirmed the locally hosted worker, core and English data load without a third-party request. OCR misread one synthetic UPI character, which the mandatory edit step allows the user to correct. The full `scripts/check.sh` gate passed: 433 backend tests, 42 web tests, one Android test, lint, typecheck, migration checks, and builds. Focused import tests passed again after final input bounds. `npm audit --omit=dev` reported no production dependency vulnerabilities. Deployment has not yet been completed in this task.
+
 ## C21 Applications planned rows and status filters — locally verified, 2026-10-21
 
 - The founder asked to remove the “Track latest plan” step, show planned IPO applications under the normal status filter, remove the non-status “Active” choice, and default to All. Applications now reads the latest ready plan's reserved rows as Planned alongside tracked applications, scoped to the workspace and without creating application records on a GET. Clearing a saved plan removes its untracked rows from this view; tracked history remains. A row becomes a tracked application only when the user marks it submitted, edits, or cancels it. Bulk actions convert only selected saved rows before applying their transition. The IPO chooser remains explicit and sorted by latest close date.

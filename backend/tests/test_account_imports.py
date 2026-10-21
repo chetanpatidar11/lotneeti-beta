@@ -1,4 +1,5 @@
 import io
+import json
 import re
 import zipfile
 from datetime import timedelta
@@ -93,6 +94,30 @@ def distinct_rows_upload():
                 )
             output_zip.writestr(name, contents)
     return SimpleUploadedFile("DistinctAccounts.xlsx", output.getvalue())
+
+
+def optional_columns_upload(*, keep: str):
+    output = io.BytesIO()
+    with (
+        zipfile.ZipFile(io.BytesIO(distinct_rows_upload().read())) as source_zip,
+        zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as output_zip,
+    ):
+        for name in source_zip.namelist():
+            contents = source_zip.read(name)
+            if name == "xl/worksheets/sheet1.xml":
+                if keep == "bank":
+                    contents = re.sub(rb'<c r="G([1-3])"[^>]*>.*?</c>', b"", contents)
+                    contents = contents.replace(
+                        b'<c r="H1" t="s"><v>7</v></c>',
+                        b'<c r="G1" t="inlineStr"><is><t>Bank Name</t></is></c>',
+                    )
+                    contents = contents.replace(b'r="H2"', b'r="G2"')
+                    contents = contents.replace(b'r="H3"', b'r="G3"')
+                else:
+                    columns = b"[GH]" if keep == "neither" else b"H"
+                    contents = re.sub(rb'<c r="' + columns + rb'[1-3]"[^>]*>.*?</c>', b"", contents)
+            output_zip.writestr(name, contents)
+    return SimpleUploadedFile("OptionalBankColumns.xlsx", output.getvalue())
 
 
 def missing_bank_upload():
@@ -235,6 +260,98 @@ def test_sample_account_workbook_previews_authorized_ids_and_confirms_only_selec
     assert AuditEvent.objects.filter(action="account_import.confirmed").exists()
     batch.refresh_from_db()
     assert batch.rows_ciphertext == ""
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("keep", "bank_name", "reference"),
+    [("neither", "BANK", True), ("account", "BANK", False), ("bank", "HDFC Bank", True)],
+)
+def test_workbook_optional_bank_columns_import_without_errors(keep, bank_name, reference):
+    owner = User.objects.create_user(email=f"{keep}@example.test")
+    workspace = create_workspace(name="Family", owner=owner)
+    client = APIClient()
+    client.force_authenticate(owner)
+    preview = client.post(
+        reverse("account-import-list", args=[workspace.pk]),
+        {"file": optional_columns_upload(keep=keep)},
+        format="multipart",
+    )
+    assert preview.status_code == 201, preview.data
+    assert preview.data["error_count"] == 0
+    confirmed = client.post(
+        reverse("account-import-preview", args=[workspace.pk, preview.data["id"]]),
+        {"row_numbers": [2]},
+        format="json",
+    )
+    assert confirmed.status_code == 200, confirmed.data
+    bank = BankAccount.objects.get()
+    assert bank.bank_name == bank_name
+    assert bank.is_imported_reference is reference
+    assert bank.active and bank.current_balance == 0
+
+
+@pytest.mark.django_db
+def test_reviewed_image_rows_use_same_validation_and_import_flow():
+    owner = User.objects.create_user(email="image-owner@example.test")
+    workspace = create_workspace(name="Family", owner=owner)
+    client = APIClient()
+    client.force_authenticate(owner)
+    rows = [
+        {
+            "Name": "Example Investor",
+            "PAN": "ABCDE1234F",
+            "Type": "CDSL",
+            "DPID": "",
+            "CLIENT ID": "12345678",
+            "UPI ID": "example@upi",
+        },
+        {
+            "Name": "Review This",
+            "PAN": "BAD",
+            "Type": "CDSL",
+            "DPID": "",
+            "CLIENT ID": "87654321",
+            "UPI ID": "second@upi",
+        },
+    ]
+    preview = client.post(
+        reverse("account-import-list", args=[workspace.pk]),
+        {"source_filename": "accounts.png", "image_rows": json.dumps(rows)},
+        format="multipart",
+    )
+    assert preview.status_code == 201, preview.data
+    assert preview.data["row_count"] == 2
+    assert preview.data["error_count"] == 1
+    assert preview.data["rows"][0]["bank_name"] == "BANK"
+    assert preview.data["rows"][0]["account_masked"] == "example@upi"
+    confirmed = client.post(
+        reverse("account-import-preview", args=[workspace.pk, preview.data["id"]]),
+        {"row_numbers": [2]},
+        format="json",
+    )
+    assert confirmed.status_code == 200, confirmed.data
+    assert Investor.objects.count() == 1
+    assert BankAccount.objects.get().is_imported_reference
+
+
+@pytest.mark.django_db
+def test_image_rows_reject_oversized_fields_and_non_image_source():
+    owner = User.objects.create_user(email="invalid-image@example.test")
+    workspace = create_workspace(name="Family", owner=owner)
+    client = APIClient()
+    client.force_authenticate(owner)
+    for filename, rows in (
+        ("accounts.txt", [{"Name": "Example"}]),
+        ("accounts.png", [{"Name": "x" * 501}]),
+    ):
+        response = client.post(
+            reverse("account-import-list", args=[workspace.pk]),
+            {"source_filename": filename, "image_rows": json.dumps(rows)},
+            format="multipart",
+        )
+        assert response.status_code == 400
+    assert not AccountImportBatch.objects.exists()
 
 
 @pytest.mark.django_db
