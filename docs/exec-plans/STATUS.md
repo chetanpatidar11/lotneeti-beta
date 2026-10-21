@@ -1,15 +1,16 @@
 # LotNeeti execution status
 
-## C22 Release access repair — locally verified, 2026-10-22
+## C22 Release access repair — deployed, 2026-10-22
 
 - The founder's VS Code release reached SSH but timed out connecting to the live EC2 IP. HTTPS health is 200 and DNS resolves to the expected Elastic IP. This workstation currently exits via 94.205.57.95, while TCP 22 is unreachable; the existing operator-only SSH rule likely still permits a previous address.
-- `deploy/release-from-vscode.sh` now checks the signed-in AWS account and production instance, then narrows the one existing inbound IPv4 TCP/22 rule in its attached security group to the workstation's current `/32`. It stops safely if the instance, group or SSH rule is unexpected or port 22 remains unreachable. It does not open SSH to everyone or create infrastructure. Production deployment still needs to be rerun from the founder's AWS-authenticated VS Code terminal.
+- `deploy/release-from-vscode.sh` now checks the signed-in AWS account and production instance, then narrows the one existing inbound IPv4 TCP/22 rule in its attached security group to the workstation's current `/32`. It stops safely if the instance, group or SSH rule is unexpected or port 22 remains unreachable. It does not open SSH to everyone or create infrastructure. Two focused helper tests, Ruff, Python compile, shell syntax, and `git diff --check` passed; commit `7b64e8b` was pushed.
+- AWS CLI access became available from this workspace. The rule changed from `159.223.36.61/32` to `94.205.57.95/32`, SSH became reachable, and the encrypted pre-release backup succeeded. Release archive SHA-256 `a0db5bfd4ba021d80daaadb56b08249262b30100d8e82ffd4abf3a5790127fec` deployed to `https://lotneeti.dpdns.org/`. The production build, Django system check, and migrations completed with no pending migrations. HTTPS sign-in and API health returned 200, the browser OCR worker and language asset returned 200, HTTP redirected to HTTPS, and the AWS rule still showed only `94.205.57.95/32` for SSH.
 
-## C22 Account image import and optional bank columns — locally verified, 2026-10-22
+## C22 Account image import and optional bank columns — deployed, 2026-10-22
 
 - The founder requested PNG/JPG/WebP account-table import and Excel files without Account Number or Bank Name columns. Image text is extracted in the browser with locally served OCR assets and must be reviewed and editable before submission. Only the reviewed text reaches the existing encrypted import preview; the image itself stays on the device. Missing bank fields use BANK and the UPI ID as the provisional account reference, with ₹0 opening Balance. This extends B07/B08 without changing the import confirmation rules.
 - Synthetic browser OCR confirmed the locally hosted worker, core and English data load without a third-party request. OCR misread one synthetic UPI character, which the mandatory edit step allows the user to correct. The full `scripts/check.sh` gate passed: 433 backend tests, 42 web tests, one Android test, lint, typecheck, migration checks, and builds. Focused import tests passed again after final input bounds. `npm audit --omit=dev` reported no production dependency vulnerabilities. Commit `3b6dbde` was pushed to `codex/autopilot`.
-- Deployment is pending. This task's filesystem permission did not include the existing AWS CLI login cache, the read request returned no grant, and automatic computer use of VS Code was denied. No AWS browser sign-in was attempted. The live `/ocr/worker.min.js` still returned 404, confirming the new release is not live. The existing `bash deploy/release-from-vscode.sh` command needs to run from the founder's signed-in VS Code terminal, then HTTPS and import should be checked.
+- The release above includes this feature. The public OCR assets and app health are live; a signed-in manual account import has not been submitted during deployment verification.
 
 ## C21 Applications planned rows and status filters — locally verified, 2026-10-21
 
