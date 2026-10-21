@@ -40,17 +40,27 @@ function render(status: ApplicationItem["status"], canEdit = true) {
   }));
 }
 
-test("application actions follow status and group rows by IPO", () => {
-  const planned = render("PLANNED");
-  assert.match(planned, /Mark submitted/);
-  assert.match(planned, /Select this IPO/);
-  assert.match(planned, /Edit/);
-  assert.match(planned, /Cancel/);
-  assert.doesNotMatch(planned, /Record result/);
-  assert.match(planned, /••••@example/);
-  assert.match(render("SUBMITTED"), /Mark blocked/);
-  const blocked = render("BLOCKED");
-  assert.match(blocked, /Record result/);
-  assert.doesNotMatch(blocked, /Mark submitted/);
-  assert.doesNotMatch(render("BLOCKED", false), /Record result/);
+test("applications require an IPO choice before showing rows and have no all-IPO option", () => {
+  const page = render("PLANNED");
+  assert.match(page, /Choose an IPO to see its applications/);
+  assert.match(page, /Select an IPO/);
+  assert.doesNotMatch(page, /All IPOs/);
+  assert.doesNotMatch(page, /Mark submitted/);
+  assert.doesNotMatch(page, /Select all visible applications/);
+  assert.doesNotMatch(render("PLANNED", false), /Mark submitted/);
+});
+
+test("IPO choices put the latest closing issue first", () => {
+  const page = renderToStaticMarkup(createElement(ApplicationsScreen, {
+    workspaceId: "workspace-1",
+    canEdit: true,
+    initialItems: [
+      item,
+      { ...item, id: "application-2", ipo: "ipo-2", ipo_name: "Newer Issue", close_date: "2026-10-20" },
+      { ...item, id: "application-3", ipo: "ipo-3", ipo_name: "Middle Issue", close_date: "2026-10-12" },
+    ],
+    latestRun: { id: null, status: null },
+  }));
+  assert.ok(page.indexOf("Newer Issue") < page.indexOf("Middle Issue"));
+  assert.ok(page.indexOf("Middle Issue") < page.indexOf("Synthetic Industries"));
 });

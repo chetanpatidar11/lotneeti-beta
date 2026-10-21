@@ -106,7 +106,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
   const [resultError, setResultError] = useState("");
   const [message, setMessage] = useState("");
   const [filter, setFilter] = useState<Filter>("ACTIVE");
-  const [ipoFilter, setIpoFilter] = useState("ALL");
+  const [ipoFilter, setIpoFilter] = useState("");
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [pendingCancelIds, setPendingCancelIds] = useState<string[]>([]);
@@ -124,12 +124,14 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
   const resultItem = items.find((item) => item.id === resultId);
   const editItem = items.find((item) => item.id === editId);
   const selectedItems = items.filter((item) => selectedIds.includes(item.id));
-  const visible = items.filter((item) => filterMatches(item, filter) && (ipoFilter === "ALL" || item.ipo === ipoFilter) && `${item.applicant_name} ${item.ipo_name} ${item.upi_label}`.toLowerCase().includes(search.toLowerCase().trim()));
+  const ipoOptions = [...new Map(items.map((item) => [item.ipo, { name: item.ipo_name, closeDate: item.close_date }])).entries()]
+    .sort((left, right) => right[1].closeDate.localeCompare(left[1].closeDate) || left[1].name.localeCompare(right[1].name));
+  const ipoItems = items.filter((item) => item.ipo === ipoFilter);
+  const visible = ipoItems.filter((item) => filterMatches(item, filter) && `${item.applicant_name} ${item.upi_label}`.toLowerCase().includes(search.toLowerCase().trim()));
   const groups = Object.entries(visible.reduce<Record<string, ApplicationItem[]>>((current, item) => {
     (current[item.ipo] ??= []).push(item);
     return current;
   }, {}));
-  const ipoOptions = [...new Map(items.map((item) => [item.ipo, item.ipo_name])).entries()];
   const eligibleUpis = upis.filter((upi) => upi.bank === editBank && upi.active && upi.verified);
 
   function replaceItems(changed: ApplicationItem[]) {
@@ -256,24 +258,29 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
     {error && <div className="plan-error" role="alert">{error}</div>}
     {message && <p className="plan-success" role="status">{message}</p>}
     {initialLoadError ? <div className="plan-error" role="alert">Applications could not be loaded. <button className="button-ghost" type="button" onClick={() => window.location.reload()}>Retry</button></div> : items.length === 0 ? <EmptyState title="No applications are being tracked yet." detail="Save a ready plan, then track it here." action={<Link href="/plan">Review plan →</Link>} /> : <>
-      <div className="application-summary" aria-label="Application status summary">
-        <span><strong>{items.filter(canCancel).length}</strong> Active</span>
-        <span><strong>{items.filter((item) => item.status === "PLANNED").length}</strong> To submit</span>
-        <span><strong>{items.filter((item) => item.status === "SUBMITTED").length}</strong> Mandates pending</span>
-        <span><strong>{items.filter((item) => item.status === "BLOCKED").length}</strong> Results pending</span>
-        <span><strong>{items.filter((item) => item.status === "CANCELLED").length}</strong> Cancelled</span>
+      <section className="application-ipo-picker" aria-label="Choose an IPO to view applications">
+        <div><span className="application-picker-eyebrow">Your applications</span><label htmlFor="application-ipo-choice">Choose an IPO</label><p>Select one IPO to review its applications and update their progress.</p></div>
+        <select id="application-ipo-choice" value={ipoFilter} onChange={(event) => { setIpoFilter(event.target.value); setSearch(""); setFilter("ACTIVE"); setSelectedIds([]); }}><option value="">Select an IPO</option>{ipoOptions.map(([id, option]) => <option key={id} value={id}>{option.name} · closes {dateLabel(option.closeDate)}</option>)}</select>
+      </section>
+      {!ipoFilter && <EmptyState title="Choose an IPO to see its applications." detail="Each IPO has its own application list and bulk actions." />}
+      {ipoFilter && <>
+      <div className="application-summary" aria-label="Application status summary for selected IPO">
+        <span><strong>{ipoItems.filter(canCancel).length}</strong> Active</span>
+        <span><strong>{ipoItems.filter((item) => item.status === "PLANNED").length}</strong> To submit</span>
+        <span><strong>{ipoItems.filter((item) => item.status === "SUBMITTED").length}</strong> Mandates pending</span>
+        <span><strong>{ipoItems.filter((item) => item.status === "BLOCKED").length}</strong> Results pending</span>
+        <span><strong>{ipoItems.filter((item) => item.status === "CANCELLED").length}</strong> Cancelled</span>
       </div>
       <div className="application-filters">
-        <label>Search<input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setSelectedIds([]); }} placeholder="Applicant, IPO or UPI" /></label>
-        <label>IPO<select value={ipoFilter} onChange={(event) => { setIpoFilter(event.target.value); setSelectedIds([]); }}><option value="ALL">All IPOs</option>{ipoOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
+        <label>Search<input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setSelectedIds([]); }} placeholder="Applicant or UPI" /></label>
         <label>Status<select value={filter} onChange={(event) => { setFilter(event.target.value as Filter); setSelectedIds([]); }}><option value="ACTIVE">Active</option><option value="ALL">All</option><option value="PLANNED">Planned</option><option value="SUBMITTED">Submitted</option><option value="BLOCKED">Blocked</option><option value="RESULTS">Results</option><option value="CANCELLED">Cancelled</option></select></label>
       </div>
       {canEdit && selectedItems.length > 0 && <div className="application-bulk" role="group" aria-label="Selected application actions"><strong>{selectedItems.length} selected</strong><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "PLANNED")} onClick={() => void bulkUpdate("submit", selectedIds)}>Mark submitted</button><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "SUBMITTED")} onClick={() => void bulkUpdate("block", selectedIds)}>Mark blocked</button><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "BLOCKED")} onClick={() => void bulkUpdate("not-allotted", selectedIds)}>Not allotted</button><button type="button" className="button-danger" disabled={busy || !selectedItems.every(canCancel)} onClick={() => setPendingCancelIds(selectedIds)}>Cancel selected</button><button type="button" className="button-ghost" onClick={() => setSelectedIds([])}>Clear</button></div>}
       {groups.length === 0 ? <EmptyState title="No applications match these filters." detail="Try a different IPO, status or search." /> : groups.map(([ipoId, group]) => {
         const eligibleIds = group.filter(canCancel).map((item) => item.id);
         return <section className="application-ipo-group" key={ipoId} aria-label={`${group[0].ipo_name} applications`}>
-          <header className="application-ipo-heading"><div><h2>{group[0].ipo_name}</h2><p>{group.length} {group.length === 1 ? "application" : "applications"} · Closes {dateLabel(group[0].close_date)}</p></div>{canEdit && eligibleIds.length > 0 && <label className="application-select-group"><input type="checkbox" checked={eligibleIds.every((id) => selectedIds.includes(id))} onChange={(event) => toggleSelection(eligibleIds, event.target.checked)} disabled={busy} /> Select this IPO</label>}</header>
-          <div className="application-table-wrap"><table className="application-table"><thead><tr>{canEdit && <th scope="col">Select</th>}<th scope="col">Applicant</th><th scope="col">Category</th><th scope="col">Amount</th><th scope="col">Bank / UPI</th><th scope="col">Status</th><th scope="col">Important date</th><th scope="col">Actions</th></tr></thead><tbody>{group.map((item) => { const date = importantDate(item); return <tr key={item.id}>
+          <header className="application-ipo-heading"><div><h2>{group[0].ipo_name}</h2><p>{group.length} {group.length === 1 ? "application" : "applications"} · Closes {dateLabel(group[0].close_date)}</p></div>{canEdit && eligibleIds.length > 0 && <label className="application-select-group application-select-mobile"><input type="checkbox" checked={eligibleIds.every((id) => selectedIds.includes(id))} onChange={(event) => toggleSelection(eligibleIds, event.target.checked)} disabled={busy} /> Select all</label>}</header>
+          <div className="application-table-wrap"><table className="application-table"><thead><tr>{canEdit && <th scope="col" className="application-select-heading"><label className="application-select-group"><input type="checkbox" aria-label="Select all visible applications" checked={eligibleIds.length > 0 && eligibleIds.every((id) => selectedIds.includes(id))} onChange={(event) => toggleSelection(eligibleIds, event.target.checked)} disabled={busy || eligibleIds.length === 0} /> Select all</label></th>}<th scope="col">Applicant</th><th scope="col">Category</th><th scope="col">Amount</th><th scope="col">Bank / UPI</th><th scope="col">Status</th><th scope="col">Important date</th><th scope="col">Actions</th></tr></thead><tbody>{group.map((item) => { const date = importantDate(item); return <tr key={item.id}>
             {canEdit && <td data-label="Select" className="application-select-cell">{canCancel(item) && <input type="checkbox" aria-label={`Select ${item.applicant_name} for ${item.ipo_name}`} checked={selectedIds.includes(item.id)} disabled={busy} onChange={(event) => toggleSelection([item.id], event.target.checked)} />}</td>}
             <th scope="row" data-label="Applicant">{item.applicant_name}</th>
             <td data-label="Category">{item.category === "SHNI" ? "sHNI" : "Retail"}<small>{item.lots} {item.lots === 1 ? "lot" : "lots"}</small></td>
@@ -293,6 +300,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
           </tr>; })}</tbody></table></div>
         </section>;
       })}
+      </>}
     </>}
     {selectedItem && <Drawer title={`${selectedItem.applicant_name} · ${selectedItem.ipo_name}`} onClose={() => setSelectedId(null)}>
       <div className="application-detail"><StatusBadge tone={statusTone(selectedItem)}>{outcomeLabel(selectedItem)}</StatusBadge><p>{selectedItem.category === "SHNI" ? "sHNI" : "Retail"} · {selectedItem.lots} {selectedItem.lots === 1 ? "lot" : "lots"} · {formatInr(selectedItem.amount)}</p><p>{selectedItem.bank_label} · {selectedItem.upi_label}</p></div>
