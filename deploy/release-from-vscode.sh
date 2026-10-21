@@ -26,6 +26,8 @@ if [[ "$current_ip" != "$public_ip" ]]; then
   exit 1
 fi
 
+python3 "$repo_root/deploy/ssh_access.py"
+
 temporary_keys=$(mktemp -d /private/tmp/lotneeti-release-keys.XXXXXX)
 trap 'rm -rf "$temporary_keys"' EXIT
 ssh-keygen -q -t ed25519 -N '' -f "$temporary_keys/id_ed25519"

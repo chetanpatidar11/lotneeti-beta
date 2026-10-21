@@ -1,5 +1,10 @@
 # LotNeeti execution status
 
+## C22 Release access repair — locally verified, 2026-10-22
+
+- The founder's VS Code release reached SSH but timed out connecting to the live EC2 IP. HTTPS health is 200 and DNS resolves to the expected Elastic IP. This workstation currently exits via 94.205.57.95, while TCP 22 is unreachable; the existing operator-only SSH rule likely still permits a previous address.
+- `deploy/release-from-vscode.sh` now checks the signed-in AWS account and production instance, then narrows the one existing inbound IPv4 TCP/22 rule in its attached security group to the workstation's current `/32`. It stops safely if the instance, group or SSH rule is unexpected or port 22 remains unreachable. It does not open SSH to everyone or create infrastructure. Production deployment still needs to be rerun from the founder's AWS-authenticated VS Code terminal.
+
 ## C22 Account image import and optional bank columns — locally verified, 2026-10-22
 
 - The founder requested PNG/JPG/WebP account-table import and Excel files without Account Number or Bank Name columns. Image text is extracted in the browser with locally served OCR assets and must be reviewed and editable before submission. Only the reviewed text reaches the existing encrypted import preview; the image itself stays on the device. Missing bank fields use BANK and the UPI ID as the provisional account reference, with ₹0 opening Balance. This extends B07/B08 without changing the import confirmation rules.
