@@ -1,9 +1,10 @@
 # LotNeeti execution status
 
-## C24 Funds, Applications and IPO controls — verified locally, 2026-10-23
+## C24 Funds, Applications and IPO controls — deployed, 2026-10-23
 
 - Requested: deduplicate UPI/account references, show internal-transfer counterpart details and all statement amounts without horizontal scrolling, default Scheduled Payments to all banks, compact application filters/labels, visible sign-out and sidebar spacing, and an off-by-default automatic-selection tab beside Calendar. Preserve existing ownership, manual choices, balances, history and Brevo verification.
 - Validation: complete `scripts/check.sh` passed with 438 backend tests, 48 web tests, one Android test, planner matrix, lint/format, migration checks, typecheck and builds. Synthetic browser checks at 1280×720 confirm full internal-transfer UPI identifiers, no statement overflow (916px scroll width = 916px available width), all-bank payments and correct-bank editing, status filtering, and hidden per-IPO Automatic buttons while disabled. The new setting defaults false for existing and new accounts; manual APPLY/SKIP choices remain authoritative.
+- Commit `ae58a1b` pushed to `origin/codex/autopilot` and deployed using the VS Code terminal after the encrypted pre-release backup succeeded. Release archive SHA-256 `fe73a5fc4f39bf7322342aabe71441ae233a17dbfecaaebc672af674ba62c490`. Production applied `accounts.0009` successfully, all four services are active, source hashes match local, no migrations remain, automatic selection is enabled for zero accounts, and Brevo SMTP remains configured. Read-only verification found the existing 17 investors, 9 banks, 13 plans and 171 applications unchanged. Home, sign-in, API health and both OCR assets returned HTTPS 200. No real application, payment or balance was edited during verification.
 
 ## C23 Correct project recovery and requested IPO usability updates — deployed, 2026-10-23
 
