@@ -6,14 +6,17 @@ import { useRouter } from "next/navigation";
 export default function ThresholdSetting({
   workspaceId,
   initialValue,
+  initialEnabled,
   initialIssueTypes,
   canEdit,
 }: {
   workspaceId: string;
   initialValue: string | null;
+  initialEnabled: boolean;
   initialIssueTypes: string[];
   canEdit: boolean;
 }) {
+  const [enabled, setEnabled] = useState(initialEnabled);
   const [value, setValue] = useState(initialValue ?? "");
   const [issueTypes, setIssueTypes] = useState(initialIssueTypes.length ? initialIssueTypes : ["MAINBOARD"]);
   const [busy, setBusy] = useState(false);
@@ -27,7 +30,7 @@ export default function ThresholdSetting({
       const response = await fetch(`/api/workspaces/${workspaceId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ auto_select_gmp_percent: value === "" ? null : value, auto_select_issue_types: issueTypes }),
+        body: JSON.stringify({ auto_select_enabled: enabled, auto_select_gmp_percent: value === "" ? null : value, auto_select_issue_types: issueTypes }),
       });
       if (!response.ok) throw new Error("Save failed");
       setMessage("");
@@ -42,14 +45,17 @@ export default function ThresholdSetting({
   return <section className="threshold-setting">
     <h2>Automatic IPO selection</h2>
     {canEdit ? <form onSubmit={save}>
+      <label><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />Enable automatic IPO selection</label>
+      {enabled && <>
       <label>GMP threshold (%)
         <input type="number" step="0.01" value={value} onChange={(event) => setValue(event.target.value)} placeholder="Not set" />
       </label>
       <fieldset className="auto-issue-types"><legend>IPO types</legend>
         {([["MAINBOARD", "Mainboard"], ["SME", "SME"]] as const).map(([id, label]) => <label key={id}><input type="checkbox" checked={issueTypes.includes(id)} onChange={() => setIssueTypes((current) => current.includes(id) ? current.length > 1 ? current.filter((item) => item !== id) : current : [...current, id])} />{label}</label>)}
       </fieldset>
+      </>}
       <button type="submit" disabled={busy}>Save selection</button>
-    </form> : <p>GMP threshold: {value === "" ? "Not set" : `${value}%`} · IPO types: {issueTypes.join(" + ")}</p>}
+    </form> : <p>{enabled ? "Enabled" : "Disabled"} · GMP threshold: {value === "" ? "Not set" : `${value}%`} · IPO types: {issueTypes.join(" + ")}</p>}
     {message && <p role="status">{message}</p>}
   </section>;
 }

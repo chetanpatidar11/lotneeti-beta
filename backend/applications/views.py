@@ -60,7 +60,9 @@ def _result(item):
         "applicant_name": item.applicant.name,
         "bank": str(item.bank_id),
         "upi": str(item.upi_id),
-        "bank_label": f"{item.bank.bank_name} {item.bank.account_masked}",
+        "bank_label": item.bank.bank_name
+        if item.bank.is_imported_reference
+        else f"{item.bank.bank_name} {item.bank.account_masked}",
         "upi_label": item.upi.handle,
         "close_date": item.ipo.close_date,
         "allotment_date": item.ipo.allotment_date,
@@ -137,7 +139,9 @@ def _saved_plan_rows(workspace, tracked):
                 "applicant": row.applicant_ref,
                 "applicant_name": investor.name,
                 "bank": row.bank_ref,
-                "bank_label": f"{bank.bank_name} {bank.account_masked}",
+                "bank_label": bank.bank_name
+                if bank.is_imported_reference
+                else f"{bank.bank_name} {bank.account_masked}",
                 "upi": row.upi_ref,
                 "upi_label": upi.handle,
                 "close_date": ipo.close_date,

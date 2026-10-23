@@ -19,6 +19,7 @@ def test_founder_workspace_can_set_twenty_percent_without_platform_default():
     founder = User.objects.create_user(email="founder@example.test")
     first = create_workspace(name="Founder", owner=founder)
     second = create_workspace(name="Other", owner=founder)
+    assert first.auto_select_enabled is False
     assert first.auto_select_gmp_percent is None
     assert second.auto_select_gmp_percent is None
     client = APIClient()
@@ -58,6 +59,7 @@ def test_only_owner_can_change_auto_select_threshold():
 def test_automatic_issue_types_default_to_mainboard_and_manual_apply_still_wins():
     owner = User.objects.create_user(email="types@example.test")
     workspace = create_workspace(name="Types", owner=owner)
+    workspace.auto_select_enabled = True
     workspace.auto_select_gmp_percent = Decimal("20.00")
     workspace.save()
     today = timezone.localdate()
@@ -135,6 +137,7 @@ def test_automatic_issue_types_default_to_mainboard_and_manual_apply_still_wins(
 def test_upcoming_is_automatic_only_when_no_open_eligible_ipo_exists():
     owner = User.objects.create_user(email="fallback@example.test")
     workspace = create_workspace(name="Fallback", owner=owner)
+    workspace.auto_select_enabled = True
     workspace.auto_select_gmp_percent = Decimal("20.00")
     workspace.save()
     today = timezone.localdate()
@@ -177,3 +180,40 @@ def test_upcoming_is_automatic_only_when_no_open_eligible_ipo_exists():
         str(issues[1].pk): True,
     }
     assert {item.id for item in build_snapshot(workspace=workspace).ipos} == {str(issues[1].pk)}
+
+
+@pytest.mark.django_db
+@override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="WARN")
+def test_automatic_selection_requires_explicit_enable_and_keeps_manual_choices():
+    from tests.test_ipo_decisions import make_ipo
+
+    owner = User.objects.create_user(email="disabled-auto@example.test")
+    workspace = create_workspace(name="Synthetic", owner=owner)
+    workspace.auto_select_gmp_percent = Decimal("1.00")
+    workspace.save()
+    ipo = make_ipo()
+    GMPObservation.objects.create(
+        ipo=ipo,
+        source_key="synthetic",
+        value_per_share=Decimal("30.00"),
+        observed_at=timezone.now(),
+    )
+    client = APIClient()
+    client.force_authenticate(owner)
+    settings_url = reverse("workspace-detail", args=[workspace.pk])
+    choices_url = reverse("workspace-ipo-decision-list", args=[workspace.pk])
+    assert client.get(choices_url).data[0]["reason"] == "AUTOMATIC_DISABLED"
+    assert not build_snapshot(workspace=workspace).ipos
+    assert (
+        client.patch(settings_url, {"auto_select_enabled": True}, format="json").status_code == 200
+    )
+    workspace.refresh_from_db()
+    assert client.get(choices_url).data[0]["selected"] is True
+    assert len(build_snapshot(workspace=workspace).ipos) == 1
+    client.patch(
+        reverse("workspace-ipo-decision-detail", args=[workspace.pk, ipo.pk]), {"decision": "APPLY"}
+    )
+    client.patch(settings_url, {"auto_select_enabled": False}, format="json")
+    workspace.refresh_from_db()
+    assert client.get(choices_url).data[0]["reason"] == "MANUAL_APPLY"
+    assert len(build_snapshot(workspace=workspace).ipos) == 1

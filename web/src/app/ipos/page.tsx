@@ -20,7 +20,7 @@ type IPO = {
   last_stale_gmp: string | null; last_stale_gmp_percent: string | null; last_stale_gmp_observed_at: string | null;
 };
 type Observation = { id: string; value_per_share: string; source_value_per_share: string; percent: string; observed_at: string; source_key: string; enabled: boolean; fresh: boolean; included_in_consensus: boolean };
-type Workspace = { id: string; role: string; auto_select_gmp_percent: string | null; auto_select_issue_types: string[] };
+type Workspace = { id: string; role: string; auto_select_enabled: boolean; auto_select_gmp_percent: string | null; auto_select_issue_types: string[] };
 function dateLabel(value: string | null) {
   return value ? new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${value}T00:00:00Z`)) : "—";
 }
@@ -53,7 +53,7 @@ export default async function IPOsPage({ searchParams }: { searchParams: Promise
     if (selectionResponse.ok) selections = (await selectionResponse.json()) as IPOSelection[];
   }
   const selectionMap = new Map(selections.map((selection) => [selection.ipo, selection]));
-  const view = params.view === "calendar" ? "calendar" : "list";
+  const view = params.view === "calendar" ? "calendar" : params.view === "automatic" ? "automatic" : "list";
   const statusRank: Record<string, number> = { OPEN: 0, UPCOMING: 1, ALLOTMENT: 2, CLOSED: 3, LISTED: 4, CANCELLED: 5 };
   const sorted = [...ipos].sort((a, b) => (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9) || a.close_date.localeCompare(b.close_date) || a.issuer_name.localeCompare(b.issuer_name));
   const calendar = ipos.filter((ipo) => ["OPEN", "UPCOMING"].includes(ipo.status)).sort((a, b) => a.open_date.localeCompare(b.open_date));
@@ -67,9 +67,9 @@ export default async function IPOsPage({ searchParams }: { searchParams: Promise
     <nav className="ipo-view-tabs" aria-label="IPO views">
       <Link href="/ipos" aria-current={view === "list" ? "page" : undefined}>IPOs</Link>
       <Link href="/ipos?view=calendar" aria-current={view === "calendar" ? "page" : undefined}>Calendar</Link>
+      <Link href="/ipos?view=automatic" aria-current={view === "automatic" ? "page" : undefined}>Automatic IPO selection</Link>
     </nav>
-    {view === "calendar" ? <section className="ipo-calendar" aria-label="Upcoming IPO dates"><div className="section-heading"><div><h2>IPO calendar</h2><p>Open and upcoming issues</p></div></div>{calendar.length === 0 ? <EmptyState title="No IPO dates to show yet." detail="Open and upcoming issues will appear here after a market data sync." /> : <ul>{calendar.map((ipo) => <li key={ipo.id}><span className="ipo-calendar-date">{dateLabel(ipo.open_date)}</span><strong>{ipo.issuer_name}</strong><span>{ipo.issue_type === "SME" ? "SME" : "Mainboard"} · closes {dateLabel(ipo.close_date)}</span><StatusBadge tone={ipo.status === "OPEN" ? "positive" : "info"}>{ipo.status}</StatusBadge></li>)}</ul>}</section> : <>
-    {workspace && <ThresholdSetting workspaceId={workspace.id} initialValue={workspace.auto_select_gmp_percent} initialIssueTypes={workspace.auto_select_issue_types} canEdit={workspace.role === "OWNER"} />}
+    {view === "automatic" ? (workspace && <ThresholdSetting workspaceId={workspace.id} initialEnabled={workspace.auto_select_enabled} initialValue={workspace.auto_select_gmp_percent} initialIssueTypes={workspace.auto_select_issue_types} canEdit={workspace.role === "OWNER"} />) : view === "calendar" ? <section className="ipo-calendar" aria-label="Upcoming IPO dates"><div className="section-heading"><div><h2>IPO calendar</h2><p>Open and upcoming issues</p></div></div>{calendar.length === 0 ? <EmptyState title="No IPO dates to show yet." detail="Open and upcoming issues will appear here after a market data sync." /> : <ul>{calendar.map((ipo) => <li key={ipo.id}><span className="ipo-calendar-date">{dateLabel(ipo.open_date)}</span><strong>{ipo.issuer_name}</strong><span>{ipo.issue_type === "SME" ? "SME" : "Mainboard"} · closes {dateLabel(ipo.close_date)}</span><StatusBadge tone={ipo.status === "OPEN" ? "positive" : "info"}>{ipo.status}</StatusBadge></li>)}</ul>}</section> : <>
     <IPOListView initialSearch={params.q ?? ""} initialFilter={params.filter ?? "all"} items={sorted.map((ipo, index) => {
         const selection = selectionMap.get(ipo.id);
         const active = ipo.plan_available ?? ["OPEN", "UPCOMING"].includes(ipo.status);
@@ -89,7 +89,7 @@ export default async function IPOsPage({ searchParams }: { searchParams: Promise
             <div><span>Close</span><strong>{dateLabel(ipo.close_date)}</strong></div>
             <div><span>Allotment</span><strong>{dateLabel(ipo.allotment_date)}</strong></div>
           </div>
-          {ipo.planning_only && <p className="plan-note">Closed for new bids. Record plans remain available until midnight IST today.</p>}{active && <div className="ipo-controls"><div className="ipo-gmp-detail">{ipo.gmp_has_founder_correction && <StatusBadge tone="info">Founder corrected</StatusBadge>}<Trend history={trendHistory} />{history.length > 0 && <details className="sources-disclosure"><summary>GMP history ({history.length})</summary><ol>{history.map((item) => <li key={item.id}>{observedLabel(item.observed_at)} · {formatInr(item.value_per_share)} ({item.percent}%){item.value_per_share !== item.source_value_per_share ? ` · source ${formatInr(item.source_value_per_share)}` : ""}</li>)}</ol></details>}</div>{workspace && <IPOChoice key={`${ipo.id}:${selection?.decision}:${selection?.selected}`} workspaceId={workspace.id} ipoId={ipo.id} initial={selection} canEdit={workspace.role !== "VIEWER"} />}</div>}
+          {ipo.planning_only && <p className="plan-note">Closed for new bids. Record plans remain available until midnight IST today.</p>}{active && <div className="ipo-controls"><div className="ipo-gmp-detail">{ipo.gmp_has_founder_correction && <StatusBadge tone="info">Founder corrected</StatusBadge>}<Trend history={trendHistory} />{history.length > 0 && <details className="sources-disclosure"><summary>GMP history ({history.length})</summary><ol>{history.map((item) => <li key={item.id}>{observedLabel(item.observed_at)} · {formatInr(item.value_per_share)} ({item.percent}%){item.value_per_share !== item.source_value_per_share ? ` · source ${formatInr(item.source_value_per_share)}` : ""}</li>)}</ol></details>}</div>{workspace && <IPOChoice key={`${ipo.id}:${selection?.decision}:${selection?.selected}`} workspaceId={workspace.id} ipoId={ipo.id} initial={selection} automaticEnabled={workspace.auto_select_enabled} canEdit={workspace.role !== "VIEWER"} />}</div>}
         </article> };
       })}
     />

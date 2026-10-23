@@ -45,11 +45,10 @@ export default async function FundsPage() {
   const banks = allBanks.filter((bank) => bank.active && investors.some((investor) => investor.id === bank.owner));
   const capital = capitalResponse.ok ? (await capitalResponse.json()) as { by_bank?: Record<string, CapitalLine> } : null;
   const archivedBanks = archiveResponse.ok ? (await archiveResponse.json()) as ArchivedBank[] : [];
-  let payments: ScheduledPayment[] = [];
-  if (banks[0]) {
-    const paymentsResponse = await getData(`workspaces/${workspace.id}/banks/${banks[0].id}/recurring-debits/`, cookieHeader);
-    if (paymentsResponse.ok) payments = (await paymentsResponse.json()) as ScheduledPayment[];
-  }
+  const payments = (await Promise.all(banks.map(async (bank) => {
+    const response = await getData(`workspaces/${workspace.id}/banks/${bank.id}/recurring-debits/`, cookieHeader);
+    return response.ok ? ((await response.json()) as ScheduledPayment[]).map((payment) => ({ ...payment, bank_id: bank.id })) : [];
+  }))).flat();
 
   return <FundsScreen workspace={workspace} investors={investors} initialBanks={banks} statementBanks={allBanks} initialPayments={payments} capitalByBank={capital?.by_bank ?? {}} archivedBanks={archivedBanks} />;
 }

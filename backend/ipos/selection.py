@@ -61,6 +61,7 @@ def resolve_ipo_choices(
     threshold: Decimal | None,
     issue_types: tuple[str, ...],
     at: datetime,
+    enabled: bool = True,
 ) -> dict[str, tuple[bool, str]]:
     """Apply the same automatic selection timing in IPO and planner views."""
     has_open = has_open_auto_ipo(
@@ -68,6 +69,9 @@ def resolve_ipo_choices(
     )
     initial = {}
     for ipo_id, values, decision, percent in candidates:
+        if not enabled and decision == "DEFAULT":
+            initial[ipo_id] = (False, "AUTOMATIC_DISABLED")
+            continue
         initial[ipo_id] = select_ipo(
             decision=decision,
             gmp_percent=percent,

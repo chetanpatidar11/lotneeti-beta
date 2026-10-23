@@ -83,6 +83,7 @@ def build_snapshot(
     choices = resolve_ipo_choices(
         candidates=selection_candidates,
         threshold=workspace.auto_select_gmp_percent,
+        enabled=workspace.auto_select_enabled,
         issue_types=issue_types,
         at=now,
     )

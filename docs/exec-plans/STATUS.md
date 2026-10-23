@@ -1,5 +1,10 @@
 # LotNeeti execution status
 
+## C24 Funds, Applications and IPO controls — verified locally, 2026-10-23
+
+- Requested: deduplicate UPI/account references, show internal-transfer counterpart details and all statement amounts without horizontal scrolling, default Scheduled Payments to all banks, compact application filters/labels, visible sign-out and sidebar spacing, and an off-by-default automatic-selection tab beside Calendar. Preserve existing ownership, manual choices, balances, history and Brevo verification.
+- Validation: complete `scripts/check.sh` passed with 438 backend tests, 48 web tests, one Android test, planner matrix, lint/format, migration checks, typecheck and builds. Synthetic browser checks at 1280×720 confirm full internal-transfer UPI identifiers, no statement overflow (916px scroll width = 916px available width), all-bank payments and correct-bank editing, status filtering, and hidden per-IPO Automatic buttons while disabled. The new setting defaults false for existing and new accounts; manual APPLY/SKIP choices remain authoritative.
+
 ## C23 Correct project recovery and requested IPO usability updates — deployed, 2026-10-23
 
 - Authoritative production checkout is this directory: `/Users/chetanpatidar/Documents/Codex/2026-10-10/con/work/lotneeti-auth-safari`, branch `codex/autopilot`. Chat “Inspect product and create branch” records its current deployments, Brevo email OTP, blue light/dark themes, per-IPO Applications/bulk controls, transfers, and image import. The old `/Users/chetanpatidar/Projects/lotneeti-new` checkout was mistakenly deployed by a different chat and must not be deployed again.

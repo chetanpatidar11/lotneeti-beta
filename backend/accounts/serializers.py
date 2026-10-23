@@ -13,6 +13,7 @@ class WorkspaceSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "cross_funding_policy",
+            "auto_select_enabled",
             "auto_select_gmp_percent",
             "auto_select_issue_types",
             "role",

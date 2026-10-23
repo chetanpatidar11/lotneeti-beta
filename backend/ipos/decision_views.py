@@ -42,6 +42,7 @@ def workspace_selection_rows(workspace, *, at):
     choices = resolve_ipo_choices(
         candidates=candidates,
         threshold=workspace.auto_select_gmp_percent,
+        enabled=workspace.auto_select_enabled,
         issue_types=tuple(workspace.auto_select_issue_types or ["MAINBOARD"]),
         at=at,
     )

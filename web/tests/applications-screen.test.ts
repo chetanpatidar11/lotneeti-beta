@@ -44,7 +44,7 @@ function render(status: ApplicationItem["status"], canEdit = true) {
 
 test("applications require an IPO choice before showing rows and have no all-IPO option", () => {
   const page = render("PLANNED");
-  assert.match(page, /Choose an IPO to see its applications/);
+  assert.match(page, /Select an IPO above to view applications/);
   assert.match(page, /Select an IPO/);
   assert.doesNotMatch(page, /All IPOs/);
   assert.doesNotMatch(page, /Track latest plan/);

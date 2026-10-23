@@ -49,7 +49,7 @@ export default function AppNav({ email, founderAdmin, localPreview, theme }: {
       <div className="sidebar-footer">
         <ThemeToggle className="sidebar-theme-toggle" initialTheme={theme} />
         {founderAdmin && <a className="admin-link" href="/admin/">Founder Admin <span aria-hidden="true">↗</span></a>}
-        <details className="account-menu"><summary><span className="account-avatar" aria-hidden="true">{email.slice(0, 1).toUpperCase()}</span><span className="account-copy"><strong>{localPreview ? "Local preview" : "Account"}</strong><small>{email}</small></span></summary>{!localPreview && <div><SignOutButton /></div>}</details>
+        <div className="account-menu"><div className="account-summary"><span className="account-avatar" aria-hidden="true">{email.slice(0, 1).toUpperCase()}</span><span className="account-copy"><strong>{localPreview ? "Local preview" : "Account"}</strong><small>{email}</small></span></div>{!localPreview && <div><SignOutButton /></div>}</div>
       </div>
     </aside>
     <header className="mobile-header"><Link className="app-brand" href="/"><span className="brand-symbol" aria-hidden="true">L</span><span>Lot<span>Neeti</span></span></Link><button className="mobile-menu-toggle" type="button" aria-expanded={menuOpen} aria-controls="mobile-overflow" onClick={() => setMenuOpen(!menuOpen)}>Menu</button></header>

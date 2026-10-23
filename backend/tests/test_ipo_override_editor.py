@@ -21,6 +21,7 @@ def test_staff_override_editor_requires_mfa_and_drives_public_and_planner_values
     founder = User.objects.create_superuser(email="founder@example.invalid", password="test")
     member = User.objects.create_user(email="member@example.invalid")
     workspace = create_workspace(name="Synthetic workspace", owner=member)
+    workspace.auto_select_enabled = True
     workspace.auto_select_gmp_percent = Decimal("20.00")
     workspace.save()
     today = timezone.localdate()

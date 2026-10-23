@@ -197,6 +197,7 @@ def test_last_gmp_can_select_an_open_ipo_but_closing_it_excludes_new_plans():
     observe(ipo, "alpha", "40.00", now - timedelta(hours=25))
     member = User.objects.create_user(email="member@example.test")
     workspace = create_workspace(name="Synthetic family", owner=member)
+    workspace.auto_select_enabled = True
     workspace.auto_select_gmp_percent = Decimal("20.00")
     workspace.save()
     api = APIClient()

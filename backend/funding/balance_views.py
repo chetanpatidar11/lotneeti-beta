@@ -181,6 +181,31 @@ class WorkspaceBalanceStatementView(APIView):
         bank_serializer = BankAccountSerializer(context={"display_details": reveal})
         pages = Paginator(changes, 50)
         page = pages.get_page(page_number)
+        page_changes = list(page.object_list)
+        transfer_ids = {change.transfer_id for change in page_changes if change.transfer_id}
+        counterparties = {}
+        for paired in (
+            BalanceChange.objects.filter(
+                bank__workspace_id=workspace_id, transfer_id__in=transfer_ids
+            )
+            .select_related("bank", "bank__owner")
+            .prefetch_related("bank__upis")
+        ):
+            counterparties.setdefault(paired.transfer_id, []).append(paired.bank)
+
+        def counterparty_label(change):
+            for bank in counterparties.get(change.transfer_id, []):
+                if bank.pk == change.bank_id:
+                    continue
+                identifiers = dict.fromkeys(
+                    [
+                        bank_serializer.get_account_display(bank),
+                        *bank_serializer.get_linked_upis(bank),
+                    ]
+                )
+                return " · ".join([bank.bank_name, bank.owner.name, *identifiers])
+            return change.counterparty_label
+
         return Response(
             {
                 "results": [
@@ -202,10 +227,10 @@ class WorkspaceBalanceStatementView(APIView):
                         "balance": str(change.new_balance),
                         "note": change.note,
                         "transfer_id": str(change.transfer_id) if change.transfer_id else None,
-                        "counterparty_label": change.counterparty_label,
+                        "counterparty_label": counterparty_label(change),
                         "created_at": change.created_at.isoformat(),
                     }
-                    for change in page.object_list
+                    for change in page_changes
                 ],
                 "next_page": page.next_page_number() if page.has_next() else None,
                 "total": pages.count,

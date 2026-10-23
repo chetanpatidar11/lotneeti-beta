@@ -117,6 +117,7 @@ def test_automatic_selection_waits_for_earlier_funding_window_but_manual_choice_
 def test_ipo_manual_apply_skip_persists_and_overrides_workspace_threshold():
     owner = User.objects.create_user(email="owner@example.test")
     workspace = create_workspace(name="Family", owner=owner)
+    workspace.auto_select_enabled = True
     workspace.auto_select_gmp_percent = Decimal("20.00")
     workspace.save()
     ipo = make_ipo()
@@ -146,6 +147,7 @@ def test_ipo_manual_apply_skip_persists_and_overrides_workspace_threshold():
     assert reset.data["selected"] is False
     assert reset.data["reason"] == "BELOW_GMP_THRESHOLD"
     assert client.get(list_url).data[0]["decision"] == "DEFAULT"
+    workspace.auto_select_enabled = True
     workspace.auto_select_gmp_percent = Decimal("5.00")
     workspace.save()
     assert client.get(list_url).data[0]["selected"] is True

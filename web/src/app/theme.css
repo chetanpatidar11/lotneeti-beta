@@ -1180,3 +1180,27 @@ html[data-theme="dark"] body > #main-content > .page:not(.auth-page) > .shell { 
 .application-ipo-picker .application-picker-eyebrow { display: none; }
 .application-ipo-heading > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; }
 .application-ipo-heading p { margin: 0; }
+
+/* C24: compact filters and complete bank identifiers within the available width. */
+.app-sidebar .app-nav { margin-top: 34px; }
+.account-summary { display: flex; align-items: center; gap: 9px; min-height: 51px; padding: 8px !important; }
+.account-menu button { min-height: 36px; font-weight: 700; }
+.application-ipo-picker { display: grid; grid-template-columns: minmax(0, 2fr) minmax(120px, 1fr) minmax(130px, 1fr); gap: 14px; align-items: end; }
+.application-ipo-picker label { display: grid; gap: 5px; min-width: 0; font-size: 12px; font-weight: 650; }
+.application-ipo-picker select { width: 100%; min-width: 0; }
+.application-filters { grid-template-columns: minmax(180px, 360px); }
+.application-select-heading, .application-select-cell { width: 30px; }
+.funds-statement-table { width: 100%; min-width: 0; table-layout: fixed; font-size: 11px; }
+.funds-statement-table th, .funds-statement-table td { padding: 7px 6px; white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
+.funds-statement-table th span, .funds-statement-table td small { display: block; margin: 2px 0 0; white-space: normal; font-size: 11px; }
+.funds-statement-table th:first-child { width: 12%; }
+.funds-statement-table th:nth-child(2) { width: 24%; }
+.funds-statement-table th:nth-child(3) { width: 28%; }
+.funds-statement-table th:nth-child(n+4) { width: 12%; }
+.funds-statement-table td:nth-child(n+4), .funds-statement-table th:nth-child(n+4) { text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) {
+  .application-ipo-picker { grid-template-columns: 1fr 1fr; }
+  .application-ipo-picker label:first-child { grid-column: 1 / -1; }
+  .funds-statement-table { font-size: 10px; }
+  .funds-statement-table th, .funds-statement-table td { padding: 5px 3px; }
+}

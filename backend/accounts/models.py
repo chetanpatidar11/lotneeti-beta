@@ -59,6 +59,7 @@ class Workspace(models.Model):
     cross_funding_policy = models.CharField(
         max_length=8, choices=CrossFundingPolicy.choices, default=CrossFundingPolicy.DEFAULT
     )
+    auto_select_enabled = models.BooleanField(default=False)
     auto_select_gmp_percent = models.DecimalField(
         max_digits=6, decimal_places=2, null=True, blank=True
     )

@@ -7,6 +7,7 @@ import { EmptyState, StatusBadge } from "@/components/ui";
 
 export type ScheduledPayment = {
   id: string;
+  bank_id: string;
   name: string;
   amount: string;
   frequency: "DAILY" | "WEEKLY" | "MONTHLY";
@@ -28,33 +29,43 @@ const emptyForm = {
 export default function ScheduledPayments({
   workspaceId,
   bankId,
+  banks,
   canEdit,
   initialPayments,
 }: {
   workspaceId: string;
   bankId: string;
+  banks: { id: string; label: string }[];
   canEdit: boolean;
   initialPayments: ScheduledPayment[];
 }) {
   const [payments, setPayments] = useState(initialPayments);
   const [form, setForm] = useState(emptyForm);
+  const [formBankId, setFormBankId] = useState(bankId || banks[0]?.id || "");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const base = `/api/workspaces/${workspaceId}/banks/${bankId}/recurring-debits`;
+  const bankIds = (bankId ? [bankId] : banks.map((bank) => bank.id)).join(",");
+  const base = (id: string) => `/api/workspaces/${workspaceId}/banks/${id}/recurring-debits`;
 
   useEffect(() => {
     let cancelled = false;
-    fetch(base).then(async (response) => {
-      if (response.ok && !cancelled) setPayments((await response.json()) as ScheduledPayment[]);
-    }).catch(() => {});
+    const ids = bankIds ? bankIds.split(",") : [];
+    Promise.all(ids.map(async (id) => {
+      const response = await fetch(`/api/workspaces/${workspaceId}/banks/${id}/recurring-debits`);
+      if (!response.ok) throw new Error("Load failed");
+      return ((await response.json()) as ScheduledPayment[]).map((payment) => ({ ...payment, bank_id: id }));
+    })).then((rows) => {
+      if (!cancelled) setPayments(rows.flat().sort((a, b) => a.next_due_date.localeCompare(b.next_due_date) || a.name.localeCompare(b.name)));
+    }).catch(() => { if (!cancelled) setMessage("Scheduled payments could not be loaded. Please refresh."); });
     return () => { cancelled = true; };
-  }, [base]);
+  }, [workspaceId, bankIds]);
 
   function startEdit(payment: ScheduledPayment) {
     setFormOpen(true);
     setEditingId(payment.id);
+    setFormBankId(payment.bank_id);
     setForm({
       name: payment.name,
       amount: payment.amount,
@@ -75,13 +86,13 @@ export default function ScheduledPayments({
       end_date: form.end_date || null,
     };
     try {
-      const response = await fetch(editingId ? `${base}/${editingId}` : base, {
+      const response = await fetch(editingId ? `${base(formBankId)}/${editingId}` : base(formBankId), {
         method: editingId ? "PATCH" : "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error("Save failed");
-      const payment = (await response.json()) as ScheduledPayment;
+      const payment = { ...((await response.json()) as ScheduledPayment), bank_id: formBankId };
       setPayments(editingId ? payments.map((item) => item.id === payment.id ? payment : item) : [...payments, payment]);
       setEditingId(null);
       setForm(emptyForm);
@@ -97,13 +108,13 @@ export default function ScheduledPayments({
   async function toggleActive(payment: ScheduledPayment) {
     setBusy(true);
     try {
-      const response = await fetch(`${base}/${payment.id}`, {
+      const response = await fetch(`${base(payment.bank_id)}/${payment.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ active: !payment.active }),
       });
       if (!response.ok) throw new Error("Update failed");
-      const updated = (await response.json()) as ScheduledPayment;
+      const updated = { ...((await response.json()) as ScheduledPayment), bank_id: payment.bank_id };
       setPayments(payments.map((item) => item.id === updated.id ? updated : item));
       setMessage(updated.active ? "Scheduled payment resumed." : "Scheduled payment paused.");
     } catch {
@@ -116,7 +127,7 @@ export default function ScheduledPayments({
   async function remove(payment: ScheduledPayment) {
     setBusy(true);
     try {
-      const response = await fetch(`${base}/${payment.id}`, { method: "DELETE" });
+      const response = await fetch(`${base(payment.bank_id)}/${payment.id}`, { method: "DELETE" });
       if (!response.ok) throw new Error("Delete failed");
       setPayments(payments.filter((item) => item.id !== payment.id));
       if (editingId === payment.id) { setEditingId(null); setForm(emptyForm); }
@@ -130,12 +141,12 @@ export default function ScheduledPayments({
 
   return (
     <section className="scheduled-payments">
-      {canEdit && <button type="button" className="button-secondary" onClick={() => { setEditingId(null); setForm(emptyForm); setFormOpen(true); }}>+ Add payment</button>}
+      {canEdit && <button type="button" className="button-secondary" onClick={() => { setEditingId(null); setFormBankId(bankId || banks[0]?.id || ""); setForm(emptyForm); setFormOpen(true); }}>+ Add payment</button>}
       {payments.length === 0 ? <EmptyState title="No scheduled payments." detail="Upcoming debits will appear here." /> : (
         <ul className="change-list">
           {payments.map((payment) => (
             <li key={payment.id}>
-              <span><strong>{payment.name}</strong><br /><small>{payment.frequency.toLowerCase()} · Next {payment.next_due_date}</small> <StatusBadge tone={payment.active ? "positive" : "neutral"}>{payment.active ? "Active" : "Paused"}</StatusBadge></span>
+              <span><strong>{payment.name}</strong><br /><small>{banks.find((bank) => bank.id === payment.bank_id)?.label} · {payment.frequency.toLowerCase()} · Next {payment.next_due_date}</small> <StatusBadge tone={payment.active ? "positive" : "neutral"}>{payment.active ? "Active" : "Paused"}</StatusBadge></span>
               <span>{formatInr(payment.amount)}<br />
                 {canEdit && <span className="payment-buttons">
                   <button type="button" aria-label={`Edit ${payment.name}`} disabled={busy} onClick={() => startEdit(payment)}>Edit</button>
@@ -149,6 +160,8 @@ export default function ScheduledPayments({
       )}
       {canEdit && formOpen && <Drawer title={editingId ? "Edit scheduled payment" : "Add scheduled payment"} onClose={() => setFormOpen(false)}>
         <form onSubmit={save} className="sign-in-form add-investor-form">
+          <label htmlFor="payment-bank">Bank account</label>
+          <select id="payment-bank" required disabled={editingId !== null} value={formBankId} onChange={(event) => setFormBankId(event.target.value)}>{banks.map((bank) => <option key={bank.id} value={bank.id}>{bank.label}</option>)}</select>
           <label htmlFor="payment-name">Name</label>
           <input id="payment-name" required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
           <label htmlFor="payment-amount">Amount (₹)</label>
