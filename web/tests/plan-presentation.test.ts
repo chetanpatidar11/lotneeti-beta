@@ -147,3 +147,11 @@ test("validation issues use plain copy and unknown codes never leak", () => {
     "This application needs review before export.",
   ]);
 });
+
+
+test("closing-day record selection remains available while closed submission export is blocked", () => {
+  const result = splitPlanningSelections([{ ipo: "closed", mode: "RETAIL_ONLY" }], { closed: "CLOSED" }, { closed: true });
+  assert.equal(result.available.length, 1);
+  assert.equal(result.unavailableCount, 0);
+  assert.equal(canExportPlan({ status: "READY", planning_only: true, planned_total: "0", rows: [], uncovered: [], audit_issues: [] }), false);
+});

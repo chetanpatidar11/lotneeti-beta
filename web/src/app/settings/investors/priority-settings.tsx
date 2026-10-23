@@ -85,7 +85,7 @@ export default function PrioritySettings({
   linkedAccounts: LinkedAccounts;
   loadError: boolean;
 }) {
-  const [workspace, setWorkspace] = useState(initialWorkspace);
+  const workspace = initialWorkspace;
   const [investors, setInvestors] = useState(sortByPriority(initialInvestors));
   const [banks, setBanks] = useState(initialBanks);
   const [linkedAccounts, setLinkedAccounts] = useState(initialLinkedAccounts);
@@ -119,7 +119,6 @@ export default function PrioritySettings({
   const [openingBalance, setOpeningBalance] = useState("0");
   const [upiBankId, setUpiBankId] = useState(initialBanks.find((bank) => bank.active)?.id ?? "");
   const [upiHandle, setUpiHandle] = useState("");
-  const [workspaceName, setWorkspaceName] = useState("");
   const [name, setName] = useState("");
   const [pan, setPan] = useState("");
   const [includeNewDemat, setIncludeNewDemat] = useState(false);
@@ -193,21 +192,6 @@ export default function PrioritySettings({
 
   function selectAll(kind: SettingsKind, ids: string[], checked: boolean) {
     setSelected((current) => ({ ...current, [kind]: checked ? ids : [] }));
-  }
-
-  async function createWorkspace(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy(true);
-    try {
-      const response = await fetch("/api/workspaces", {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: workspaceName }),
-      });
-      if (!response.ok) throw new Error("Create failed");
-      setWorkspace((await response.json()) as Workspace);
-      note("");
-    } catch {
-      note("We could not create the workspace. Please try again.", true);
-    } finally { setBusy(false); }
   }
 
   async function addInvestor(event: FormEvent<HTMLFormElement>) {
@@ -511,12 +495,9 @@ export default function PrioritySettings({
     : "";
 
   return <main className="page settings-page"><div className="shell settings-shell">
-    <PageHeader eyebrow="Workspace" title="Settings" description={workspace ? workspace.name : "Set up a workspace to start planning."} />
+    <PageHeader eyebrow="Account" title="Settings" description="Manage your investors and linked accounts." />
     {message && <p role={messageError ? "alert" : "status"} className={messageError ? "settings-message error" : "settings-message"}>{message}</p>}
-    {loadError ? <div className="plan-error" role="alert">Settings could not be loaded. <button type="button" className="button-secondary" onClick={() => window.location.reload()}>Retry</button></div> : !workspace ? <form onSubmit={createWorkspace} className="sign-in-form settings-create-workspace">
-      <label htmlFor="workspace-name">Workspace name</label><input id="workspace-name" required value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} />
-      <button type="submit" disabled={busy}>Create workspace</button>
-    </form> : <>
+    {loadError ? <div className="plan-error" role="alert">Settings could not be loaded. <button type="button" className="button-secondary" onClick={() => window.location.reload()}>Retry</button></div> : !workspace ? <EmptyState title="Your account is being set up" detail="Sign in again to finish your account setup." /> : <>
       <nav className="settings-tabs" aria-label="Settings sections">
         {([["investors", "Investors"], ["demats", "Demat Accounts"], ["banks", "Bank Accounts"], ["upis", "UPIs"], ["import", "Import"]] as const).map(([key, label]) => <button key={key} type="button" className={tab === key ? "settings-tab active" : "settings-tab"} aria-current={tab === key ? "page" : undefined} onClick={() => changeTab(key)}>{label}</button>)}
       </nav>

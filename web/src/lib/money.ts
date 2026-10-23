@@ -16,3 +16,14 @@ export function balanceActionLabel(operation: "ADD" | "REMOVE" | "SET" | "TRANSF
   if (operation === "TRANSFER_IN") return "Transfer from bank";
   return "Set Balance";
 }
+
+
+export function sumInr(values: Array<string | number | null | undefined>): number {
+  const totalPaise = values.reduce((sum, value) => {
+    const match = String(value ?? "0").trim().match(/^(-?)(\d+)(?:\.(\d{1,2}))?$/);
+    if (!match) return sum;
+    const paise = BigInt(match[2]) * 100n + BigInt((match[3] ?? "").padEnd(2, "0") || "0");
+    return sum + (match[1] ? -paise : paise);
+  }, 0n);
+  return Number(totalPaise) / 100;
+}

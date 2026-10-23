@@ -5,10 +5,13 @@ from django.core.exceptions import ValidationError
 from funding.models import BankAccount
 from funding.restrictions import restricted_bank_names
 from planner.models import PlanRun
+from planner.plan_window import stored_snapshot_is_planning_only
 from planner.policies import bank_policy
 
 
-def assert_exportable_plan(plan_run: PlanRun, *, ipo_id: str | None = None) -> None:
+def assert_exportable_plan(
+    plan_run: PlanRun, *, ipo_id: str | None = None, allow_record_only: bool = False
+) -> None:
     if (
         plan_run.status != PlanRun.Status.READY
         or plan_run.audit_issues
@@ -17,6 +20,10 @@ def assert_exportable_plan(plan_run: PlanRun, *, ipo_id: str | None = None) -> N
         .exists()
     ):
         raise ValidationError("Resolve blocking plan issues before export")
+    if not allow_record_only and stored_snapshot_is_planning_only(plan_run.input_snapshot):
+        raise ValidationError(
+            "This IPO is closed. Closing-day plans are for record keeping and cannot be exported."
+        )
     assert_current_bank_funding_rules(plan_run, ipo_id=ipo_id)
 
 

@@ -8,7 +8,7 @@ import PlanScreen, { type PlanLookups } from "./plan-screen";
 type Workspace = { id: string; role: string };
 type Investor = { id: string; name: string; planning_priority: number; active: boolean };
 type Bank = { id: string; owner: string; bank_name: string; account_display: string; current_balance: string; active: boolean; effective_cross_funding_policy: string };
-type IPO = { id: string; issuer_name: string; upper_price: string; lot_size: number; current_gmp_percent: string | null; close_date: string; allotment_date: string; status: string };
+type IPO = { id: string; issuer_name: string; upper_price: string; lot_size: number; current_gmp_percent: string | null; close_date: string; allotment_date: string; status: string; plan_available?: boolean; planning_only?: boolean };
 type Demat = { id: string; depository: string; dp_id_masked: string; client_id_masked: string; client_id_display: string; active: boolean };
 type UPI = { id: string; handle: string; holder: string; active: boolean; verified: boolean };
 type Preference = { bank: string; priority: number; enabled: boolean };
@@ -60,6 +60,7 @@ export default async function PlanPage() {
   const selectionState = splitPlanningSelections(
     decisions.filter((decision) => decision.selected).map((decision) => ({ ipo: decision.ipo, mode: decision.mode })),
     Object.fromEntries(ipos.map((ipo) => [ipo.id, ipo.status])),
+    Object.fromEntries(ipos.map((ipo) => [ipo.id, ipo.plan_available ?? ["OPEN", "UPCOMING"].includes(ipo.status)])),
   );
   const lookups: PlanLookups = {
     ipos: Object.fromEntries(ipos.map((ipo) => [ipo.id, { name: ipo.issuer_name, upperPrice: ipo.upper_price, lotSize: ipo.lot_size, gmpPercent: ipo.current_gmp_percent, closeDate: ipo.close_date, allotmentDate: ipo.allotment_date }])),

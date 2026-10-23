@@ -9,7 +9,6 @@ from core.audit import record_event
 
 
 class WorkspaceViewSet(
-    mixins.CreateModelMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,

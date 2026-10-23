@@ -14,7 +14,7 @@ type IPO = {
   id: string; issuer_name: string; symbol: string; issue_type: string; lower_price: string; upper_price: string;
   source_market: string; listing_exchanges: string; designated_exchange: string;
   lot_size: number; open_date: string; close_date: string; allotment_date: string; listing_date: string | null;
-  status: string; current_gmp: string | null; current_gmp_percent: string | null; current_gmp_observed_at: string | null;
+  status: string; plan_available?: boolean; planning_only?: boolean; current_gmp: string | null; current_gmp_percent: string | null; current_gmp_observed_at: string | null;
   gmp_source_count: number; gmp_source_conflict: boolean; gmp_stale_source_count: number;
   gmp_data_state: "FRESH" | "STALE" | "MISSING"; gmp_has_founder_correction: boolean;
   last_stale_gmp: string | null; last_stale_gmp_percent: string | null; last_stale_gmp_observed_at: string | null;
@@ -72,7 +72,7 @@ export default async function IPOsPage({ searchParams }: { searchParams: Promise
     {workspace && <ThresholdSetting workspaceId={workspace.id} initialValue={workspace.auto_select_gmp_percent} initialIssueTypes={workspace.auto_select_issue_types} canEdit={workspace.role === "OWNER"} />}
     <IPOListView initialSearch={params.q ?? ""} initialFilter={params.filter ?? "all"} items={sorted.map((ipo, index) => {
         const selection = selectionMap.get(ipo.id);
-        const active = ["OPEN", "UPCOMING"].includes(ipo.status);
+        const active = ipo.plan_available ?? ["OPEN", "UPCOMING"].includes(ipo.status);
         const selectionLabel = selection?.decision === "APPLY" ? "Selected" : selection?.decision === "SKIP" ? "Skipped" : selection?.selected ? "Auto selected" : "Not selected";
         const history = histories[index].filter((item) => item.enabled);
         const trendHistory = history.filter((item) => item.source_key === history[0]?.source_key);
@@ -89,7 +89,7 @@ export default async function IPOsPage({ searchParams }: { searchParams: Promise
             <div><span>Close</span><strong>{dateLabel(ipo.close_date)}</strong></div>
             <div><span>Allotment</span><strong>{dateLabel(ipo.allotment_date)}</strong></div>
           </div>
-          {active && <div className="ipo-controls"><div className="ipo-gmp-detail">{ipo.gmp_has_founder_correction && <StatusBadge tone="info">Founder corrected</StatusBadge>}<Trend history={trendHistory} />{history.length > 0 && <details className="sources-disclosure"><summary>GMP history ({history.length})</summary><ol>{history.map((item) => <li key={item.id}>{observedLabel(item.observed_at)} · {formatInr(item.value_per_share)} ({item.percent}%){item.value_per_share !== item.source_value_per_share ? ` · source ${formatInr(item.source_value_per_share)}` : ""}</li>)}</ol></details>}</div>{workspace && <IPOChoice key={`${ipo.id}:${selection?.decision}:${selection?.selected}`} workspaceId={workspace.id} ipoId={ipo.id} initial={selection} canEdit={workspace.role !== "VIEWER"} />}</div>}
+          {ipo.planning_only && <p className="plan-note">Closed for new bids. Record plans remain available until midnight IST today.</p>}{active && <div className="ipo-controls"><div className="ipo-gmp-detail">{ipo.gmp_has_founder_correction && <StatusBadge tone="info">Founder corrected</StatusBadge>}<Trend history={trendHistory} />{history.length > 0 && <details className="sources-disclosure"><summary>GMP history ({history.length})</summary><ol>{history.map((item) => <li key={item.id}>{observedLabel(item.observed_at)} · {formatInr(item.value_per_share)} ({item.percent}%){item.value_per_share !== item.source_value_per_share ? ` · source ${formatInr(item.source_value_per_share)}` : ""}</li>)}</ol></details>}</div>{workspace && <IPOChoice key={`${ipo.id}:${selection?.decision}:${selection?.selected}`} workspaceId={workspace.id} ipoId={ipo.id} initial={selection} canEdit={workspace.role !== "VIEWER"} />}</div>}
         </article> };
       })}
     />

@@ -1,8 +1,11 @@
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APIClient
 from test_planner_persistence import setup_plan
 
@@ -10,6 +13,7 @@ from accounts.models import User, WorkspaceMembership
 from applications.models import Application
 from core.models import AuditEvent
 from funding.models import BalanceChange, BankAccount
+from planner.export_readiness import assert_exportable_plan
 from planner.persistence import create_plan_run
 
 
@@ -258,3 +262,103 @@ def test_partial_shni_allotment_releases_full_mandate_and_deducts_only_actual_co
         available="188000.00",
     )
     assert BalanceChange.objects.get(operation="ALLOTMENT").delta == Decimal("-42000.00")
+
+
+@pytest.mark.django_db
+def test_closing_day_record_plan_can_be_tracked_submitted_and_blocked_but_not_exported():
+    owner, workspace, snapshot = setup_plan()
+    late_snapshot = replace(snapshot, as_of=datetime(2026, 10, 3, 17, 1, tzinfo=UTC))
+    run = create_plan_run(workspace=workspace, snapshot=late_snapshot, actor=owner)
+    client = APIClient()
+    client.force_authenticate(owner)
+    tracked = client.post(reverse("application-start-tracking", args=[workspace.pk, run.pk]), {})
+    assert tracked.status_code == 201
+    application = Application.objects.get()
+    for action in ("submit", "block"):
+        assert (
+            client.post(
+                reverse("application-action", args=[workspace.pk, application.pk, action]), {}
+            ).status_code
+            == 200
+        )
+    application.refresh_from_db()
+    assert application.status == "BLOCKED"
+    with pytest.raises(ValidationError, match="record keeping"):
+        assert_exportable_plan(run)
+
+
+@pytest.mark.django_db
+def test_stale_saved_plans_share_six_submission_slots_across_categories_and_upis(monkeypatch):
+    from funding.models import UPIHandle
+    from ipos.models import IPO
+    from planner.models import PlanRow
+
+    owner, workspace, snapshot = setup_plan()
+    client = APIClient()
+    client.force_authenticate(owner)
+    run = create_plan_run(workspace=workspace, snapshot=snapshot, actor=owner)
+    row = run.rows.get()
+    ipo = IPO.objects.get(pk=row.ipo_ref)
+    first_upi = UPIHandle.objects.get(pk=row.upi_ref)
+    second_upi = UPIHandle(bank=first_upi.bank, holder=first_upi.holder, verified=True)
+    second_upi.set_handle("second@synthetic.test")
+    second_upi.save()
+    instant = timezone.now()
+    monkeypatch.setattr("applications.services.timezone.now", lambda: instant)
+    applications = []
+    for index in range(7):
+        clone = IPO.objects.get(pk=ipo.pk)
+        clone.pk = None
+        clone.source_record_id = f"synthetic-extra-{index}"
+        clone.save()
+        category = "SHNI" if index == 0 else "RETAIL"
+        lots = 14 if category == "SHNI" else 1
+        handle = first_upi if index % 2 == 0 else second_upi
+        plan_row = PlanRow.objects.create(
+            plan_run=run,
+            position=index + 1,
+            ipo_ref=str(clone.pk),
+            applicant_ref=row.applicant_ref,
+            demat_ref=row.demat_ref,
+            bank_ref=row.bank_ref,
+            upi_ref=str(handle.pk),
+            category=category,
+            lots=lots,
+            amount=Decimal(15000 * lots),
+        )
+        item = Application.objects.create(
+            workspace=workspace,
+            plan_row=plan_row,
+            ipo=clone,
+            applicant_id=row.applicant_ref,
+            demat_id=row.demat_ref,
+            bank_id=row.bank_ref,
+            upi=handle,
+            category=category,
+            lots=lots,
+            amount=plan_row.amount,
+        )
+        applications.append(item)
+    for item in applications[:6]:
+        assert (
+            client.post(
+                reverse("application-action", args=[workspace.pk, item.pk, "submit"]), {}
+            ).status_code
+            == 200
+        )
+    seventh = applications[-1]
+    response = client.post(
+        reverse("application-action", args=[workspace.pk, seventh.pk, "submit"]), {}
+    )
+    assert response.status_code == 409
+    assert "Retail and sHNI" in response.data["detail"]
+    seventh.refresh_from_db()
+    assert seventh.status == "PLANNED"
+    # The half-open 24h window releases exactly expired slots.
+    monkeypatch.setattr("applications.services.timezone.now", lambda: instant + timedelta(hours=24))
+    assert (
+        client.post(
+            reverse("application-action", args=[workspace.pk, seventh.pk, "submit"]), {}
+        ).status_code
+        == 200
+    )

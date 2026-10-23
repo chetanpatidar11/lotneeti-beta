@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { backendUrl } from "@/lib/backend";
-import { formatInr } from "@/lib/money";
+import { formatInr, sumInr } from "@/lib/money";
 import { selectedWorkspace } from "@/lib/workspace";
 import { EmptyState, MetricCard, PageHeader, SectionHeading, StatusBadge } from "@/components/ui";
 import LiveSyncButton from "./live-sync-button";
@@ -42,7 +42,7 @@ export default async function HomePage() {
   const workspaces = await getData<Workspace[]>("workspaces/", cookieHeader);
   if (!workspaces) redirect("/sign-in");
   const workspace = await selectedWorkspace(workspaces);
-  if (!workspace) return <main className="page"><div className="shell home-shell"><PageHeader eyebrow="Overview" title="Operations dashboard" description="Your IPO activity and available money in one place." /><EmptyState title="Create a workspace to begin" detail="Add your investors and bank accounts, then select IPOs to plan applications." action={<Link className="button-link" href="/settings/investors">Set up workspace</Link>} /></div></main>;
+  if (!workspace) return <main className="page"><div className="shell home-shell"><PageHeader eyebrow="Overview" title="Operations dashboard" description="Your IPO activity and available money in one place." /><EmptyState title="Your account setup is not ready yet" detail="Sign in again to finish setting up your account." action={<Link className="button-link" href="/settings/investors">Account settings</Link>} /></div></main>;
   const prefix = `workspaces/${workspace.id}`;
   const [capital, operations, ipos, decisions, banks, applications, feed] = await Promise.all([
     getData<Capital>(`${prefix}/capital/`, cookieHeader),
@@ -53,6 +53,12 @@ export default async function HomePage() {
     getData<Application[]>(`${prefix}/applications/`, cookieHeader),
     getData<FeedStatus>("ipos/live-sync/", cookieHeader),
   ]);
+  const bankTotals = {
+    balance: sumInr((banks ?? []).map((bank) => capital?.by_bank?.[bank.id]?.balance ?? bank.current_balance)),
+    blocked: sumInr((banks ?? []).map((bank) => capital?.by_bank?.[bank.id]?.blocked)),
+    planned: sumInr((banks ?? []).map((bank) => capital?.by_bank?.[bank.id]?.planned)),
+    available: sumInr((banks ?? []).map((bank) => capital?.by_bank?.[bank.id]?.available)),
+  };
   const paymentLists = await Promise.all((banks ?? []).map((bank) => getData<Payment[]>(`${prefix}/banks/${bank.id}/recurring-debits/`, cookieHeader)));
   const payments = paymentLists.flatMap((items) => items ?? []);
   const selected = new Map((decisions ?? []).map((item) => [item.ipo, item]));
@@ -73,7 +79,7 @@ export default async function HomePage() {
   }
 
   return <main className="page"><div className="shell home-shell">
-    <PageHeader eyebrow="Overview" title="Operations dashboard" description={workspace.name} action={<Link className="button-link" href="/plan">Review plan <span aria-hidden="true">↗</span></Link>} />
+    <PageHeader eyebrow="Overview" title="Operations dashboard" description="Your IPO activity and available money in one place." action={<Link className="button-link" href="/plan">Review plan <span aria-hidden="true">↗</span></Link>} />
     <div className="market-feed-status"><div><strong>IPO market data</strong>{feed?.status === "ERROR" && <small>Latest update failed</small>}</div>{feed?.can_sync ? <LiveSyncButton /> : feed?.founder ? <a href="/admin/login/?next=/">Verify as founder to enable Live sync</a> : null}</div>
     {!capital || !operations ? <div className="plan-error" role="alert">Dashboard data is temporarily unavailable. <Link href="/">Retry</Link></div> : <>
       <section className="metric-grid" aria-label="Money overview">
@@ -95,12 +101,12 @@ export default async function HomePage() {
       <section className="home-panel"><SectionHeading title="Open & selected IPOs" detail="Published issues and your current choices" action={<Link href="/ipos">View all IPOs →</Link>} />
         {featured.length === 0 ? <EmptyState title="No IPOs are available from configured providers yet." detail="Published IPOs will appear here when data is available." /> : <ul className="home-ipo-list">{featured.map((ipo) => { const choice = selected.get(ipo.id); const days = daysUntil(ipo.close_date); return <li key={ipo.id}><div><strong>{ipo.issuer_name}</strong><small>{ipo.issue_type === "SME" ? "SME" : "Mainboard"} · {ipo.status === "OPEN" && days >= 0 ? `Closes ${days === 0 ? "today" : `in ${days} days`}` : ipo.status} · {choice?.mode ? modeLabel(choice.mode) : "No mode selected"}</small></div><div className="home-ipo-end"><strong>{ipo.current_gmp_percent === null ? "GMP —" : `${ipo.current_gmp_percent}% GMP`}</strong><StatusBadge tone={choice?.selected ? "positive" : "neutral"}>{choice?.selected ? "Selected" : "Not selected"}</StatusBadge></div></li>; })}</ul>}
       </section>
-      <section className="home-panel"><SectionHeading title="Action needed" detail="Items to review in this workspace" />
+      <section className="home-panel"><SectionHeading title="Action needed" detail="Items to review" />
         {actions.length === 0 ? <EmptyState title="Nothing needs attention now." detail="New applications and upcoming dates will show here." /> : <ul className="action-list">{actions.slice(0, 8).map((action, index) => <li key={`${action.title}-${index}`}><div><strong>{action.title}</strong><small>{action.detail}</small></div><Link href={action.href} aria-label={`Review ${action.title}`}>Review →</Link></li>)}</ul>}
       </section>
     </div>
     <section className="home-panel" style={{ marginTop: 16 }}><SectionHeading title="Bank availability" detail="Money by account" action={<Link href="/funds">Manage funds →</Link>} />
-      {(banks ?? []).length === 0 ? <EmptyState title="No bank accounts yet." detail="Add a bank and set its Balance to start planning." action={<Link href="/funds">Add bank</Link>} /> : <div className="compact-table-wrap"><table className="compact-table"><thead><tr><th>Bank</th><th>Balance</th><th>Blocked</th><th>Planned</th><th>Available</th></tr></thead><tbody>{(banks ?? []).map((bank) => { const line = capital?.by_bank?.[bank.id]; return <tr key={bank.id}><th scope="row">{bank.bank_name}<small>{bank.account_display}</small></th><td>{formatInr(line?.balance ?? bank.current_balance)}</td><td>{line ? formatInr(line.blocked) : "—"}</td><td>{line ? formatInr(line.planned) : "—"}</td><td className="positive-cell">{line ? formatInr(line.available) : "—"}</td></tr>; })}</tbody></table></div>}
+      {(banks ?? []).length === 0 ? <EmptyState title="No bank accounts yet." detail="Add a bank and set its Balance to start planning." action={<Link href="/funds">Add bank</Link>} /> : <div className="compact-table-wrap"><table className="compact-table"><thead><tr><th>Bank</th><th>Balance</th><th>Blocked</th><th>Planned</th><th>Available</th></tr></thead><tbody>{(banks ?? []).map((bank) => { const line = capital?.by_bank?.[bank.id]; return <tr key={bank.id}><th scope="row">{bank.bank_name}<span> · {bank.account_display}</span></th><td>{formatInr(line?.balance ?? bank.current_balance)}</td><td>{line ? formatInr(line.blocked) : "—"}</td><td>{line ? formatInr(line.planned) : "—"}</td><td className="positive-cell">{line ? formatInr(line.available) : "—"}</td></tr>; })}</tbody><tfoot><tr><th scope="row">Total</th><td>{formatInr(bankTotals.balance)}</td><td>{formatInr(bankTotals.blocked)}</td><td>{formatInr(bankTotals.planned)}</td><td className="positive-cell">{formatInr(bankTotals.available)}</td></tr></tfoot></table></div>}
     </section>
   </div></main>;
 }

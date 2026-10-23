@@ -1,5 +1,15 @@
 # LotNeeti execution status
 
+## C23 Correct project recovery and requested IPO usability updates — in progress, 2026-10-23
+
+- Authoritative production checkout is this directory: `/Users/chetanpatidar/Documents/Codex/2026-10-10/con/work/lotneeti-auth-safari`, branch `codex/autopilot`. Chat “Inspect product and create branch” records its current deployments, Brevo email OTP, blue light/dark themes, per-IPO Applications/bulk controls, transfers, and image import. The old `/Users/chetanpatidar/Projects/lotneeti-new` checkout was mistakenly deployed by a different chat and must not be deployed again.
+- Restored this verified current source through the VS Code release helper after 433 backend and 42 frontend tests and a successful production build. Kept the security patch at Next.js 16.4.3 while preserving Tesseract/OCR and all newer dependencies. The encrypted pre-release backup succeeded, release SHA-256 `63655020883afcc6157b557e15429095ec851f595040453f9d93c97362ba990f` deployed successfully, there were no migrations to apply, and both API health and OCR worker returned HTTPS 200. Server email environment and all user records were preserved.
+- Applying the original requested full UPI display and one-line Funds/Applications rows, totals in both Bank availability views, personal account provisioning without workspace creation/switching, a closing-day record-plan window until midnight IST, and current shared bank/UPI limit checks on submission. Preserve per-IPO selection, status/search filters, edit/cancel/bulk actions, transfers/descriptions, archive history, OTP, public landing page, and image import.
+- The bank cap stays shared across Retail and sHNI; cancellation frees its rolling slot. Existing configured amount-limit semantics remain unchanged. Internal ownership/membership boundaries remain; removing those would mix customers’ private records.
+- Validation passed: complete `scripts/check.sh` with 436 backend tests, 46 web tests, one Android test, all planner matrix mappings, lint/format, Django and migration checks, typecheck and production builds. Final copy/density edits also passed frontend lint/typecheck/build. Browser verification uses an isolated synthetic database: the blue light theme shows 10 complete application rows at 1280×720 after selecting an IPO, retains all newer actions, shows full UPI IDs in Funds and the exact-paise footer totals, and contains no workspace selector. Screenshot artifacts are retained in the recovery chat’s outputs directory.
+- Marked the outdated checkout’s AGENTS instructions as historical and stopped its local deployment helper with a clear message directing future releases here. No existing historical changes were deleted. Ready for final release through VS Code.
+
+
 ## C22 Release access repair — deployed, 2026-10-22
 
 - The founder's VS Code release reached SSH but timed out connecting to the live EC2 IP. HTTPS health is 200 and DNS resolves to the expected Elastic IP. This workstation currently exits via 94.205.57.95, while TCP 22 is unreachable; the existing operator-only SSH rule likely still permits a previous address.

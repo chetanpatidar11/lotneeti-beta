@@ -39,8 +39,10 @@ class BankAccountViewSet(
         )
 
     def get_queryset(self):
-        return BankAccount.objects.filter(workspace=self.get_workspace()).order_by(
-            "bank_name", "id"
+        return (
+            BankAccount.objects.filter(workspace=self.get_workspace())
+            .prefetch_related("upis")
+            .order_by("bank_name", "id")
         )
 
     def get_serializer_context(self):

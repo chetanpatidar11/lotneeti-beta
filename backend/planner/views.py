@@ -19,6 +19,7 @@ from planner.engine import generate_proposal
 from planner.manual_plan import review_manual_rows
 from planner.models import PlanRun
 from planner.persistence import clear_plan_run, create_reviewed_plan_run
+from planner.plan_window import snapshot_is_planning_only
 from planner.snapshot_builder import build_snapshot
 
 
@@ -103,6 +104,7 @@ class PlannerPreviewView(APIView):
                 "input_snapshot_hash": proposal.input_snapshot_hash,
                 "output_hash": proposal.output_hash,
                 "status": "READY" if proposal.audit.valid else "BLOCKED",
+                "planning_only": snapshot_is_planning_only(snapshot),
                 "planned_total": str(proposal.audit.planned_total),
                 "rows": [
                     {
@@ -177,6 +179,7 @@ class PlannerValidateView(APIView):
         return Response(
             {
                 "status": "READY" if audit.valid else "BLOCKED",
+                "planning_only": snapshot_is_planning_only(snapshot),
                 "planned_total": str(total),
                 "rows": [
                     {

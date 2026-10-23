@@ -15,6 +15,7 @@ from django.utils import timezone
 from rest_framework.exceptions import APIException, ValidationError
 
 from accounts.models import EmailLoginToken, User
+from accounts.services import ensure_personal_workspace
 from core.audit import record_event
 
 TOKEN_LIFETIME = timedelta(minutes=15)
@@ -154,6 +155,7 @@ def consume_registration(request, token: str) -> User:
     record.used_at = timezone.now()
     record.pending_password_hash = ""
     record.save(update_fields=["used_at", "pending_password_hash"])
+    ensure_personal_workspace(owner=user)
     login(request, user, backend="django.contrib.auth.backends.ModelBackend")
     request.session.set_expiry(settings.SESSION_COOKIE_AGE)
     record_event(action="auth.email_verified", target=user, actor=user)
@@ -189,6 +191,7 @@ def verify_registration_code(request, email: str, code: str) -> User | None:
     record.used_at = timezone.now()
     record.pending_password_hash = ""
     record.save(update_fields=["used_at", "pending_password_hash"])
+    ensure_personal_workspace(owner=user)
     login(request, user, backend="django.contrib.auth.backends.ModelBackend")
     request.session.set_expiry(settings.SESSION_COOKIE_AGE)
     record_event(action="auth.email_verified", target=user, actor=user)
@@ -204,6 +207,7 @@ def login_with_password(request, email: str, password: str) -> User:
     user = authenticate(request, email=email, password=password)
     if not _workspace_user(user):
         raise ValidationError({"detail": "Email or password is incorrect."})
+    ensure_personal_workspace(owner=user)
     login(request, user, backend="django.contrib.auth.backends.ModelBackend")
     request.session.set_expiry(settings.SESSION_COOKIE_AGE)
     record_event(
@@ -240,6 +244,7 @@ def complete_password_reset_code(request, email: str, code: str, password: str) 
     user.save(update_fields=["password"])
     record.used_at = timezone.now()
     record.save(update_fields=["used_at"])
+    ensure_personal_workspace(owner=user)
     login(request, user, backend="django.contrib.auth.backends.ModelBackend")
     request.session.set_expiry(settings.SESSION_COOKIE_AGE)
     record_event(action="auth.password_reset", target=user, actor=user)
@@ -257,6 +262,7 @@ def complete_password_reset(request, token: str, password: str) -> User:
     user.save(update_fields=["password"])
     record.used_at = timezone.now()
     record.save(update_fields=["used_at"])
+    ensure_personal_workspace(owner=user)
     login(request, user, backend="django.contrib.auth.backends.ModelBackend")
     request.session.set_expiry(settings.SESSION_COOKIE_AGE)
     record_event(action="auth.password_reset", target=user, actor=user)

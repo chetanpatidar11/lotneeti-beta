@@ -8,6 +8,7 @@ from ipos.content import published_summary
 from ipos.gmp_effective import effective_observation_value, resolve_gmp
 from ipos.models import IPO, GMPObservation
 from ipos.overrides import OVERRIDABLE_FIELDS, effective_ipo_resolution, effective_ipo_values
+from ipos.planning_window import planning_window
 from ipos.selection import selection_status
 
 
@@ -130,7 +131,11 @@ class PublicIPOSerializer(serializers.ModelSerializer):
         effective = self._ipo_resolution(instance).values
         for name in OVERRIDABLE_FIELDS.intersection(result):
             result[name] = self.fields[name].to_representation(effective[name])
-        result["status"] = selection_status(effective, at=timezone.now())
+        now = timezone.now()
+        result["status"] = selection_status(effective, at=now)
+        result["plan_available"], result["planning_only"] = planning_window(
+            status=result["status"], close_date=effective["close_date"], now=now
+        )
         return result
 
     def _ipo_resolution(self, obj):

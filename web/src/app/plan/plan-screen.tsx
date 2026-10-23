@@ -309,7 +309,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
           const ipo = lookups.ipos[row.ipo];
           return ipo ? [{ amount: row.amount, closeDate: ipo.closeDate, allotmentDate: ipo.allotmentDate, category: row.category }] : [];
         })))}</strong>. Total applications can exceed today’s Balance when money from an earlier IPO is reused after allotment. Each bank is checked at its application cutoff.</p>
-        {!validating && <p className="plan-note" role="status">{!canExportPlan(preview) ? "⚠ Blocking: Resolve issues before export." : planStatus(preview) === "Warning" ? "Ready to export. Review the highlighted issues first." : "Ready to export."}</p>}
+        {!validating && <p className="plan-note" role="status">{preview.planning_only ? "Record-only plan: save and track an application already made. Export is closed; planning ends at midnight IST." : !canExportPlan(preview) ? "⚠ Blocking: Resolve issues before export." : planStatus(preview) === "Warning" ? "Ready to export. Review the highlighted issues first." : "Ready to export."}</p>}
         {preview.audit_issues.length > 0 && <div className="plan-error" role="alert">
           <strong>⚠ Blocking: Resolve these issues before export</strong>
           <ul>{preview.audit_issues.map((issue, index) => <li key={`${issue.code}-${index}`}>{issueMessage(issue.code)}</li>)}</ul>

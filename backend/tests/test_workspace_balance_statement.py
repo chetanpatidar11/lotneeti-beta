@@ -5,7 +5,7 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 from test_planner_persistence import setup_plan
 
-from accounts.models import User
+from accounts.models import User, WorkspaceMembership
 from accounts.services import create_workspace
 from funding.models import BalanceChange, BankAccount
 
@@ -41,6 +41,15 @@ def test_statement_combines_banks_and_filters_with_workspace_scope():
     filtered = client.get(url, {"bank": str(first.pk)})
     assert filtered.status_code == 200
     assert [row["bank_id"] for row in filtered.data["results"]] == [str(first.pk)]
+    assert filtered.data["results"][0]["linked_upis"] == ["demo@upi.test"]
+    assert filtered.data["results"][0]["account_display"] == "DEMO-ACCOUNT-0001"
+    viewer = User.objects.create_user(email="statement-viewer@example.test")
+    WorkspaceMembership.objects.create(workspace=workspace, user=viewer, role="VIEWER")
+    client.force_authenticate(viewer)
+    masked = client.get(url, {"bank": str(first.pk)}).data["results"][0]
+    assert masked["linked_upis"] == ["••••@upi.test"]
+    assert masked["account_display"] == first.account_masked
+    client.force_authenticate(owner)
     assert client.get(url, {"page": "0"}).status_code == 400
     assert client.get(url, {"bank": "not-a-bank"}).status_code == 400
     outsider = User.objects.create_user(email="outsider-statement@example.test")

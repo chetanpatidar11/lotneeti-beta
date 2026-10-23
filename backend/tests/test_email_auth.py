@@ -44,6 +44,7 @@ def test_one_form_verifies_new_account_then_signs_in_for_30_days():
     verified = client.post(reverse("register-verify"), {"email": "new@example.test", "code": code})
     assert verified.status_code == 200
     user = User.objects.get(email="new@example.test")
+    assert Workspace.objects.filter(owner=user).count() == 1
     assert user.email_verified_at is not None
     assert user.check_password(credentials["password"])
     assert AuditEvent.objects.filter(action="auth.email_verified", actor=user).exists()

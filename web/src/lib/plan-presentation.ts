@@ -14,6 +14,7 @@ export type PlanRow = {
 };
 
 export type PlanPreview = {
+  planning_only?: boolean;
   status: "READY" | "BLOCKED";
   planned_total: string;
   rows: PlanRow[];
@@ -46,7 +47,7 @@ export function planStatus(plan: PlanPreview): "Ready" | "Warning" | "Blocking" 
 }
 
 export function canExportPlan(plan: PlanPreview): boolean {
-  return planStatus(plan) !== "Blocking";
+  return !plan.planning_only && planStatus(plan) !== "Blocking";
 }
 
 export function fundingLabel(row: PlanRow): string {
@@ -78,8 +79,9 @@ export type FundingPreference = { bank: string; priority: number; enabled: boole
 export function splitPlanningSelections(
   selections: { ipo: string; mode: string }[],
   statuses: Record<string, string>,
+  availability: Record<string, boolean> = {},
 ): { available: { ipo: string; mode: string }[]; unavailableCount: number } {
-  const available = selections.filter(({ ipo }) => ["OPEN", "UPCOMING"].includes(statuses[ipo]));
+  const available = selections.filter(({ ipo }) => (availability[ipo] ?? ["OPEN", "UPCOMING"].includes(statuses[ipo])));
   return { available, unavailableCount: selections.length - available.length };
 }
 

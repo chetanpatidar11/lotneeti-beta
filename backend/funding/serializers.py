@@ -25,6 +25,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
     account_masked = serializers.CharField(read_only=True)
     account_reference = serializers.SerializerMethodField()
     account_display = serializers.SerializerMethodField()
+    linked_upis = serializers.SerializerMethodField()
     effective_cross_funding_policy = serializers.SerializerMethodField()
     initial_balance = serializers.DecimalField(
         max_digits=14, decimal_places=2, write_only=True, required=False, default=Decimal("0.00")
@@ -40,6 +41,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
             "account_masked",
             "account_reference",
             "account_display",
+            "linked_upis",
             "is_placeholder",
             "is_imported_reference",
             "initial_balance",
@@ -56,6 +58,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
             "account_masked",
             "account_reference",
             "account_display",
+            "linked_upis",
             "is_placeholder",
             "is_imported_reference",
             "current_balance",
@@ -81,6 +84,14 @@ class BankAccountSerializer(serializers.ModelSerializer):
         if self.context.get("display_details"):
             return decrypt_value(instance.account_ciphertext, purpose="bank-account")
         return instance.account_masked
+
+    def get_linked_upis(self, instance):
+        return [
+            decrypt_value(upi.handle_ciphertext, purpose="upi")
+            if self.context.get("display_details")
+            else upi.handle_masked
+            for upi in instance.upis.all()
+        ]
 
     def get_effective_cross_funding_policy(self, instance):
         from planner.policies import bank_policy

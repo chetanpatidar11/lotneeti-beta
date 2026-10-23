@@ -2,16 +2,16 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { balanceActionLabel, formatInr } from "@/lib/money";
+import { balanceActionLabel, formatInr, sumInr } from "@/lib/money";
 import { Drawer } from "@/components/drawer";
 import { EmptyState, PageHeader, SectionHeading, StatusBadge } from "@/components/ui";
 import ScheduledPayments, { type ScheduledPayment } from "./scheduled-payments";
 
 type Workspace = { id: string; name: string; role: string };
 type Investor = { id: string; name: string };
-type Bank = { id: string; owner: string; bank_name: string; account_masked: string; account_reference: string; account_display: string; current_balance: string; active: boolean };
+type Bank = { id: string; owner: string; bank_name: string; account_masked: string; account_reference: string; account_display: string; linked_upis: string[]; current_balance: string; active: boolean };
 type Change = { id: number; operation: "ADD" | "REMOVE" | "SET" | "TRANSFER_OUT" | "TRANSFER_IN" | "ALLOTMENT"; amount: string; balance: string; note: string; counterparty_label: string; created_at: string };
-type StatementChange = Change & { bank_id: string; bank_name: string; owner_name: string; account_masked: string; delta: string };
+type StatementChange = Change & { bank_id: string; bank_name: string; owner_name: string; account_masked: string; account_display: string; linked_upis: string[]; delta: string };
 type StatementPage = { results: StatementChange[]; next_page: number | null; total: number };
 type CapitalLine = { balance: string; blocked: string; planned: string; available: string };
 type ArchivedBank = { id: string; bank_name: string; account_masked: string; last_changed: string };
@@ -54,6 +54,13 @@ export default function FundsScreen({ workspace, investors, initialBanks, statem
   const statementBankChoices = [...statementBanks, ...banks.filter((bank) => !statementBanks.some((item) => item.id === bank.id))];
   const canEdit = workspace.role !== "VIEWER";
   const accountLabel = (bank: Bank) => `${bank.bank_name} · ${investors.find((item) => item.id === bank.owner)?.name ?? "Owner"} · ${bank.account_display}`;
+
+  const totals = {
+    balance: sumInr(banks.map((bank) => bank.current_balance)),
+    blocked: sumInr(banks.map((bank) => capitalLines[bank.id]?.blocked)),
+    planned: sumInr(banks.map((bank) => capitalLines[bank.id]?.planned)),
+    available: sumInr(banks.map((bank) => capitalLines[bank.id]?.available)),
+  };
 
   async function refreshCapital() {
     try {
@@ -139,7 +146,7 @@ export default function FundsScreen({ workspace, investors, initialBanks, statem
   }
 
   return <main className="page"><div className="shell settings-shell">
-    <PageHeader eyebrow="Capital / Funds" title="Bank availability" description={workspace.name} action={canEdit && investors.length > 0 ? <button type="button" onClick={() => setAddBankOpen(true)}>+ Add bank</button> : undefined} />
+    <PageHeader eyebrow="Capital / Funds" title="Bank availability" description="Balances across your bank accounts." action={canEdit && investors.length > 0 ? <button type="button" onClick={() => setAddBankOpen(true)}>+ Add bank</button> : undefined} />
     {message && <p className="plan-note" role="status">{message}</p>}
     <nav className="settings-tabs funds-tabs" aria-label="Funds sections">
       {([["accounts", "Accounts"], ["statement", "Bank statement"], ["payments", "Scheduled Payments / EMI"], ["deleted", "Deleted bank history"]] as const).map(([key, label]) => <button type="button" key={key} className={tab === key ? "settings-tab active" : "settings-tab"} aria-current={tab === key ? "page" : undefined} onClick={() => setTab(key)}>{label}</button>)}
@@ -147,11 +154,11 @@ export default function FundsScreen({ workspace, investors, initialBanks, statem
     {tab === "accounts" && <>
       {canEdit && banks.length > 0 && <div className="funds-actions" role="group" aria-label="Balance actions">{(["add", "remove", "set", "transfer"] as Action[]).map((item) => <button key={item} className={item === "add" ? "" : "button-secondary"} type="button" disabled={item === "transfer" && banks.length < 2} title={item === "transfer" && banks.length < 2 ? "Add another active bank to record a transfer" : undefined} onClick={() => { setAction(item); setActionBankId(""); setDestinationBankId(""); setAmount(""); setDescription(""); }}>{actionLabel(item)}</button>)}</div>}
       {banks.length === 0 ? <EmptyState title="No active bank accounts" detail={investors.length === 0 ? "Add or activate an investor, then link a bank." : "Add a bank or activate an account in Settings."} action={<Link href="/settings/investors">Investor settings</Link>} /> :
-        <div className="compact-table-wrap funds-table-wrap"><table className="compact-table funds-table"><thead><tr><th>Owner / bank</th><th>Balance</th><th>Blocked</th><th>Planned</th><th>Available</th><th>State</th></tr></thead><tbody>{banks.map((bank) => { const line = capitalLines[bank.id]; return <tr key={bank.id}><th scope="row" className="funds-owner-cell"><strong>{bank.bank_name}</strong><span>{investors.find((item) => item.id === bank.owner)?.name ?? "Owner"} · {bank.account_display}</span></th><td>{formatInr(bank.current_balance)}</td><td>{line ? formatInr(line.blocked) : "—"}</td><td>{line ? formatInr(line.planned) : "—"}</td><td className="positive-cell">{line ? formatInr(line.available) : "—"}</td><td><StatusBadge tone={bank.active ? "positive" : "neutral"}>{bank.active ? "Active" : "Paused"}</StatusBadge></td></tr>; })}</tbody></table></div>}
+        <div className="compact-table-wrap funds-table-wrap"><table className="compact-table funds-table"><thead><tr><th>Owner / bank / UPI</th><th>Balance</th><th>Blocked</th><th>Planned</th><th>Available</th><th>State</th></tr></thead><tbody>{banks.map((bank) => { const line = capitalLines[bank.id]; return <tr key={bank.id}><th scope="row" className="funds-owner-cell"><strong>{bank.bank_name}</strong><span>{investors.find((item) => item.id === bank.owner)?.name ?? "Owner"} · {bank.account_display}</span><span>{bank.linked_upis?.join(" · ") || "No linked UPI"}</span></th><td>{formatInr(bank.current_balance)}</td><td>{line ? formatInr(line.blocked) : "—"}</td><td>{line ? formatInr(line.planned) : "—"}</td><td className="positive-cell">{line ? formatInr(line.available) : "—"}</td><td><StatusBadge tone={bank.active ? "positive" : "neutral"}>{bank.active ? "Active" : "Paused"}</StatusBadge></td></tr>; })}</tbody><tfoot><tr><th scope="row">Total</th><td>{formatInr(totals.balance)}</td><td>{formatInr(totals.blocked)}</td><td>{formatInr(totals.planned)}</td><td className="positive-cell">{formatInr(totals.available)}</td><td>—</td></tr></tfoot></table></div>}
     </>}
     {tab === "statement" && <section className="section-panel funds-statement"><SectionHeading title="Bank statement" detail={`${statementTotal} recorded movement${statementTotal === 1 ? "" : "s"} across your banks`} />
       <label className="funds-filter">Bank account<select value={statementBankId} onChange={(event) => setStatementBankId(event.target.value)}><option value="">All banks</option>{statementBankChoices.map((bank) => <option key={bank.id} value={bank.id}>{bank.bank_name} · {bank.account_display}</option>)}</select></label>
-      {statement.length === 0 && !statementLoading ? <EmptyState title="No balance changes yet." /> : <div className="compact-table-wrap"><table className="compact-table funds-statement-table"><thead><tr><th>Date</th><th>Bank / owner</th><th>Transaction</th><th>Debit</th><th>Credit</th><th>Balance after</th></tr></thead><tbody>{statement.map((change) => <tr key={change.id}><td>{new Date(change.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</td><th scope="row"><strong>{change.bank_name}</strong><span>{change.owner_name} · {change.account_masked}</span></th><td>{balanceActionLabel(change.operation)}{change.counterparty_label && <small>{change.counterparty_label}</small>}{change.note && <small>{change.note}</small>}</td><td>{Number(change.delta) < 0 ? formatInr(Math.abs(Number(change.delta))) : "—"}</td><td>{Number(change.delta) > 0 ? formatInr(change.delta) : "—"}</td><td>{formatInr(change.balance)}</td></tr>)}</tbody></table></div>}
+      {statement.length === 0 && !statementLoading ? <EmptyState title="No balance changes yet." /> : <div className="compact-table-wrap"><table className="compact-table funds-statement-table"><thead><tr><th>Date</th><th>Bank / owner</th><th>Transaction</th><th>Debit</th><th>Credit</th><th>Balance after</th></tr></thead><tbody>{statement.map((change) => <tr key={change.id}><td>{new Date(change.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</td><th scope="row"><strong>{change.bank_name}</strong><span>{change.owner_name} · {change.account_display ?? change.account_masked} · {change.linked_upis?.join(" · ")}</span></th><td>{balanceActionLabel(change.operation)}{change.counterparty_label && <small>{change.counterparty_label}</small>}{change.note && <small>{change.note}</small>}</td><td>{Number(change.delta) < 0 ? formatInr(Math.abs(Number(change.delta))) : "—"}</td><td>{Number(change.delta) > 0 ? formatInr(change.delta) : "—"}</td><td>{formatInr(change.balance)}</td></tr>)}</tbody></table></div>}
       {statementNext && <button type="button" className="button-secondary" disabled={statementLoading} onClick={() => void loadStatement(statementBankId, statementNext, true)}>{statementLoading ? "Loading…" : "Load more"}</button>}
     </section>}
     {tab === "payments" && <section className="section-panel funds-scheduled"><SectionHeading title="Scheduled Payments / EMI" detail="Upcoming debits for the selected bank" />

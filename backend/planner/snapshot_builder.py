@@ -21,8 +21,9 @@ from investors.models import DematAccount, Investor
 from ipos.gmp_effective import latest_selection_gmp
 from ipos.models import IPOUserDecision
 from ipos.overrides import effective_ipo_values, published_ipos
+from ipos.planning_window import planning_window
 from ipos.public_serializers import gmp_percent
-from ipos.selection import resolve_ipo_choices
+from ipos.selection import resolve_ipo_choices, selection_status
 from planner.cash import expected_release_at
 from planner.dto import (
     ApplicantInput,
@@ -94,7 +95,9 @@ def build_snapshot(
         if not selected:
             continue
         retail_cutoff = datetime.combine(effective["close_date"], time(17), tzinfo=zone)
-        if retail_cutoff < now:
+        if not planning_window(
+            status=selection_status(effective, at=now), close_date=effective["close_date"], now=now
+        )[0]:
             continue
         if ipo_ids is not None and str(ipo.pk) not in ipo_ids:
             continue
@@ -112,7 +115,9 @@ def build_snapshot(
             )
         )
     if ipo_ids is not None and ipo_ids != {ipo.id for ipo in selected_ipos}:
-        raise ValidationError("Requested IPOs must be published, selected and open for planning")
+        raise ValidationError(
+            "Requested IPOs must be published, selected and within their planning window"
+        )
 
     investors = list(Investor.objects.filter(workspace=workspace, is_deleted=False).order_by("id"))
     demats = DematAccount.objects.filter(investor__workspace=workspace).order_by("id")

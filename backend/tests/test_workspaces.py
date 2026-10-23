@@ -7,19 +7,12 @@ from accounts.services import create_workspace
 
 
 @pytest.mark.django_db
-def test_workspace_creation_adds_owner_membership():
+def test_manual_workspace_creation_is_no_longer_available():
     owner = User.objects.create_user(email="owner@example.test", password="test-password")
     client = APIClient()
     client.force_authenticate(owner)
-
-    response = client.post(reverse("workspace-list"), {"name": "Family"})
-
-    assert response.status_code == 201
-    assert response.data["role"] == WorkspaceMembership.Role.OWNER
-    assert (
-        WorkspaceMembership.objects.get(workspace_id=response.data["id"], user=owner).role
-        == "OWNER"
-    )
+    assert client.post(reverse("workspace-list"), {"name": "Family"}).status_code == 405
+    assert not WorkspaceMembership.objects.filter(user=owner).exists()
 
 
 @pytest.mark.django_db
@@ -60,7 +53,7 @@ def test_operator_and_viewer_can_read_but_cannot_change_workspace(role):
 
 
 @pytest.mark.django_db
-def test_owner_can_rename_workspace():
+def test_personal_account_name_cannot_be_changed_through_legacy_workspace_api():
     owner = User.objects.create_user(email="owner@example.test")
     workspace = create_workspace(name="Original", owner=owner)
     client = APIClient()
@@ -70,4 +63,4 @@ def test_owner_can_rename_workspace():
 
     assert response.status_code == 200
     workspace.refresh_from_db()
-    assert workspace.name == "Renamed"
+    assert workspace.name == "Original"

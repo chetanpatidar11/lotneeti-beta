@@ -10,8 +10,10 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.models import WorkspaceMembership
 from accounts.permissions import WorkspaceDataPermission
 from funding.models import ArchivedBalanceChange, BalanceChange, BankAccount
+from funding.serializers import BankAccountSerializer
 from funding.services import add_money, remove_money, set_balance, transfer_money
 
 
@@ -170,8 +172,13 @@ class WorkspaceBalanceStatementView(APIView):
         changes = (
             BalanceChange.objects.filter(bank__in=banks)
             .select_related("bank", "bank__owner")
+            .prefetch_related("bank__upis")
             .order_by("-created_at", "-id")
         )
+        reveal = WorkspaceMembership.objects.filter(
+            workspace_id=workspace_id, user=request.user, role__in=("OWNER", "OPERATOR")
+        ).exists()
+        bank_serializer = BankAccountSerializer(context={"display_details": reveal})
         pages = Paginator(changes, 50)
         page = pages.get_page(page_number)
         return Response(
@@ -183,6 +190,8 @@ class WorkspaceBalanceStatementView(APIView):
                         "bank_name": change.bank.bank_name,
                         "owner_name": change.bank.owner.name,
                         "account_masked": change.bank.account_masked,
+                        "account_display": bank_serializer.get_account_display(change.bank),
+                        "linked_upis": bank_serializer.get_linked_upis(change.bank),
                         "operation": change.operation,
                         "delta": str(change.delta),
                         "amount": str(

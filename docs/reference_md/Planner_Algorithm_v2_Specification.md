@@ -40,6 +40,7 @@ The legacy planner already established useful behavior: one-PAN-per-IPO eligibil
 | Bank amount cap | ₹5,00,000 inside the rolling window. |
 | Retail application time | Default 5:00 PM on closing date; admin-configurable. |
 | sHNI application time | Default 4:00 PM on closing date; admin-configurable. |
+| Closing-day record plan | Generate/review/save for an application already made until midnight Asia/Kolkata at the start of the next day. Exchange status and cutoffs are unchanged; late plans cannot be exported for submission. |
 | Expected cash reuse after IPO | From the next calendar day after the IPO allotment date. |
 | User personal GMP default | 20% auto-selection threshold for the founder workspace; not a platform-wide mandatory rule. |
 

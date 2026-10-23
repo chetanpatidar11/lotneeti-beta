@@ -14,6 +14,7 @@ type Bank = {
   account_masked: string;
   account_reference: string;
   account_display: string;
+  linked_upis: string[];
   current_balance: string;
   active: boolean;
 };

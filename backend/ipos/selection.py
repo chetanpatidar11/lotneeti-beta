@@ -4,6 +4,8 @@ from datetime import datetime, time
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
+from ipos.planning_window import planning_window
+
 
 def selection_status(values: dict, *, at: datetime) -> str:
     status = values["status"]
@@ -72,7 +74,14 @@ def resolve_ipo_choices(
             threshold=threshold,
             issue_type=values["issue_type"],
             auto_issue_types=issue_types,
-            status=selection_status(values, at=at),
+            # Keep closing-day record plans selectable while status remains CLOSED.
+            status=(
+                "OPEN"
+                if planning_window(
+                    status=selection_status(values, at=at), close_date=values["close_date"], now=at
+                )[1]
+                else selection_status(values, at=at)
+            ),
             allow_upcoming=not has_open,
         )
     chosen = []

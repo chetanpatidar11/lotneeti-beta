@@ -3,7 +3,6 @@ import { cookies } from "next/headers";
 import { backendUrl } from "@/lib/backend";
 import { getCurrentUser } from "@/lib/session";
 import { localPreviewEnabled } from "@/lib/local-preview";
-import { selectedWorkspace } from "@/lib/workspace";
 import AppNav from "./app-nav";
 import ApiActivityIndicator from "./api-activity-indicator";
 import SessionKeeper from "./session-keeper";
@@ -21,27 +20,18 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const theme = requestCookies.get("lotneeti_theme")?.value === "dark" ? "dark" : "light";
   const signedIn = cookieHeader.includes("sessionid=");
   const user = signedIn ? await getCurrentUser() : null;
-  let workspaces: { id: string; name: string; role: string }[] = [];
   let founderAdmin = false;
   if (user) {
-    const headers = { cookie: cookieHeader };
-    const [workspaceResponse, founderResponse] = await Promise.allSettled([
-      fetch(backendUrl("workspaces/"), { headers, cache: "no-store" }),
-      fetch(backendUrl("platform/overview/"), { headers, cache: "no-store" }),
-    ]);
-    if (workspaceResponse.status === "fulfilled" && workspaceResponse.value.ok) {
-      workspaces = await workspaceResponse.value.json() as typeof workspaces;
-    }
-    founderAdmin = founderResponse.status === "fulfilled" && founderResponse.value.ok;
+    const response = await fetch(backendUrl("platform/overview/"), { headers: { cookie: cookieHeader }, cache: "no-store" }).catch(() => null);
+    founderAdmin = response?.ok ?? false;
   }
-  const workspace = await selectedWorkspace(workspaces);
   return (
     <html lang="en" data-theme={theme}>
       <head><meta name="referrer" content="no-referrer" /></head>
       <body>
         <ApiActivityIndicator />
         <a className="skip-link" href="#main-content">Skip to content</a>
-        {user ? <div className="app-layout"><SessionKeeper /><AppNav email={user.email} workspaces={workspaces} selectedId={workspace?.id} founderAdmin={founderAdmin} theme={theme} localPreview={localPreviewEnabled() && user.email === "local-preview@lotneeti.test"} /><div className="app-main" id="main-content" tabIndex={-1}>{children}</div></div> : <div id="main-content" tabIndex={-1}>{children}</div>}
+        {user ? <div className="app-layout"><SessionKeeper /><AppNav email={user.email} founderAdmin={founderAdmin} theme={theme} localPreview={localPreviewEnabled() && user.email === "local-preview@lotneeti.test"} /><div className="app-main" id="main-content" tabIndex={-1}>{children}</div></div> : <div id="main-content" tabIndex={-1}>{children}</div>}
       </body>
     </html>
   );

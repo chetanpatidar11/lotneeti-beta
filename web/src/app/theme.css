@@ -1146,3 +1146,37 @@ html[data-theme="dark"] body > #main-content > .page:not(.auth-page) > .shell { 
   .landing-theme-toggle button, .landing-theme-toggle button:hover:not(:disabled) { min-width: 32px; padding: 5px 7px; font-size: 0; }
   .landing-theme-toggle button span { margin: 0; font-size: 16px; }
 }
+
+/* Compact application and Funds rows retain the existing themes and actions. */
+.applications-shell .page-header { margin-bottom: 12px; }
+.application-ipo-picker { gap: 12px; padding: 9px 14px; margin-bottom: 9px; }
+.application-ipo-picker label { font-size: 16px; }
+.application-ipo-picker p { display: none; }
+.application-ipo-picker select { min-height: 34px; padding: 5px 10px; font-size: 13px; }
+.application-summary { margin-bottom: 8px; }
+.application-summary span { min-height: 29px; padding: 4px 9px; }
+.application-filters { margin-bottom: 8px; }
+.application-filters label { gap: 3px; }
+.application-filters input, .application-filters select { min-height: 31px; padding: 5px 9px; }
+.application-table { min-width: 1080px; font-size: 11px; white-space: nowrap; }
+.application-table th, .application-table td { padding: 4px 7px; white-space: nowrap; }
+.application-table td strong, .application-table td small { display: inline; }
+.application-table td small { margin: 0 4px; }
+.application-row-actions { flex-wrap: nowrap; min-width: 0; gap: 3px; }
+.application-row-actions button, .application-row-actions a { min-height: 26px; padding: 3px 5px; font-size: 10px; }
+.funds-owner-cell strong, .funds-owner-cell span, .funds-statement-table th strong, .funds-statement-table th span, .funds-statement-table td small { display: inline; white-space: nowrap; }
+.funds-owner-cell span, .funds-statement-table th span, .funds-statement-table td small { margin: 0 0 0 7px; font-size: 11px; }
+.compact-table tfoot th, .compact-table tfoot td { border-top: 2px solid var(--border-strong); font-weight: 800; }
+@media (max-width: 900px) {
+  .application-table-wrap { overflow-x: auto; border: 1px solid var(--border); background: var(--surface); }
+  .application-table { display: table; width: 100%; min-width: 1080px; }
+  .application-table thead { display: table-header-group; position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+  .application-table tbody { display: table-row-group; }
+  .application-table tr { display: table-row; margin: 0; padding: 0; border: 0; }
+  .application-table th, .application-table td { display: table-cell; width: auto; padding: 4px 7px; }
+  .application-table th::before, .application-table td::before { content: none; }
+  .application-row-actions button, .application-row-actions a { min-height: 30px; }
+}
+.application-ipo-picker .application-picker-eyebrow { display: none; }
+.application-ipo-heading > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; }
+.application-ipo-heading p { margin: 0; }

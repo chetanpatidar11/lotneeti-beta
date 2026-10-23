@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { balanceActionLabel, formatInr } from "../src/lib/money";
+import { balanceActionLabel, formatInr, sumInr } from "../src/lib/money";
 
 test("bank amounts use Indian grouping and plain balance action labels", () => {
   assert.equal(formatInr("128400.00"), "₹1,28,400");
@@ -13,4 +13,9 @@ test("bank amounts use Indian grouping and plain balance action labels", () => {
   assert.equal(balanceActionLabel("ALLOTMENT"), "Allotment cost");
   assert.equal(balanceActionLabel("TRANSFER_OUT"), "Transfer to bank");
   assert.equal(balanceActionLabel("TRANSFER_IN"), "Transfer from bank");
+});
+
+
+test("bank totals sum decimal amounts exactly to paise", () => {
+  assert.equal(sumInr(["0.10", "0.20", "1234.56", undefined]), 1234.86);
 });

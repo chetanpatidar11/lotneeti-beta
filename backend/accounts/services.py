@@ -21,3 +21,17 @@ def create_workspace(*, name: str, owner: User) -> Workspace:
     )
     record_beta_event(workspace=workspace, event_type=BetaEvent.Type.ACTIVATED)
     return workspace
+
+
+@transaction.atomic
+def ensure_personal_workspace(*, owner: User) -> Workspace:
+    locked_owner = User.objects.select_for_update().get(pk=owner.pk)
+    membership = (
+        WorkspaceMembership.objects.filter(user=locked_owner)
+        .select_related("workspace")
+        .order_by("workspace__created_at", "workspace_id")
+        .first()
+    )
+    if membership:
+        return membership.workspace
+    return create_workspace(name="Personal", owner=locked_owner)

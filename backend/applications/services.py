@@ -16,8 +16,11 @@ from core.models import BetaEvent
 from funding.models import BalanceChange, BankAccount, UPIHandle
 from investors.models import DematAccount, Investor
 from ipos.models import IPO
+from planner.dto import PlannerConfig, RollingUsageInput, UPIInput
+from planner.engine import PLANNER_VERSION
 from planner.export_readiness import assert_exportable_plan
 from planner.policies import bank_policy
+from planner.rolling import RollingLimitTracker
 
 
 def _require_writer(workspace, actor):
@@ -33,7 +36,7 @@ def _require_writer(workspace, actor):
 def start_tracking_plan(*, plan_run, actor, row_ids=None) -> tuple[Application, ...]:
     workspace = Workspace.objects.select_for_update().get(pk=plan_run.workspace_id)
     _require_writer(workspace, actor)
-    assert_exportable_plan(plan_run)
+    assert_exportable_plan(plan_run, allow_record_only=True)
     rows = list(plan_run.rows.all())
     requested = set(row_ids) if row_ids is not None else None
     eligible = [
@@ -147,6 +150,8 @@ def edit_application(
     item.amount = amount
     item.bank = bank
     item.upi = upi
+    if item.status == Application.Status.SUBMITTED:
+        _assert_submission_limits(item)
     item.edited_at = timezone.now()
     item.save(update_fields=["category", "lots", "amount", "bank", "upi", "edited_at"])
     record_event(
@@ -192,6 +197,51 @@ def cancel_application(*, application: Application, actor) -> Application:
     return item
 
 
+def _assert_submission_limits(item, *, exclude_id=None):
+    BankAccount.objects.select_for_update().get(pk=item.bank_id)
+    upi = UPIHandle.objects.get(pk=item.upi_id)
+    now = timezone.now()
+    config = PlannerConfig(PLANNER_VERSION, "DISALLOW", "DEFAULT")
+    usage = (
+        Application.objects.filter(
+            bank_id=item.bank_id, submitted_at__gt=now - timedelta(hours=24), submitted_at__lte=now
+        )
+        .exclude(status=Application.Status.CANCELLED)
+        .exclude(pk=exclude_id or item.pk)
+    )
+    check = RollingLimitTracker(
+        tuple(
+            RollingUsageInput(
+                str(event.pk),
+                str(event.bank_id),
+                str(event.upi_id),
+                event.amount,
+                event.submitted_at,
+                False,
+            )
+            for event in usage
+        )
+    ).check(
+        upi=UPIInput(
+            str(upi.pk),
+            str(upi.bank_id),
+            str(upi.holder_id),
+            upi.active,
+            upi.verified,
+            upi.count_limit_override,
+            upi.amount_limit_override,
+        ),
+        amount=item.amount,
+        at=now,
+        config=config,
+    )
+    if not check.allowed:
+        raise ValidationError(
+            "This bank or UPI has reached its application limit. Retail and sHNI share "
+            "six applications in a rolling 24 hours; the configured amount limit also applies."
+        )
+
+
 @transaction.atomic
 def mark_submitted(*, application: Application, actor) -> Application:
     item = Application.objects.select_for_update().get(pk=application.pk)
@@ -200,6 +250,7 @@ def mark_submitted(*, application: Application, actor) -> Application:
         raise ValidationError("Only a planned application can be marked submitted")
     if item.bank.owner_id != item.applicant_id and bank_policy(item.bank) == "DISALLOW":
         raise ValidationError("This bank cannot fund another investor's application")
+    _assert_submission_limits(item)
     item.status = Application.Status.SUBMITTED
     item.submitted_at = timezone.now()
     item.save(update_fields=["status", "submitted_at"])

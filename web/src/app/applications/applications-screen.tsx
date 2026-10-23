@@ -285,11 +285,11 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
           <div className="application-table-wrap"><table className="application-table"><thead><tr>{canEdit && <th scope="col" className="application-select-heading"><label className="application-select-group"><input type="checkbox" aria-label="Select all visible applications" checked={eligibleIds.length > 0 && eligibleIds.every((id) => selectedIds.includes(id))} onChange={(event) => toggleSelection(eligibleIds, event.target.checked)} disabled={busy || eligibleIds.length === 0} /> Select all</label></th>}<th scope="col">Applicant</th><th scope="col">Category</th><th scope="col">Amount</th><th scope="col">Bank / UPI</th><th scope="col">Status</th><th scope="col">Important date</th><th scope="col">Actions</th></tr></thead><tbody>{group.map((item) => { const date = importantDate(item); return <tr key={item.id}>
             {canEdit && <td data-label="Select" className="application-select-cell">{canCancel(item) && <input type="checkbox" aria-label={`Select ${item.applicant_name} for ${item.ipo_name}`} checked={selectedIds.includes(item.id)} disabled={busy} onChange={(event) => toggleSelection([item.id], event.target.checked)} />}</td>}
             <th scope="row" data-label="Applicant">{item.applicant_name}</th>
-            <td data-label="Category">{item.category === "SHNI" ? "sHNI" : "Retail"}<small>{item.lots} {item.lots === 1 ? "lot" : "lots"}</small></td>
+            <td data-label="Category">{item.category === "SHNI" ? "sHNI" : "Retail"} <small>{item.lots} {item.lots === 1 ? "lot" : "lots"}</small></td>
             <td data-label="Amount" className="money-cell">{formatInr(item.amount)}</td>
-            <td data-label="Bank / UPI">{item.bank_label}<small>{item.upi_label}</small></td>
+            <td data-label="Bank / UPI">{item.bank_label} <small>{item.upi_label}</small></td>
             <td data-label="Status"><StatusBadge tone={statusTone(item)}>{outcomeLabel(item)}</StatusBadge></td>
-            <td data-label="Important date"><small>{date.label}</small>{date.value}</td>
+            <td data-label="Important date"><small>{date.label}</small> {date.value}</td>
             <td data-label="Actions"><div className="application-row-actions">
               {canEdit && item.status === "PLANNED" && <button type="button" disabled={busy} onClick={() => void update(item, "submit")}>Mark submitted</button>}
               {canEdit && item.status === "SUBMITTED" && <button type="button" disabled={busy} onClick={() => void update(item, "block")}>Mark blocked</button>}
