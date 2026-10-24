@@ -63,6 +63,7 @@ export default function IPOChoice({ workspaceId, ipoId, initial, canEdit, automa
   }
 
   return <div className="ipo-choice">
+    {canEdit && shareholderTerms && <div className="ipo-shareholder-control"><ShareholderChoice key={`${choice.shareholder_preferred}:${choice.shareholder_eligible?.join(",")}`} workspaceId={workspaceId} ipoId={ipoId} initial={choice} terms={shareholderTerms} accounts={accounts} onSaved={(next) => { setChoice(next); router.refresh(); }} /></div>}
     {automaticEnabled && choice.decision === "DEFAULT" && !choice.selected && autoSelectionReason(choice) && <p className="selection-rule">{autoSelectionReason(choice)}</p>}
     {canEdit && <div className="ipo-choice-buttons">
       {automaticEnabled && <button type="button" disabled={busy} aria-pressed={choice.decision === "DEFAULT"} onClick={() => save({ decision: "DEFAULT" })}>Automatic</button>}
@@ -78,12 +79,11 @@ export default function IPOChoice({ workspaceId, ipoId, initial, canEdit, automa
         <option value="CUSTOM">Custom</option>
       </select>
     </label>
-    {(choice.mode === "RETAIL_PLUS_SHNI" || choice.mode === "SHNI_PREFERRED") && <p className="ipo-mode-help">{choice.mode === "RETAIL_PLUS_SHNI"
+    {(choice.mode === "RETAIL_PLUS_SHNI" || choice.mode === "SHNI_PREFERRED") && <p className="ipo-mode-help">{choice.shareholder_preferred ? "Retail coverage first, then shareholder coverage and maximum lots, then sHNI upgrades with remaining funds." : choice.mode === "RETAIL_PLUS_SHNI"
       ? "Start with Retail coverage, then try an sHNI upgrade pass where funds allow."
       : "Start with Retail coverage, then repeat upgrades to fit as many minimum sHNI applications as possible."}</p>}</div>}
     {choice.selected && choice.mode === "BHNI_PREFERRED" && <p className="ipo-mode-help">Try the minimum whole-lot amount above ₹10 lakh using each investor’s own bank ASBA account. Keep Retail where bHNI funds are unavailable.</p>}
     {choice.shareholder_terms_changed && <p role="alert">Shareholder terms changed. Review and confirm eligible investors again.</p>}
-    {canEdit && shareholderTerms && <ShareholderChoice key={`${choice.shareholder_preferred}:${choice.shareholder_eligible?.join(",")}`} workspaceId={workspaceId} ipoId={ipoId} initial={choice} terms={shareholderTerms} accounts={accounts} onSaved={(next) => { setChoice(next); router.refresh(); }} />}
     {message && <p role="status">{message}</p>}
   </div>;
 }

@@ -1,5 +1,12 @@
 # LotNeeti execution status
 
+## C30 Shareholder priority before public upgrades — locally verified, 2026-10-24
+
+- For shareholder-preferred IPOs, reserve normal Retail coverage, add minimum shareholder coverage for all eligible investors, maximize shareholder lots, then use residual funding for public sHNI/bHNI upgrades. Preserve manual locks, explicit modes, cash/UPI limits and the unchanged legacy engine/default flow. Move Shareholder preferred to the left of the IPO controls and explain the priority order.
+- Verify scarce shared funds, shareholder maximum before sHNI, residual upgrades, bank restrictions/rolling limits, locks, deterministic output and exact disabled-overlay behavior before deployment.
+- Implemented the order in the isolated quota adapter with quota version v2. The same legacy public upgrade/repair functions run after the shareholder passes, with shareholder quantities and mappings held fixed. All 13 legacy engine/contract files remain unchanged. Explicit Retail Only/Custom modes, existing public applications and manual locks retain their precedence. bHNI uses residual funds and no longer removes an unfunded shareholder explanation.
+- Full `scripts/check.sh` passed: 505 backend, 54 web and one Android test; planner matrix, Ruff/format, Django/migration drift, lint/typecheck and production/Android builds. New regressions cover minimum coverage under shared cash, maximum shareholder before public upgrades, exact residual sHNI boundary, later commitments, UPI limits, locked categories, mixed IPOs, 15+8 and disabled-overlay equality in all existing public modes. Synthetic browser verified the left button, one Retail lot plus 13 shareholder lots from ₹2.5 lakh, Ready validation, save and re-plan.
+
 ## C29 Shareholder quota and bHNI planning — deployed, 2026-10-24
 
 - Add opt-in per-IPO shareholder eligibility with a separate maximum-whole-lot planning pass and an optional bHNI preference/manual category using own-bank ASBA above ₹10 lakh. Keep the existing Retail/sHNI selection engine, DTO contracts, wallet ranking, ordering, upgrade/repair passes and golden outputs unchanged. Preserve one public application per PAN/IPO; allow one additional verified shareholder-reservation application. New quota settings must fail closed unless issue terms permit them.

@@ -1,3 +1,4 @@
+from dataclasses import replace
 from decimal import Decimal
 
 import pytest
@@ -12,6 +13,7 @@ from applications.services import start_tracking_plan
 from funding.models import BankAccount, UPIHandle
 from investors.models import DematAccount, Investor
 from ipos.quota_terms import shareholder_terms_fingerprint
+from planner.dto import CashBlockInput, application_cutoff
 from planner.engine import generate_proposal
 from planner.models import PlanRun
 from planner.quota_planning import generate_quota_proposal, quota_context
@@ -87,7 +89,7 @@ def test_fifteen_public_plus_eight_maximum_shareholder_rows_preserve_normal_mapp
     assert saved.status_code == 201, saved.data
     assert saved.data["status"] == "READY", saved.data
     run = PlanRun.objects.get()
-    assert run.planner_version == "planner-v2.0+quota-v1"
+    assert run.planner_version == "planner-v2.0+quota-v2"
     apps = start_tracking_plan(plan_run=run, actor=run.generated_by)
     assert len(apps) == 23
     for investor in investors:
@@ -97,10 +99,12 @@ def test_fifteen_public_plus_eight_maximum_shareholder_rows_preserve_normal_mapp
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("mode", ["RETAIL_ONLY", "SHNI_PREFERRED", "RETAIL_PLUS_SHNI"])
 @override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="ALLOW")
-def test_disabled_quota_has_identical_legacy_proposal_and_hashes():
+def test_disabled_quota_has_identical_legacy_proposal_and_hashes(mode):
     _, workspace, _, _, decision, _ = setup_quota(count=2, eligible_count=1)
     decision.shareholder_preferred = False
+    decision.mode = mode
     decision.save()
     snapshot = build_snapshot(workspace=workspace)
     assert generate_quota_proposal(
@@ -118,6 +122,189 @@ def test_shareholder_uses_affordable_whole_lots_without_changing_public_row():
     assert [(row.category, row.lots) for row in result.coverage.rows] == [
         ("RETAIL", 1),
         ("SHARE", 2),
+    ]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("mode", ["RETAIL_PLUS_SHNI", "SHNI_PREFERRED", "BHNI_PREFERRED"])
+@override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="ALLOW")
+def test_shareholder_maximum_precedes_public_upgrade_in_each_preferred_mode(mode):
+    _, workspace, _, _, decision, client = setup_quota(count=1, eligible_count=1)
+    decision.mode = mode
+    decision.save()
+    snapshot = build_snapshot(workspace=workspace)
+    context = quota_context(workspace, snapshot)
+    result = generate_quota_proposal(snapshot, context)
+    assert result.audit.valid, result.audit.issues
+    assert [(row.category, row.lots) for row in result.coverage.rows] == [
+        ("RETAIL", 1),
+        ("SHARE", 13),
+    ]
+    assert generate_quota_proposal(snapshot, context) == result
+    preview = client.post(reverse("planner-preview", args=[workspace.pk]), {}, format="json")
+    saved = client.post(
+        reverse("planner-run-create", args=[workspace.pk]),
+        {"rows": preview.data["rows"]},
+        format="json",
+    )
+    assert preview.data["status"] == saved.data["status"] == "READY"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("balance,share_lots", [("60000", [1, 1]), ("90000", [3, 1])])
+@override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="ALLOW")
+def test_all_shareholders_receive_minimum_before_any_increase_with_shared_funds(
+    balance, share_lots
+):
+    _, workspace, investors, _, decision, _ = setup_quota(
+        count=2, eligible_count=2, balance=balance
+    )
+    decision.mode = "SHNI_PREFERRED"
+    decision.save()
+    snapshot = build_snapshot(workspace=workspace)
+    bank = next(item for item in snapshot.banks if item.owner_id == str(investors[0].pk))
+    snapshot = replace(
+        snapshot,
+        banks=(bank,),
+        upis=tuple(item for item in snapshot.upis if item.bank_id == bank.id),
+    )
+    result = generate_quota_proposal(snapshot, quota_context(workspace, snapshot))
+    assert result.audit.valid, result.audit.issues
+    assert sum(row.category == "RETAIL" and row.lots == 1 for row in result.coverage.rows) == 2
+    assert (
+        sorted((row.lots for row in result.coverage.rows if row.category == "SHARE"), reverse=True)
+        == share_lots
+    )
+    assert not result.coverage.uncovered
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("balance,category", [("404999", "RETAIL"), ("405000", "SHNI")])
+@override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="ALLOW")
+def test_only_residual_funds_upgrade_retail_after_shareholder_maximum(balance, category):
+    _, workspace, _, _, decision, _ = setup_quota(count=1, eligible_count=1, balance=balance)
+    decision.mode = "SHNI_PREFERRED"
+    decision.save()
+    snapshot = build_snapshot(workspace=workspace)
+    result = generate_quota_proposal(snapshot, quota_context(workspace, snapshot))
+    assert result.audit.valid, result.audit.issues
+    public, share = result.coverage.rows
+    assert share.category == "SHARE" and share.lots == 13
+    assert public.category == category
+    assert public.lots == (14 if category == "SHNI" else 1)
+
+
+@pytest.mark.django_db
+@override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="ALLOW")
+def test_fifteen_investors_keep_all_eight_maximum_shareholder_rows_before_shni():
+    _, workspace, _, _, decision, _ = setup_quota()
+    decision.mode = "SHNI_PREFERRED"
+    decision.save()
+    snapshot = build_snapshot(workspace=workspace)
+    result = generate_quota_proposal(snapshot, quota_context(workspace, snapshot))
+    assert result.audit.valid, result.audit.issues
+    share = [row for row in result.coverage.rows if row.category == "SHARE"]
+    public = [row for row in result.coverage.rows if row.category != "SHARE"]
+    assert len(share) == 8 and all(row.lots == 13 for row in share)
+    assert len(public) == 15 and any(row.category == "SHNI" for row in public)
+    assert not result.coverage.uncovered
+
+
+@pytest.mark.django_db
+@override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="ALLOW")
+def test_other_selected_ipo_keeps_its_existing_shni_flow():
+    _, workspace, _, _, decision, _ = setup_quota(count=1, eligible_count=1, balance="430000")
+    decision.mode = "SHNI_PREFERRED"
+    decision.save()
+    snapshot = build_snapshot(workspace=workspace)
+    other = replace(
+        snapshot.ipos[0], id="00000000-0000-0000-0000-000000000030", gmp_percent=Decimal("50")
+    )
+    snapshot = replace(snapshot, ipos=snapshot.ipos + (other,))
+    context = quota_context(workspace, snapshot)
+    old_other = next(
+        row for row in generate_proposal(snapshot).coverage.rows if row.ipo_id == other.id
+    )
+    result = generate_quota_proposal(snapshot, context)
+    assert result.audit.valid, result.audit.issues
+    assert next(row for row in result.coverage.rows if row.ipo_id == other.id) == old_other
+    assert next(row for row in result.coverage.rows if row.category == "SHARE").lots == 13
+
+
+@pytest.mark.django_db
+@override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="ALLOW")
+def test_later_cash_commitment_cannot_be_spent_by_earlier_shni_upgrade():
+    _, workspace, _, _, decision, _ = setup_quota(count=1, eligible_count=1, balance="450000")
+    decision.mode = "SHNI_PREFERRED"
+    decision.save()
+    snapshot = build_snapshot(workspace=workspace)
+    snapshot = replace(
+        snapshot,
+        cash_blocks=(
+            CashBlockInput(
+                "later-synthetic-block",
+                snapshot.banks[0].id,
+                Decimal("50000"),
+                application_cutoff(snapshot.ipos[0], "RETAIL"),
+                None,
+            ),
+        ),
+    )
+    result = generate_quota_proposal(snapshot, quota_context(workspace, snapshot))
+    assert result.audit.valid, result.audit.issues
+    assert [(row.category, row.lots) for row in result.coverage.rows] == [
+        ("RETAIL", 1),
+        ("SHARE", 13),
+    ]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "count_limit,amount_limit,expected", [(1, "500000", []), (6, "200000", [12])]
+)
+@override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="ALLOW")
+def test_shareholder_priority_still_respects_combined_upi_limits(
+    count_limit, amount_limit, expected
+):
+    _, workspace, _, _, decision, _ = setup_quota(count=1, eligible_count=1, balance="500000")
+    decision.mode = "SHNI_PREFERRED"
+    decision.save()
+    snapshot = build_snapshot(workspace=workspace)
+    snapshot = replace(
+        snapshot,
+        config=replace(
+            snapshot.config, upi_count_limit=count_limit, upi_amount_limit=Decimal(amount_limit)
+        ),
+    )
+    result = generate_quota_proposal(snapshot, quota_context(workspace, snapshot))
+    assert result.audit.valid, result.audit.issues
+    assert [row.lots for row in result.coverage.rows if row.category == "SHARE"] == expected
+    assert result.coverage.rows[0].category == ("SHNI" if count_limit == 1 else "RETAIL")
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "locked_category,lots,expected",
+    [("SHNI", 14, [("SHNI", 14), ("SHARE", 2)]), ("SHARE", 2, [("SHNI", 14), ("SHARE", 2)])],
+)
+@override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="ALLOW")
+def test_manual_locks_outrank_shareholder_priority(locked_category, lots, expected):
+    _, workspace, _, _, decision, client = setup_quota(count=1, eligible_count=1)
+    decision.mode = "SHNI_PREFERRED"
+    decision.save()
+    url = reverse("planner-preview", args=[workspace.pk])
+    rows = client.post(url, {}, format="json").data["rows"]
+    row = next(
+        item for item in rows if (item["category"] == "SHARE") == (locked_category == "SHARE")
+    )
+    row.update(category=locked_category, lots=lots, amount=str(15000 * lots))
+    response = client.post(url, {"locked_rows": [row]}, format="json")
+    assert response.data["status"] == "READY", response.data
+    assert sorted((item["category"], item["lots"]) for item in response.data["rows"]) == sorted(
+        expected
+    )
+    assert next(item for item in response.data["rows"] if item["category"] == locked_category)[
+        "locked"
     ]
 
 
@@ -162,6 +349,22 @@ def test_bhni_uses_minimum_above_ten_lakh_own_bank_asba_and_shareholder_can_coex
         ).status_code
         == 200
     )
+
+
+@pytest.mark.django_db
+@override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="ALLOW")
+def test_bhni_success_keeps_unfunded_shareholder_explanation():
+    _, workspace, _, _, decision, _ = setup_quota(count=1, eligible_count=1, balance="1250000")
+    decision.mode = "BHNI_PREFERRED"
+    decision.save()
+    UPIHandle.objects.filter(bank__workspace=workspace).update(verified=False)
+    snapshot = build_snapshot(workspace=workspace)
+    result = generate_quota_proposal(snapshot, quota_context(workspace, snapshot))
+    assert result.audit.valid, result.audit.issues
+    assert [row.category for row in result.coverage.rows] == ["BHNI"]
+    assert [item.reason for item in result.coverage.uncovered] == [
+        "SHAREHOLDER_INSUFFICIENT_FUNDS_OR_LIMITS"
+    ]
 
 
 @pytest.mark.django_db

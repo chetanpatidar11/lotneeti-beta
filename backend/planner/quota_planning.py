@@ -1,7 +1,7 @@
 """Opt-in quota overlay. The Retail/sHNI engine and its input contracts stay unchanged.
 
-Run the legacy engine first, keep every normal mapping fixed, then consider bHNI
-replacements and additional shareholder rows. Audit shareholder rows as a separate
+For preferred shareholder issues, defer public upgrades until minimum shareholder
+coverage and shareholder increases are funded. Audit shareholder rows as a separate
 virtual issue; ASBA amounts reserve cash but never consume UPI limits.
 """
 
@@ -23,10 +23,14 @@ from planner.cash import PlannedAllocation, cash_at_cutoff, expected_release_at
 from planner.coverage import CoverageResult, CoverageRow, PlanReason, UncoveredApplicant
 from planner.dto import CashBlockInput, ExistingApplicationInput, application_cutoff, canonical_json
 from planner.engine import PlannerProposal, generate_proposal
+from planner.explanations import explain_row
 from planner.manual_plan import review_manual_rows
 from planner.ordering import selected_ipo_order
+from planner.quotes import minimum_shni_quote
+from planner.repair import repair_shni_upgrades
+from planner.upgrades import upgrade_retail_to_shni
 
-QUOTA_VERSION = "planner-v2.0+quota-v1"
+QUOTA_VERSION = "planner-v2.0+quota-v2"
 SHARE = "SHARE"
 BHNI = "BHNI"
 PUBLIC = "PUBLIC"
@@ -423,6 +427,103 @@ def _valid_candidate(snapshot, rows, context):
     return audit_quota_rows(snapshot, tuple(rows), context).valid
 
 
+def _shareholder_candidate(snapshot, context, ipo, rule, applicant, rows, *, maximum):
+    demats = sorted(
+        (item for item in snapshot.demats if item.active and item.applicant_id == applicant.id),
+        key=lambda item: item.id,
+    )
+    if not demats:
+        return None
+    unit = ipo.upper_price * ipo.lot_size
+    preferences = {
+        item.bank_id: item.priority
+        for item in snapshot.funding_preferences
+        if item.beneficiary_id == applicant.id and item.enabled
+    }
+    candidates = []
+    for bank in snapshot.banks:
+        if not bank.active:
+            continue
+        for upi in snapshot.upis:
+            if upi.bank_id != bank.id or not upi.active or not upi.verified:
+                continue
+            low, high, best = rule.minimum_lots, maximum, None
+            while low <= high:
+                lots = (low + high) // 2
+                candidate = CoverageRow(
+                    ipo.id,
+                    applicant.id,
+                    SHARE,
+                    lots,
+                    unit * lots,
+                    demats[0].id,
+                    bank.id,
+                    upi.id,
+                    warnings=() if bank.owner_id == applicant.id else ("CROSS_FUNDING",),
+                    reasons=(
+                        PlanReason(
+                            "SHAREHOLDER_PRIORITY",
+                            "Shareholder coverage and lots take priority over public upgrades.",
+                        ),
+                    ),
+                )
+                if _valid_candidate(snapshot, rows + [candidate], context):
+                    best, low = candidate, lots + 1
+                else:
+                    high = lots - 1
+            if best:
+                candidates.append(
+                    (
+                        (
+                            -best.lots,
+                            bank.owner_id != applicant.id,
+                            bank.id not in preferences,
+                            preferences.get(bank.id, 0),
+                            upi.holder_id != applicant.id,
+                            bank.id,
+                            upi.id,
+                        ),
+                        best,
+                    )
+                )
+    return min(candidates, key=lambda item: item[0])[1] if candidates else None
+
+
+def _upgrade_after_shareholders(snapshot, context, rows, deferred):
+    """Reuse public upgrade/repair rules with shareholder mappings held fixed."""
+    virtual = _virtual_snapshot(snapshot, context, rows)
+    virtual = replace(
+        virtual,
+        ipos=tuple(
+            item if item.id in deferred else replace(item, mode="RETAIL_ONLY")
+            for item in virtual.ipos
+        ),
+    )
+    fixed_share = {
+        (row.ipo_id + SUFFIX, row.applicant_id): row for row in rows if row.category == SHARE
+    }
+    coverage = CoverageResult(
+        tuple(
+            replace(_share_row(row), locked=True) if row.category == SHARE else row
+            for row in rows
+            if row.category != BHNI
+        ),
+        (),
+    )
+    upgraded = upgrade_retail_to_shni(virtual, coverage)
+    repaired = repair_shni_upgrades(virtual, upgraded)
+    restored = [
+        fixed_share[(row.ipo_id, row.applicant_id)]
+        if row.ipo_id.endswith(SUFFIX)
+        else replace(row, reasons=explain_row(snapshot, row))
+        if not row.locked
+        else row
+        for row in repaired.rows
+    ] + [row for row in rows if row.category == BHNI]
+    # Never let a public upgrade invalidate confirmed quota terms or existing locks.
+    return restored if _valid_candidate(snapshot, restored, context) else rows
+
+
 def generate_quota_proposal(snapshot, context):
     if not context.active and not has_quota_rows(snapshot.locked_rows):
         return generate_proposal(snapshot)
@@ -441,8 +542,16 @@ def generate_quota_proposal(snapshot, context):
         for item in snapshot.locked_rows
         if item.category in {SHARE, BHNI}
     )
+    rules = {item.id: item for item in context.ipos}
+    deferred = {item.id for item in context.ipos if item.enabled and item.preferred}
     base_snapshot = replace(
         snapshot,
+        ipos=tuple(
+            replace(item, mode="RETAIL_ONLY")
+            if item.id in deferred and item.mode != "CUSTOM"
+            else item
+            for item in snapshot.ipos
+        ),
         locked_rows=tuple(
             item for item in snapshot.locked_rows if item.category not in {SHARE, BHNI}
         ),
@@ -474,13 +583,70 @@ def generate_quota_proposal(snapshot, context):
     legacy = generate_proposal(base_snapshot)
     rows = list(legacy.coverage.rows) + list(external_locks)
     uncovered = list(legacy.coverage.uncovered)
-    rules = {item.id: item for item in context.ipos}
     applicants = sorted(snapshot.applicants, key=lambda item: (item.priority, item.id))
     existing = {
         (item.ipo_id, item.applicant_id)
         for item in snapshot.existing_applications
         if not item.cancelled
     }
+    existing_share = {
+        (item.ipo_id, item.applicant_id) for item in context.existing_share if not item.cancelled
+    }
+    # Complete minimum coverage for everyone before increasing any shareholder row.
+    for maximize in (False, True):
+        for ipo in selected_ipo_order(snapshot.ipos):
+            rule = rules.get(ipo.id)
+            if not rule or not (rule.enabled and rule.preferred):
+                continue
+            maximum = (
+                min(
+                    minimum_shni_quote(ipo.upper_price, ipo.lot_size).lots - 1,
+                    int(
+                        (rule.maximum_amount / (ipo.upper_price * ipo.lot_size)).to_integral_value(
+                            rounding=ROUND_FLOOR
+                        )
+                    ),
+                )
+                if maximize
+                else rule.minimum_lots
+            )
+            for applicant in applicants:
+                if (
+                    not applicant.active
+                    or applicant.id not in rule.eligible
+                    or (ipo.id, applicant.id) in existing_share
+                ):
+                    continue
+                prior = next(
+                    (
+                        row
+                        for row in rows
+                        if row.ipo_id == ipo.id
+                        and row.applicant_id == applicant.id
+                        and row.category == SHARE
+                    ),
+                    None,
+                )
+                if (prior is not None) != maximize or (prior and prior.locked):
+                    continue
+                others = [row for row in rows if row is not prior]
+                candidate = _shareholder_candidate(
+                    snapshot, context, ipo, rule, applicant, others, maximum=maximum
+                )
+                if candidate and (prior is None or candidate.lots > prior.lots):
+                    rows = others + [candidate]
+                elif not maximize:
+                    reason = (
+                        "SHAREHOLDER_INSUFFICIENT_FUNDS_OR_LIMITS"
+                        if any(
+                            item.active and item.applicant_id == applicant.id
+                            for item in snapshot.demats
+                        )
+                        else "SHAREHOLDER_NO_DEMAT"
+                    )
+                    uncovered.append(UncoveredApplicant(ipo.id, applicant.id, reason))
+    if deferred:
+        rows = _upgrade_after_shareholders(snapshot, context, rows, deferred)
     for ipo in selected_ipo_order(snapshot.ipos):
         rule = rules.get(ipo.id)
         if not rule:
@@ -542,99 +708,9 @@ def generate_quota_proposal(snapshot, context):
                             item
                             for item in uncovered
                             if (item.ipo_id, item.applicant_id) != (ipo.id, applicant.id)
+                            or item.reason.startswith("SHAREHOLDER_")
                         ]
                         break
-        if not (rule.enabled and rule.preferred):
-            continue
-        existing_share = {
-            (item.ipo_id, item.applicant_id)
-            for item in context.existing_share
-            if not item.cancelled
-        }
-        for applicant in applicants:
-            if (
-                applicant.id not in rule.eligible
-                or (ipo.id, applicant.id) in existing_share
-                or any(
-                    row.ipo_id == ipo.id
-                    and row.applicant_id == applicant.id
-                    and row.category == SHARE
-                    for row in rows
-                )
-            ):
-                continue
-            demats = sorted(
-                (
-                    item
-                    for item in snapshot.demats
-                    if item.active and item.applicant_id == applicant.id
-                ),
-                key=lambda item: item.id,
-            )
-            if not demats:
-                uncovered.append(UncoveredApplicant(ipo.id, applicant.id, "SHAREHOLDER_NO_DEMAT"))
-                continue
-            unit = ipo.upper_price * ipo.lot_size
-            maximum = int((rule.maximum_amount / unit).to_integral_value(rounding=ROUND_FLOOR))
-            preferences = {
-                item.bank_id: item.priority
-                for item in snapshot.funding_preferences
-                if item.beneficiary_id == applicant.id and item.enabled
-            }
-            candidates = []
-            for bank in snapshot.banks:
-                if not bank.active:
-                    continue
-                for upi in snapshot.upis:
-                    if upi.bank_id != bank.id or not upi.active or not upi.verified:
-                        continue
-                    low, high, best = rule.minimum_lots, maximum, None
-                    while low <= high:
-                        lots = (low + high) // 2
-                        candidate = CoverageRow(
-                            ipo.id,
-                            applicant.id,
-                            SHARE,
-                            lots,
-                            unit * lots,
-                            demats[0].id,
-                            bank.id,
-                            upi.id,
-                            warnings=() if bank.owner_id == applicant.id else ("CROSS_FUNDING",),
-                            reasons=(
-                                PlanReason(
-                                    "SHAREHOLDER_MAXIMUM",
-                                    "Maximum affordable shareholder lots after the normal plan.",
-                                ),
-                            ),
-                        )
-                        if _valid_candidate(snapshot, rows + [candidate], context):
-                            best, low = candidate, lots + 1
-                        else:
-                            high = lots - 1
-                    if best:
-                        candidates.append(
-                            (
-                                (
-                                    -best.lots,
-                                    bank.owner_id != applicant.id,
-                                    bank.id not in preferences,
-                                    preferences.get(bank.id, 0),
-                                    upi.holder_id != applicant.id,
-                                    bank.id,
-                                    upi.id,
-                                ),
-                                best,
-                            )
-                        )
-            if candidates:
-                rows.append(min(candidates, key=lambda item: item[0])[1])
-            else:
-                uncovered.append(
-                    UncoveredApplicant(
-                        ipo.id, applicant.id, "SHAREHOLDER_INSUFFICIENT_FUNDS_OR_LIMITS"
-                    )
-                )
     result_rows = tuple(rows)
     audit = audit_quota_rows(snapshot, result_rows, context)
 

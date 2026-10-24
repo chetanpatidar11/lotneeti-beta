@@ -197,7 +197,8 @@ input[type="checkbox"] { min-height: auto; accent-color: var(--accent); }
 .sources-disclosure summary { width: fit-content; min-height: 26px; color: var(--accent); cursor: pointer; }
 .sources-disclosure ol { margin: 4px 0 0; padding-left: 17px; }
 .sources-disclosure li { padding: 3px 0; }
-.ipo-choice { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin: 0; }
+.ipo-choice { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin: 0; }
+.ipo-shareholder-control { margin-right: auto; }
 .ipo-choice > p { margin: 0; }
 .selection-rule { color: var(--muted); font-size: 11px; }
 .ipo-choice-buttons { flex-wrap: wrap; }
