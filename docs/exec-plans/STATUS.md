@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## C25 Compact and aligned bank statement — verified locally, 2026-10-24
+
+- Rename Balance after to Balance, align numeric headers and amounts, and show each statement entry in two compact lines. Keep full identifiers and notes available in a transaction details panel. Preserve signed-delta mapping and all saved balance history.
+- Removed the conflicting statement-header left-alignment override and consolidated statement styles. Explicit Date / Bank / Transaction / Debit / Credit / Balance columns keep monetary headers and values right-aligned. Bank and owner share the first line; UPI uses the second. Transfer direction and counterparty identity are arranged on two lines, with full identifiers and notes retained in an accessible details drawer.
+- Verification: 50 web tests passed, including positive/negative SET, add/remove, transfer-in/out, allotment and zero-delta column mapping. Frontend lint, typecheck, production build and diff checks passed. Isolated synthetic browser checks passed at 1280 and 1440px, with uniform 55px two-line rows and no horizontal statement overflow; narrow 390px width also fits. Light/dark themes and full transfer-details drawer were checked. No backend, migration or balance changes.
+
 ## C24 Funds, Applications and IPO controls — deployed, 2026-10-23
 
 - Requested: deduplicate UPI/account references, show internal-transfer counterpart details and all statement amounts without horizontal scrolling, default Scheduled Payments to all banks, compact application filters/labels, visible sign-out and sidebar spacing, and an off-by-default automatic-selection tab beside Calendar. Preserve existing ownership, manual choices, balances, history and Brevo verification.

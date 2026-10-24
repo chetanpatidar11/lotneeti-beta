@@ -6,13 +6,13 @@ import { balanceActionLabel, formatInr, sumInr } from "@/lib/money";
 import { bankIdentifiers } from "@/lib/bank-display";
 import { Drawer } from "@/components/drawer";
 import { EmptyState, PageHeader, SectionHeading, StatusBadge } from "@/components/ui";
+import BankStatementTable, { type StatementChange } from "./bank-statement-table";
 import ScheduledPayments, { type ScheduledPayment } from "./scheduled-payments";
 
 type Workspace = { id: string; name: string; role: string };
 type Investor = { id: string; name: string };
 type Bank = { id: string; owner: string; bank_name: string; account_masked: string; account_reference: string; account_display: string; linked_upis: string[]; current_balance: string; active: boolean };
 type Change = { id: number; operation: "ADD" | "REMOVE" | "SET" | "TRANSFER_OUT" | "TRANSFER_IN" | "ALLOTMENT"; amount: string; balance: string; note: string; counterparty_label: string; created_at: string };
-type StatementChange = Change & { bank_id: string; bank_name: string; owner_name: string; account_masked: string; account_display: string; linked_upis: string[]; delta: string };
 type StatementPage = { results: StatementChange[]; next_page: number | null; total: number };
 type CapitalLine = { balance: string; blocked: string; planned: string; available: string };
 type ArchivedBank = { id: string; bank_name: string; account_masked: string; last_changed: string };
@@ -159,7 +159,7 @@ export default function FundsScreen({ workspace, investors, initialBanks, statem
     </>}
     {tab === "statement" && <section className="section-panel funds-statement"><SectionHeading title="Bank statement" detail={`${statementTotal} recorded movement${statementTotal === 1 ? "" : "s"} across your banks`} />
       <label className="funds-filter">Bank account<select value={statementBankId} onChange={(event) => setStatementBankId(event.target.value)}><option value="">All banks</option>{statementBankChoices.map((bank) => <option key={bank.id} value={bank.id}>{bank.bank_name} · {bank.account_display}</option>)}</select></label>
-      {statement.length === 0 && !statementLoading ? <EmptyState title="No balance changes yet." /> : <div className="compact-table-wrap"><table className="compact-table funds-statement-table"><thead><tr><th>Date</th><th>Bank / owner</th><th>Transaction</th><th>Debit</th><th>Credit</th><th>Balance after</th></tr></thead><tbody>{statement.map((change) => <tr key={change.id}><td>{new Date(change.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</td><th scope="row"><strong>{change.bank_name}</strong><span>{change.owner_name} · {bankIdentifiers(change.account_display ?? change.account_masked, change.linked_upis)}</span></th><td>{balanceActionLabel(change.operation)}{change.counterparty_label && <small>{change.counterparty_label}</small>}{change.note && <small>{change.note}</small>}</td><td>{Number(change.delta) < 0 ? formatInr(Math.abs(Number(change.delta))) : "—"}</td><td>{Number(change.delta) > 0 ? formatInr(change.delta) : "—"}</td><td>{formatInr(change.balance)}</td></tr>)}</tbody></table></div>}
+      {statement.length === 0 && !statementLoading ? <EmptyState title="No balance changes yet." /> : <BankStatementTable changes={statement} />}
       {statementNext && <button type="button" className="button-secondary" disabled={statementLoading} onClick={() => void loadStatement(statementBankId, statementNext, true)}>{statementLoading ? "Loading…" : "Load more"}</button>}
     </section>}
     {tab === "payments" && <section className="section-panel funds-scheduled"><SectionHeading title="Scheduled Payments / EMI" detail="Upcoming debits across your banks" />
