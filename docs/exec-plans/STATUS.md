@@ -1,10 +1,12 @@
 # LotNeeti execution status
 
-## C28 Manual lot edits — locally verified, 2026-10-24
+## C28 Manual lot edits — deployed, 2026-10-24
 
 - Allow whole-lot edits above automatic defaults in Edit draft application and tracked application edits. Recalculate amounts, preserve manual locks, keep automatic default sizes, and validate category amounts, cash, duplicate applications and rolling limits across preview/save/re-plan/track.
 
 - Enabled Retail lot inputs in both edit forms and safely handle an empty draft quantity. Replaced the one-lot hard rule in manual audit, lock validation, repair feasibility and tracked edits with the Retail amount ceiling; automatic default quotes remain unchanged. Added the missing record-only flag to save responses so editing/saving a closed IPO retains correct export messaging. Full `scripts/check.sh` passed: 475 backend, 52 web and one Android test plus planner matrix, lint/format/typecheck/migration checks and production/Android builds. New tests cover positive integer quantities, ₹2 lakh boundary, cash rejection, lock/re-plan preservation, saving/tracking/submitted edits and repair/audit consistency. Synthetic browser editing changed 1 lot to 2, immediately recalculated ₹15,000 to ₹30,000, survived clearing/re-entering input and remained locked through re-planning.
+
+- Commit `40d3ad5` pushed and deployed using the existing terminal release helper after a successful encrypted backup. Release archive SHA-256 `a70ab19b250a1aa59696c849f064bc8b868bb8cb8b619d7216cd3586032996b3`. Seven deployed source hashes match local; live synthetic two-lot lock/audit and unchanged one-lot automatic quote assertions passed. All four services are active, zero migrations remain, Brevo is configured, and Home/sign-in/API health/OCR checks returned HTTPS 200. Read-only production counts remain 17 investors, 10 banks, 13 plans and 171 applications. Additional synthetic browser verification confirmed saved Planned rows display two lots/₹30,000 and an existing Submitted application can be edited to the same quantity/amount. No production balance or application records were edited during verification.
 
 ## C27 Manual plans after IPO closing — deployed, 2026-10-24
 
