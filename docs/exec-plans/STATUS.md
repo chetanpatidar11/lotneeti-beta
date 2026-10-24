@@ -1,10 +1,12 @@
 # LotNeeti execution status
 
-## C27 Manual plans after IPO closing — locally verified, 2026-10-24
+## C27 Manual plans after IPO closing — deployed, 2026-10-24
 
 - Allow explicit manual selection, planning, saving and application tracking after closing without a midnight limit. Closed, allotment and listed IPOs remain excluded from automatic selection. Preserve actual exchange dates/status, export restrictions, funding/duplicate/application limits and scoped permissions.
 
 - Implemented unlimited manual availability for closed/allotment/listed IPOs, a Select manually button and direct Closed-filter link from Plan. Removed the status substitution that allowed closing-day automatic selection after 17:00 IST. Actual dates/status and record-plan export restrictions remain intact. Full `scripts/check.sh` passed: 465 backend, 52 web and one Android test, planner matrix, Ruff/format, Django/migrations, lint/typecheck and production/Android builds. New regressions cover midnight, months-old plans, all closed statuses, stale OPEN status, high-GMP automatic exclusion, preview/validate/save/track/submit, outsider denial and cancelled/draft exclusion.
+
+- Synthetic browser flow passed for a listed IPO closed in September: manually select, generate 13 rows, save, view Planned applications and mark one Submitted. Automatic was absent despite enabled account automation and 90% synthetic GMP. Commit `faff727` pushed and deployed through the existing terminal release helper after a successful encrypted backup; archive SHA-256 `d790e57a5f73e174418156e06c0ee67c79e0d596f8f96d0f646c8af88991d1b8`. Four live source hashes match local, all four services are active, zero migrations remain, Brevo remains configured, and live synthetic rule assertions passed. Home/sign-in/API health/OCR assets returned HTTPS 200. Read-only counts remain 17 investors, 10 banks, 13 plans and 171 applications; no production records changed during verification. Production dependency audit reported zero vulnerabilities.
 
 ## C26 Synchronize linked UPI holders on bank-holder edits — deployed, 2026-10-24
 
