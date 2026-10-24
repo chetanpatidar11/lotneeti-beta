@@ -20,6 +20,7 @@ from ipos.models import IPO
 from planner.dto import PlannerConfig, RollingUsageInput, UPIInput
 from planner.engine import PLANNER_VERSION
 from planner.export_readiness import assert_exportable_plan
+from planner.models import PlanRun
 from planner.policies import bank_policy
 from planner.rolling import RollingLimitTracker
 
@@ -34,10 +35,19 @@ def _require_writer(workspace, actor):
 
 
 @transaction.atomic
-def start_tracking_plan(*, plan_run, actor, row_ids=None) -> tuple[Application, ...]:
+def start_tracking_plan(
+    *, plan_run, actor, row_ids=None, record_only=False
+) -> tuple[Application, ...]:
     workspace = Workspace.objects.select_for_update().get(pk=plan_run.workspace_id)
     _require_writer(workspace, actor)
-    assert_exportable_plan(plan_run, allow_record_only=True)
+    if record_only:
+        plan_run = PlanRun.objects.select_for_update().get(pk=plan_run.pk, workspace=workspace)
+        if plan_run.status not in {PlanRun.Status.READY, PlanRun.Status.BLOCKED}:
+            raise ValidationError("This saved plan is no longer available")
+        if PlanRun.objects.filter(workspace=workspace).first().pk != plan_run.pk:
+            raise ValidationError("This plan is no longer current. Refresh Applications.")
+    else:
+        assert_exportable_plan(plan_run, allow_record_only=True)
     rows = list(plan_run.rows.all())
     requested = set(row_ids) if row_ids is not None else None
     eligible = [
@@ -51,6 +61,20 @@ def start_tracking_plan(*, plan_run, actor, row_ids=None) -> tuple[Application, 
     for row in eligible:
         if requested is not None and row.pk not in requested:
             continue
+        if record_only:
+            recordable_warnings = {
+                "CASH_OVERSPEND",
+                "INSUFFICIENT_BALANCE",
+                "UPI_LIMIT_EXCEEDED",
+                "BANK_LIMIT_EXCEEDED",
+                "CROSS_FUNDING_DISALLOWED",
+                "LOCKED_ROW_INFEASIBLE",
+            }
+            if set(row.blocking_reasons) - recordable_warnings:
+                raise ValidationError(
+                    "Correct the application's account, category or eligibility details "
+                    "before recording it"
+                )
         ipo = IPO.objects.get(pk=row.ipo_ref)
         applicant = Investor.objects.get(
             pk=row.applicant_ref, workspace=workspace, is_deleted=False
@@ -107,14 +131,18 @@ def start_tracking_plan(*, plan_run, actor, row_ids=None) -> tuple[Application, 
             target=application,
             actor=actor,
             workspace=workspace,
-            metadata={"status": application.status},
+            metadata={
+                "status": application.status,
+                "record_only": record_only,
+                "plan_warnings": row.blocking_reasons if record_only else [],
+            },
         )
     return tuple(tracked)
 
 
 @transaction.atomic
 def edit_application(
-    *, application: Application, actor, category: str, lots: int, bank_id, upi_id
+    *, application: Application, actor, category: str, lots: int, bank_id, upi_id, record_only=False
 ) -> Application:
     item = (
         Application.objects.select_for_update()
@@ -122,7 +150,10 @@ def edit_application(
         .get(pk=application.pk)
     )
     _require_writer(item.workspace, actor)
-    if item.status not in {Application.Status.PLANNED, Application.Status.SUBMITTED}:
+    allowed = {Application.Status.PLANNED, Application.Status.SUBMITTED}
+    if record_only:
+        allowed.add(Application.Status.BLOCKED)
+    if item.status not in allowed:
         raise ValidationError("Only planned or submitted applications can be edited")
     if category not in {"RETAIL", "SHNI", "SHARE", "BHNI"} or type(lots) is not int or lots < 1:
         raise ValidationError("Choose a valid category and number of lots")
@@ -135,7 +166,7 @@ def edit_application(
     ).first()
     if bank is None:
         raise ValidationError("Choose an active bank account in this workspace")
-    if bank.owner_id != item.applicant_id and bank_policy(bank) == "DISALLOW":
+    if not record_only and bank.owner_id != item.applicant_id and bank_policy(bank) == "DISALLOW":
         raise ValidationError("This bank cannot fund another investor's application")
     upi = (
         UPIHandle.objects.filter(pk=upi_id, bank=bank, active=True, verified=True).first()
@@ -177,7 +208,7 @@ def edit_application(
             Application.Status.BLOCKED,
         ),
     ).exclude(pk=item.pk).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-    if amount + other_commitments > bank.current_balance:
+    if not record_only and amount + other_commitments > bank.current_balance:
         raise ValidationError("Bank Balance is below the updated application amount")
     before = {
         "category": item.category,
@@ -191,8 +222,14 @@ def edit_application(
     item.amount = amount
     item.bank = bank
     item.upi = upi
-    if item.status == Application.Status.SUBMITTED:
-        _assert_submission_limits(item)
+    warnings = []
+    if record_only:
+        if amount + other_commitments > bank.current_balance:
+            warnings.append("Bank Balance is below the updated application amount")
+        if bank.owner_id != item.applicant_id and bank_policy(bank) == "DISALLOW":
+            warnings.append("This bank is restricted to own-account funding")
+    if item.status in {Application.Status.SUBMITTED, Application.Status.BLOCKED}:
+        warnings.extend(_assert_submission_limits(item, allow_warnings=record_only))
     item.edited_at = timezone.now()
     item.save(update_fields=["category", "lots", "amount", "bank", "upi", "edited_at"])
     record_event(
@@ -201,6 +238,8 @@ def edit_application(
         actor=actor,
         workspace=item.workspace,
         metadata={
+            "record_only": record_only,
+            "warnings": warnings,
             "before": before,
             "after": {
                 "category": category,
@@ -238,7 +277,7 @@ def cancel_application(*, application: Application, actor) -> Application:
     return item
 
 
-def _assert_submission_limits(item, *, exclude_id=None):
+def _assert_submission_limits(item, *, exclude_id=None, allow_warnings=False):
     locked_bank = BankAccount.objects.select_for_update().get(pk=item.bank_id)
     item.bank = locked_bank
     if item.category == "BHNI":
@@ -256,8 +295,11 @@ def _assert_submission_limits(item, *, exclude_id=None):
             bank_id=item.bank_id, status__in=("PLANNED", "SUBMITTED", "BLOCKED")
         ).exclude(pk=item.pk).aggregate(total=Sum("amount"))["total"] or Decimal("0")
         if item.amount + other > item.bank.current_balance:
-            raise ValidationError("Bank Balance is below the ASBA amount after other applications")
-        return
+            message = "Bank Balance is below the ASBA amount after other applications"
+            if allow_warnings:
+                return [message]
+            raise ValidationError(message)
+        return []
     validate_quota_mapping(
         workspace=item.workspace,
         ipo=item.ipo,
@@ -306,21 +348,28 @@ def _assert_submission_limits(item, *, exclude_id=None):
         config=config,
     )
     if not check.allowed:
-        raise ValidationError(
+        message = (
             "This bank or UPI has reached its application limit. Retail and sHNI share "
             "six applications in a rolling 24 hours; the configured amount limit also applies."
         )
+        if allow_warnings:
+            return [message]
+        raise ValidationError(message)
+    return []
 
 
 @transaction.atomic
-def mark_submitted(*, application: Application, actor) -> Application:
+def mark_submitted(*, application: Application, actor, record_only=False) -> Application:
     item = Application.objects.select_for_update().get(pk=application.pk)
     _require_writer(item.workspace, actor)
     if item.status != Application.Status.PLANNED:
         raise ValidationError("Only a planned application can be marked submitted")
+    warnings = []
     if item.bank.owner_id != item.applicant_id and bank_policy(item.bank) == "DISALLOW":
-        raise ValidationError("This bank cannot fund another investor's application")
-    _assert_submission_limits(item)
+        if not record_only:
+            raise ValidationError("This bank cannot fund another investor's application")
+        warnings.append("This bank is restricted to own-account funding")
+    warnings.extend(_assert_submission_limits(item, allow_warnings=record_only))
     item.status = Application.Status.SUBMITTED
     item.submitted_at = timezone.now()
     item.save(update_fields=["status", "submitted_at"])
@@ -329,15 +378,17 @@ def mark_submitted(*, application: Application, actor) -> Application:
         target=item,
         actor=actor,
         workspace=item.workspace,
-        metadata={"status": item.status},
+        metadata={"status": item.status, "record_only": record_only, "warnings": warnings},
     )
     return item
 
 
 @transaction.atomic
-def mark_blocked(*, application: Application, actor) -> Application:
+def mark_blocked(*, application: Application, actor, record_only=False) -> Application:
     item = Application.objects.select_for_update().get(pk=application.pk)
     _require_writer(item.workspace, actor)
+    if record_only and item.status == Application.Status.PLANNED:
+        item = mark_submitted(application=item, actor=actor, record_only=True)
     if item.status != Application.Status.SUBMITTED:
         raise ValidationError("Only a submitted application can be marked blocked")
     item.status = Application.Status.BLOCKED
@@ -349,7 +400,7 @@ def mark_blocked(*, application: Application, actor) -> Application:
         target=item,
         actor=actor,
         workspace=item.workspace,
-        metadata={"status": item.status},
+        metadata={"status": item.status, "record_only": record_only},
     )
     return item
 

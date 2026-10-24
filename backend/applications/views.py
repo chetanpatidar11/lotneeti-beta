@@ -171,6 +171,10 @@ def _saved_plan_rows(workspace, tracked):
     return result
 
 
+class RecordingRequestSerializer(serializers.Serializer):
+    record_only = serializers.BooleanField(default=False)
+
+
 class AllotmentSerializer(serializers.Serializer):
     quantity = serializers.IntegerField(min_value=1)
     actual_cost = serializers.DecimalField(
@@ -195,6 +199,7 @@ class ApplicationEditSerializer(serializers.Serializer):
 
 
 class ApplicationBulkSerializer(serializers.Serializer):
+    record_only = serializers.BooleanField(default=False)
     action = serializers.ChoiceField(choices=["submit", "block", "cancel", "not-allotted"])
     ids = serializers.ListField(child=serializers.UUIDField(), min_length=1, max_length=100)
 
@@ -205,6 +210,7 @@ class ApplicationBulkSerializer(serializers.Serializer):
 
 
 class TrackingRowsSerializer(serializers.Serializer):
+    record_only = serializers.BooleanField(default=False)
     row_ids = serializers.ListField(
         child=serializers.UUIDField(), min_length=1, max_length=100, required=False
     )
@@ -249,6 +255,7 @@ class StartTrackingView(APIView):
                 plan_run=run,
                 actor=request.user,
                 row_ids=serializer.validated_data.get("row_ids"),
+                record_only=serializer.validated_data["record_only"],
             )
         except ValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=409)
@@ -275,6 +282,9 @@ class ApplicationActionView(APIView):
         }
         if action not in (*actions, "allotted", "edit"):
             return Response({"detail": "Unknown application action."}, status=404)
+        recording = RecordingRequestSerializer(data=request.data)
+        recording.is_valid(raise_exception=True)
+        record_only = recording.validated_data["record_only"]
         try:
             if action == "edit":
                 serializer = ApplicationEditSerializer(data=request.data)
@@ -286,6 +296,7 @@ class ApplicationActionView(APIView):
                     lots=serializer.validated_data["lots"],
                     bank_id=serializer.validated_data["bank"],
                     upi_id=serializer.validated_data.get("upi"),
+                    record_only=record_only,
                 )
             elif action == "allotted":
                 serializer = AllotmentSerializer(data=request.data)
@@ -297,7 +308,11 @@ class ApplicationActionView(APIView):
                     actual_cost=serializer.validated_data["actual_cost"],
                 )
             else:
-                changed = actions[action](application=item, actor=request.user)
+                changed = actions[action](
+                    application=item,
+                    actor=request.user,
+                    **({"record_only": record_only} if action in {"submit", "block"} else {}),
+                )
         except ValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=409)
         return Response(_result(changed))
@@ -331,7 +346,18 @@ class ApplicationBulkView(APIView):
                     return Response(
                         {"detail": "One or more applications are unavailable."}, status=404
                     )
-                changed = [actions[action](application=item, actor=request.user) for item in items]
+                changed = [
+                    actions[action](
+                        application=item,
+                        actor=request.user,
+                        **(
+                            {"record_only": serializer.validated_data["record_only"]}
+                            if action in {"submit", "block"}
+                            else {}
+                        ),
+                    )
+                    for item in items
+                ]
         except ValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=409)
         return Response([_result(item) for item in changed])

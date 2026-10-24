@@ -79,7 +79,7 @@ test("saved blocked plans show a review message and retain their IPO choice", ()
   }));
   assert.match(page, /Plan saved with warnings/);
   assert.match(page, /Your planned applications are shown below/);
-  assert.match(page, /You can keep this plan without clearing the warnings/);
+  assert.match(page, /You can record submission, blocked funds, edits and cancellation without clearing the warnings/);
   assert.match(page, /href="\/plan"/);
   assert.match(page, /Synthetic Industries/);
   assert.doesNotMatch(page, /No planned applications yet/);

@@ -138,7 +138,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
     return current;
   }, {}));
   const needsPlanReview = (item: ApplicationItem) => savedApplicationNeedsReview(item.is_plan_row, latestRun.status);
-  const canSelect = (item: ApplicationItem) => canCancel(item) && !needsPlanReview(item);
+  const canSelect = canCancel;
   const eligibleUpis = upis.filter((upi) => upi.bank === editBank && upi.active && upi.verified);
 
   function replaceItems(changed: ApplicationItem[]) {
@@ -153,11 +153,11 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
   async function materializePlanned(chosen: ApplicationItem[]): Promise<Map<string, ApplicationItem>> {
     const drafts = chosen.filter((item) => item.is_plan_row);
     if (drafts.length === 0) return new Map();
-    if (!latestRun.id || latestRun.status !== "READY") throw new Error("This saved plan needs review. Resolve its issues in Plan before updating applications.");
+    if (!latestRun.id || !["READY", "BLOCKED"].includes(latestRun.status ?? "")) throw new Error("This saved plan is no longer available. Refresh Applications.");
     const response = await fetch(`/api/workspaces/${workspaceId}/planner/runs/${latestRun.id}/track`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ row_ids: drafts.map((item) => item.plan_row_id) }),
+      body: JSON.stringify({ row_ids: drafts.map((item) => item.plan_row_id), record_only: true }),
     });
     if (!response.ok) throw new Error(await responseError(response, "We could not use these planned applications."));
     const tracked = await response.json() as ApplicationItem[];
@@ -172,7 +172,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
     setResultError("");
     try {
       const tracked = (await materializePlanned([item])).get(item.plan_row_id) ?? item;
-      const response = await fetch(`/api/workspaces/${workspaceId}/applications/${tracked.id}/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const response = await fetch(`/api/workspaces/${workspaceId}/applications/${tracked.id}/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ record_only: true }) });
       if (!response.ok) throw new Error(await responseError(response, "We could not update this application."));
       replaceItems([await response.json() as ApplicationItem]);
       setResultId(null);
@@ -191,7 +191,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
       const chosen = items.filter((item) => ids.includes(item.id));
       const tracked = await materializePlanned(chosen);
       const applicationIds = chosen.map((item) => tracked.get(item.plan_row_id)?.id ?? item.id);
-      const response = await fetch(`/api/workspaces/${workspaceId}/applications/bulk`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, ids: applicationIds }) });
+      const response = await fetch(`/api/workspaces/${workspaceId}/applications/bulk`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, ids: applicationIds, record_only: true }) });
       if (!response.ok) throw new Error(await responseError(response, "No applications were changed. Review the selection and try again."));
       replaceItems(await response.json() as ApplicationItem[]);
       setSelectedIds([]);
@@ -234,7 +234,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
     try {
       const tracked = (await materializePlanned([editItem])).get(editItem.plan_row_id) ?? editItem;
       if (tracked.id !== editItem.id) setEditId(tracked.id);
-      const response = await fetch(`/api/workspaces/${workspaceId}/applications/${tracked.id}/edit`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ category: editCategory, lots: editLots, bank: editBank, upi: editCategory === "BHNI" ? null : editUpi }) });
+      const response = await fetch(`/api/workspaces/${workspaceId}/applications/${tracked.id}/edit`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ category: editCategory, lots: editLots, bank: editBank, upi: editCategory === "BHNI" ? null : editUpi, record_only: true }) });
       if (!response.ok) throw new Error(await responseError(response, "We could not save this application."));
       replaceItems([await response.json() as ApplicationItem]);
       setEditId(null);
@@ -266,7 +266,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
     <PageHeader eyebrow="Execution" title="Applications" description="Manage planned applications by IPO, then record submission and results." />
     {error && <div className="plan-error" role="alert">{error}</div>}
     {message && <p className="plan-success" role="status">{message}</p>}
-    {latestRun.status === "BLOCKED" && !initialLoadError && <div className="plan-note plan-review-notice" role="status"><strong>Plan saved with warnings.</strong> Your planned applications are shown below. You can keep this plan without clearing the warnings. <Link href="/plan">Review warnings →</Link></div>}
+    {latestRun.status === "BLOCKED" && !initialLoadError && <div className="plan-note plan-review-notice" role="status"><strong>Plan saved with warnings.</strong> Your planned applications are shown below. You can record submission, blocked funds, edits and cancellation without clearing the warnings. <Link href="/plan">Review warnings →</Link></div>}
     {initialLoadError ? <div className="plan-error" role="alert">Applications could not be loaded. <button className="button-ghost" type="button" onClick={() => window.location.reload()}>Retry</button></div> : items.length === 0 ? <EmptyState title="No planned applications yet." detail="Save a ready plan to see its applications here." action={<Link href="/plan">Review plan →</Link>} /> : <>
       <section className="application-ipo-picker" aria-label="Application filters">
         <label>Select an IPO<select id="application-ipo-choice" value={ipoFilter} onChange={(event) => { setIpoFilter(event.target.value); setSearch(""); setSelectedIds([]); }}><option value="">Select an IPO</option>{ipoOptions.map(([id, option]) => <option key={id} value={id}>{option.name} · closes {dateLabel(option.closeDate)}</option>)}</select></label>
@@ -285,7 +285,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
       <div className="application-filters">
         <label>Search<input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setSelectedIds([]); }} placeholder="Applicant or UPI" /></label>
       </div>
-      {canEdit && selectedItems.length > 0 && <div className="application-bulk" role="group" aria-label="Selected application actions"><strong>{selectedItems.length} selected</strong><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "PLANNED")} onClick={() => void bulkUpdate("submit", selectedIds)}>Mark submitted</button><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "SUBMITTED")} onClick={() => void bulkUpdate("block", selectedIds)}>Mark blocked</button><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "BLOCKED")} onClick={() => void bulkUpdate("not-allotted", selectedIds)}>Not allotted</button><button type="button" className="button-danger" disabled={busy || !selectedItems.every(canCancel)} onClick={() => setPendingCancelIds(selectedIds)}>Cancel selected</button><button type="button" className="button-ghost" onClick={() => setSelectedIds([])}>Clear</button></div>}
+      {canEdit && selectedItems.length > 0 && <div className="application-bulk" role="group" aria-label="Selected application actions"><strong>{selectedItems.length} selected</strong><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "PLANNED")} onClick={() => void bulkUpdate("submit", selectedIds)}>Mark submitted</button><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => ["PLANNED", "SUBMITTED"].includes(item.status))} onClick={() => void bulkUpdate("block", selectedIds)}>Mark blocked</button><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "BLOCKED")} onClick={() => void bulkUpdate("not-allotted", selectedIds)}>Not allotted</button><button type="button" className="button-danger" disabled={busy || !selectedItems.every(canCancel)} onClick={() => setPendingCancelIds(selectedIds)}>Cancel selected</button><button type="button" className="button-ghost" onClick={() => setSelectedIds([])}>Clear</button></div>}
       {groups.length === 0 ? <EmptyState title="No applications match these filters." detail="Try a different IPO, status or search." /> : groups.map(([ipoId, group]) => {
         const eligibleIds = group.filter(canSelect).map((item) => item.id);
         return <section className="application-ipo-group" key={ipoId} aria-label={`${group[0].ipo_name} applications`}>
@@ -299,10 +299,10 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
             <td data-label="Status"><StatusBadge tone={needsPlanReview(item) ? "warning" : statusTone(item)}>{needsPlanReview(item) ? "Planned" : outcomeLabel(item)}</StatusBadge></td>
             <td data-label="Important date">{date.label && <small>{date.label}</small>} {date.value}</td>
             <td data-label="Actions"><div className="application-row-actions">
-              {canEdit && !needsPlanReview(item) && item.status === "PLANNED" && <button type="button" disabled={busy} onClick={() => void update(item, "submit")}>Mark submitted</button>}
-              {canEdit && item.status === "SUBMITTED" && <button type="button" disabled={busy} onClick={() => void update(item, "block")}>Mark blocked</button>}
+              {canEdit && item.status === "PLANNED" && <button type="button" disabled={busy} onClick={() => void update(item, "submit")}>Mark submitted</button>}
+              {canEdit && ["PLANNED", "SUBMITTED"].includes(item.status) && <button type="button" disabled={busy} onClick={() => void update(item, "block")}>Mark blocked</button>}
               {canEdit && item.status === "BLOCKED" && <button type="button" disabled={busy} onClick={() => { setResultError(""); setResultId(item.id); }}>Record result</button>}
-              {canEdit && !needsPlanReview(item) && (item.status === "PLANNED" || item.status === "SUBMITTED") && <button type="button" className="button-secondary" disabled={busy} onClick={() => void openEdit(item)}>Edit</button>}
+              {canEdit && ["PLANNED", "SUBMITTED", "BLOCKED"].includes(item.status) && <button type="button" className="button-secondary" disabled={busy} onClick={() => void openEdit(item)}>Edit</button>}
               {canEdit && canSelect(item) && <button type="button" className="button-ghost-danger" disabled={busy} onClick={() => setPendingCancelIds([item.id])}>Cancel</button>}
               {item.status === "ALLOTTED" && <Link className="button-secondary" href="/portfolio">View holding</Link>}
               <button type="button" className="button-ghost" onClick={() => setSelectedId(item.id)}>Details</button>
@@ -318,7 +318,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
       {selectedItem.status === "ALLOTTED" && <Link href="/portfolio">View holding →</Link>}
     </Drawer>}
     {editItem && <Drawer title={`Edit ${editItem.applicant_name} · ${editItem.ipo_name}`} onClose={() => setEditId(null)}>
-      <p className="intro">Update the application you track here. An earlier plan export will still show its original details. If this was submitted through a broker or bank, update or cancel it there separately.</p>
+      <p className="intro">Record the application details here. An earlier plan export will still show its original details. If this was submitted through a broker or bank, update or cancel it there separately.</p>
       {editError && <div className="plan-error" role="alert">{editError}</div>}
       {editLoading ? <p>Loading bank and UPI choices…</p> : <form className="sign-in-form" onSubmit={(event) => void saveEdit(event)}>
         <label htmlFor="application-edit-category">Category</label><select id="application-edit-category" value={editCategory} onChange={(event) => { const category = event.target.value; setEditCategory(category); const unit = applicationLotAmount(editItem.amount, editItem.lots); setEditLots(category === "BHNI" ? minimumBhniLots(unit, 1) : category === "SHNI" ? minimumShniLots(unit, 1) : 1); if (category === "BHNI") { setEditBank(banks.find((bank) => bank.active && !bank.is_placeholder && !bank.is_imported_reference && bank.owner === editItem.applicant)?.id ?? ""); setEditUpi(""); } else { setEditUpi(upis.find((upi) => upi.bank === editBank && upi.active && upi.verified)?.id ?? ""); } }}>{editItem.category === "SHARE" ? <option value="SHARE">Shareholder</option> : <><option value="RETAIL">Retail</option><option value="SHNI">sHNI</option><option value="BHNI">bHNI (bank ASBA)</option></>}</select>
