@@ -1,8 +1,11 @@
 import re
 from decimal import Decimal
 
+from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
+from core.audit import record_event
 from core.crypto import decrypt_value
 from funding.models import (
     BalanceChange,
@@ -181,7 +184,10 @@ class BankAccountSerializer(serializers.ModelSerializer):
         )
         return bank
 
+    @transaction.atomic
     def update(self, instance, validated_data):
+        instance = BankAccount.objects.select_for_update().get(pk=instance.pk)
+        sync_holder = "owner" in validated_data
         number = validated_data.pop("account_number", None)
         validated_data.pop("initial_balance", None)
         was_placeholder = instance.is_placeholder
@@ -200,8 +206,23 @@ class BankAccountSerializer(serializers.ModelSerializer):
         elif instance.is_imported_reference and number_changed:
             instance.is_imported_reference = False
         instance.save()
-        if was_placeholder and not instance.is_placeholder:
-            instance.upis.update(holder=instance.owner)
+        if sync_holder or (was_placeholder and not instance.is_placeholder):
+            changed = list(instance.upis.select_for_update().exclude(holder_id=instance.owner_id))
+            UPIHandle.objects.filter(pk__in=[upi.pk for upi in changed]).update(
+                holder=instance.owner, updated_at=timezone.now()
+            )
+            for upi in changed:
+                record_event(
+                    action="upi.holder_synced",
+                    target=upi,
+                    actor=getattr(self.context.get("request"), "user", None),
+                    workspace=instance.workspace,
+                    metadata={
+                        "bank_id": str(instance.pk),
+                        "previous_holder_id": str(upi.holder_id),
+                        "holder_id": str(instance.owner_id),
+                    },
+                )
         return instance
 
 

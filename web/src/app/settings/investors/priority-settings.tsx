@@ -6,6 +6,7 @@ import { Drawer } from "@/components/drawer";
 import { EmptyState, PageHeader, SectionHeading, StatusBadge } from "@/components/ui";
 import { formatInr } from "@/lib/money";
 import { movePriority, sortByPriority } from "@/lib/priorities";
+import { reassignBankUpis } from "@/lib/bank-ownership";
 import { applySettingsAction, toggleSelected, type SettingsKind } from "@/lib/settings-removal";
 import PreferredFunding, { type BankOption, type FundingPreference } from "./preferred-funding";
 import AccountImport from "./account-import";
@@ -340,16 +341,7 @@ export default function PrioritySettings({
       if (!response.ok) throw new Error(await accountError(response, "Check the bank details and try again."));
       const updated = await response.json() as BankOption;
       setBanks((current) => current.map((item) => item.id === updated.id ? updated : item));
-      if (banks.find((item) => item.id === updated.id)?.is_placeholder) {
-        setLinkedAccounts((current) => {
-          const moved = Object.values(current).flatMap((accounts) => accounts.upis).filter((item) => item.bank_id === updated.id).map((item) => ({ ...item, holder: updated.owner }));
-          const next = Object.fromEntries(Object.entries(current).map(([id, accounts]) => [id, {
-            ...accounts, upis: accounts.upis.filter((item) => !moved.some((upi) => upi.id === item.id)),
-          }]));
-          next[updated.owner] = { ...(next[updated.owner] ?? { demats: [], upis: [] }), upis: [...(next[updated.owner]?.upis ?? []), ...moved] };
-          return next;
-        });
-      }
+      setLinkedAccounts((current) => reassignBankUpis(current, updated.id, updated.owner));
       await refreshInvestors();
       setEditBankId(null);
       note(updated.active ? "Bank details saved." : "Bank details saved. Activate this bank when you are ready to use it.");
@@ -547,6 +539,7 @@ export default function PrioritySettings({
       </form></Drawer>}
       {editBankId && <Drawer title={banks.find((bank) => bank.id === editBankId)?.is_placeholder ? "Choose bank account owner" : "Edit bank account"} onClose={() => setEditBankId(null)}><form className="sign-in-form" onSubmit={saveBank}>
         {(banks.find((bank) => bank.id === editBankId)?.is_placeholder || banks.find((bank) => bank.id === editBankId)?.is_imported_reference) && <p className="form-note">This account uses the UPI ID as its account number. You can replace it with the real bank account number now or later.</p>}
+        <p className="form-note">Saving the bank holder also updates every UPI linked to this bank.</p>
         <label htmlFor="edit-bank-owner">Bank and UPI holder</label><select id="edit-bank-owner" value={editBankOwner} onChange={(event) => setEditBankOwner(event.target.value)} required><option value="">Choose holder</option>{investors.filter((investor) => investor.active || investor.id === editBankOwner).map((investor) => <option key={investor.id} value={investor.id}>{investor.name}{investor.active ? "" : " (inactive)"}</option>)}</select>
         <label htmlFor="edit-bank-name">Bank name</label><input id="edit-bank-name" required value={editBankName} onChange={(event) => setEditBankName(event.target.value)} />
         <label htmlFor="edit-bank-number">Account number</label><input id="edit-bank-number" required autoComplete="off" value={editAccountNumber} onChange={(event) => setEditAccountNumber(event.target.value)} />

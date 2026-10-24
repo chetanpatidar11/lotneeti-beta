@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## C26 Synchronize linked UPI holders on bank-holder edits — verified locally, 2026-10-24
+
+- Correct the server and immediate Settings state, which currently synchronize UPI holders only when completing placeholder banks. An explicit bank-holder save must synchronize all linked active/inactive UPIs in the same transaction; re-saving the same holder should repair stale links. Preserve unrelated banks, demats, UPI identifiers/limits, balances, application records, and existing workspace permissions.
+- Bank-holder saves now lock the bank and synchronize all linked UPI holders atomically, with an audit event for each changed UPI. Explicit same-holder saves repair stale links; unrelated API edits do not reassign independent holders. Settings immediately moves the matching UPI rows to the selected investor for both regular and imported banks. The form explains this behavior.
+- Full `scripts/check.sh` passed: 443 backend, 52 web and one Android test, planner matrix, Ruff/format, Django/migration checks, lint, typecheck and production/Android builds. Regression coverage includes active/inactive handles, identifier/limit/balance preservation, unrelated accounts, same-holder repair, forbidden cross-scope/viewer/inactive-owner edits, idempotence and atomic rollback. Synthetic browser bank edit updated the UPI holder immediately and survived page reload. A read-only production check of the founder account found zero mismatches; no customer data repair was needed.
+
 ## C25 Compact and aligned bank statement — deployed, 2026-10-24
 
 - Rename Balance after to Balance, align numeric headers and amounts, and show each statement entry in two compact lines. Keep full identifiers and notes available in a transaction details panel. Preserve signed-delta mapping and all saved balance history.
