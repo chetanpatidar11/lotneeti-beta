@@ -150,7 +150,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
       const result = await response.json() as PlanPreview;
       if (sequence === validationSequence.current) {
         showPreview({ ...result, uncovered: current.uncovered });
-        setMessage(result.status === "READY" ? "Plan checked and ready." : "Plan checked. Resolve the blocking items below.");
+        setMessage(result.status === "READY" ? "Plan checked and ready." : "Plan checked. Warnings found; you can still save this plan.");
       }
     } catch {
       if (sequence === validationSequence.current) setError("We could not validate the plan. Try again.");
@@ -172,7 +172,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
       if (!response.ok) throw new Error("We could not save this plan. Review the rows and try again.");
       const result = await response.json() as PlanPreview;
       showPreview({ ...result, uncovered: current.uncovered });
-      setMessage(result.status === "READY" ? "Plan saved and ready." : "Plan saved with blocking items to resolve.");
+      setMessage(result.status === "READY" ? "Plan saved and ready." : "Plan saved with warnings. Your planned applications are available in Applications.");
       router.refresh();
     } catch { setError("We could not save this plan. Review the rows and try again."); }
     finally { setBusy(false); }
@@ -295,10 +295,10 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
       </div>
       <div className="plan-toolbar">
         <button type="button" onClick={generate} disabled={busy || validating || !canEdit || lookups.selectedIpos.length === 0}>{busy ? "Working…" : preview ? "Re-plan unlocked" : "Generate Plan"}</button>
-        {preview && <><button className="button-secondary" type="button" onClick={() => void validatePlan()} disabled={busy || validating}>Validate</button><button className="button-secondary" type="button" onClick={() => void savePlan()} disabled={busy || validating || !canEdit}>Save</button></>}
+        {preview && <><button className="button-secondary" type="button" onClick={() => void validatePlan()} disabled={busy || validating}>Validate</button><button className="button-secondary" type="button" onClick={() => void savePlan()} disabled={busy || validating || !canEdit}>{planStatus(preview) === "Blocking" ? "Save with warnings" : "Save"}</button></>}
       </div>
       {error && <p className="plan-error" role="alert">{error}</p>}
-      {message && <p className="plan-note" role="status">{message}</p>}
+      {message && <p className="plan-note" role="status">{message} {message.startsWith("Plan saved") && <Link href="/applications">View applications →</Link>}</p>}
       {validating && <p role="status">Checking your changes…</p>}
       {preview && <section aria-live="polite">
         <div className="plan-summary">
@@ -306,15 +306,15 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
           <div><span>Applications</span><strong>{preview.rows.length}</strong></div>
           <div><span>Applicants covered</span><strong>{new Set(preview.rows.map((row) => row.applicant)).size}</strong></div>
           <div><span>Retail / sHNI / Shareholder / bHNI</span><strong>{["RETAIL", "SHNI", "SHARE", "BHNI"].map((category) => preview.rows.filter((row) => row.category === category).length).join(" / ")}</strong></div>
-          <div><span>Status</span><strong>{validating ? "Checking" : planStatus(preview)}</strong></div>
+          <div><span>Status</span><strong>{validating ? "Checking" : planStatus(preview) === "Blocking" ? "Warnings" : planStatus(preview)}</strong></div>
         </div>
         <p className="plan-note">Highest amount needed at one time in this draft: <strong>{formatInr(peakConcurrentAmount(preview.rows.flatMap((row) => {
           const ipo = lookups.ipos[row.ipo];
           return ipo ? [{ amount: row.amount, closeDate: ipo.closeDate, allotmentDate: ipo.allotmentDate, category: row.category }] : [];
         })))}</strong>. Total applications can exceed today’s Balance when money from an earlier IPO is reused after allotment. Each bank is checked at its application cutoff.</p>
-        {!validating && <p className="plan-note" role="status">{preview.planning_only ? "Manual record plan: save and mark applications submitted at any time. Export for new bids is closed." : !canExportPlan(preview) ? "⚠ Blocking: Resolve issues before export." : planStatus(preview) === "Warning" ? "Ready to export. Review the highlighted issues first." : "Ready to export."}</p>}
+        {!validating && <p className="plan-note" role="status">{preview.planning_only ? "Manual record plan: you can save even with warnings. Export for new bids is closed." : !canExportPlan(preview) ? "Warnings found. You can still save this plan. Resolve issues before export." : planStatus(preview) === "Warning" ? "Ready to export. Review the highlighted issues first." : "Ready to export."}</p>}
         {preview.audit_issues.length > 0 && <div className="plan-error" role="alert">
-          <strong>⚠ Blocking: Resolve these issues before export</strong>
+          <strong>Warnings — you can still save this plan</strong>
           <ul>{preview.audit_issues.map((issue, index) => <li key={`${issue.code}-${index}`}>{issueMessage(issue.code)}</li>)}</ul>
         </div>}
         {preview.uncovered.length > 0 && <p className="plan-note">{preview.uncovered.length} applicant/IPO {preview.uncovered.length === 1 ? "pair" : "pairs"} could not be planned.</p>}

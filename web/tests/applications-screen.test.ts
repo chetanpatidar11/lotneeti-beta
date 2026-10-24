@@ -77,9 +77,9 @@ test("saved blocked plans show a review message and retain their IPO choice", ()
     initialItems: [{ ...item, is_plan_row: true }],
     latestRun: { id: "blocked-plan", status: "BLOCKED" },
   }));
-  assert.match(page, /Your saved plan needs review/);
-  assert.match(page, /Its planned applications are shown below/);
-  assert.match(page, /funding or bank\/UPI-limit issues/);
+  assert.match(page, /Plan saved with warnings/);
+  assert.match(page, /Your planned applications are shown below/);
+  assert.match(page, /You can keep this plan without clearing the warnings/);
   assert.match(page, /href="\/plan"/);
   assert.match(page, /Synthetic Industries/);
   assert.doesNotMatch(page, /No planned applications yet/);

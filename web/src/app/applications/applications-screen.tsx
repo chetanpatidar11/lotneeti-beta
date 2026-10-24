@@ -266,7 +266,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
     <PageHeader eyebrow="Execution" title="Applications" description="Manage planned applications by IPO, then record submission and results." />
     {error && <div className="plan-error" role="alert">{error}</div>}
     {message && <p className="plan-success" role="status">{message}</p>}
-    {latestRun.status === "BLOCKED" && !initialLoadError && <div className="plan-note plan-review-notice" role="status"><strong>Your saved plan needs review.</strong> Its planned applications are shown below. Resolve the funding or bank/UPI-limit issues in Plan before marking them submitted. <Link href="/plan">Review plan →</Link></div>}
+    {latestRun.status === "BLOCKED" && !initialLoadError && <div className="plan-note plan-review-notice" role="status"><strong>Plan saved with warnings.</strong> Your planned applications are shown below. You can keep this plan without clearing the warnings. <Link href="/plan">Review warnings →</Link></div>}
     {initialLoadError ? <div className="plan-error" role="alert">Applications could not be loaded. <button className="button-ghost" type="button" onClick={() => window.location.reload()}>Retry</button></div> : items.length === 0 ? <EmptyState title="No planned applications yet." detail="Save a ready plan to see its applications here." action={<Link href="/plan">Review plan →</Link>} /> : <>
       <section className="application-ipo-picker" aria-label="Application filters">
         <label>Select an IPO<select id="application-ipo-choice" value={ipoFilter} onChange={(event) => { setIpoFilter(event.target.value); setSearch(""); setSelectedIds([]); }}><option value="">Select an IPO</option>{ipoOptions.map(([id, option]) => <option key={id} value={id}>{option.name} · closes {dateLabel(option.closeDate)}</option>)}</select></label>
@@ -296,7 +296,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
             <td data-label="Category">{categoryLabel(item.category)} <small>{item.lots} {item.lots === 1 ? "lot" : "lots"}</small></td>
             <td data-label="Amount" className="money-cell">{formatInr(item.amount)}</td>
             <td data-label="Bank / UPI">{item.bank_label} <small>{item.upi_label}</small></td>
-            <td data-label="Status"><StatusBadge tone={needsPlanReview(item) ? "warning" : statusTone(item)}>{needsPlanReview(item) ? "Needs review" : outcomeLabel(item)}</StatusBadge></td>
+            <td data-label="Status"><StatusBadge tone={needsPlanReview(item) ? "warning" : statusTone(item)}>{needsPlanReview(item) ? "Planned" : outcomeLabel(item)}</StatusBadge></td>
             <td data-label="Important date">{date.label && <small>{date.label}</small>} {date.value}</td>
             <td data-label="Actions"><div className="application-row-actions">
               {canEdit && !needsPlanReview(item) && item.status === "PLANNED" && <button type="button" disabled={busy} onClick={() => void update(item, "submit")}>Mark submitted</button>}
@@ -313,7 +313,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
       </>}
     </>}
     {selectedItem && <Drawer title={`${selectedItem.applicant_name} · ${selectedItem.ipo_name}`} onClose={() => setSelectedId(null)}>
-      <div className="application-detail"><StatusBadge tone={needsPlanReview(selectedItem) ? "warning" : statusTone(selectedItem)}>{needsPlanReview(selectedItem) ? "Needs review" : outcomeLabel(selectedItem)}</StatusBadge><p>{categoryLabel(selectedItem.category)} · {selectedItem.lots} {selectedItem.lots === 1 ? "lot" : "lots"} · {formatInr(selectedItem.amount)}</p><p>{selectedItem.bank_label} · {selectedItem.upi_label}</p></div>
+      <div className="application-detail"><StatusBadge tone={needsPlanReview(selectedItem) ? "warning" : statusTone(selectedItem)}>{needsPlanReview(selectedItem) ? "Planned" : outcomeLabel(selectedItem)}</StatusBadge><p>{categoryLabel(selectedItem.category)} · {selectedItem.lots} {selectedItem.lots === 1 ? "lot" : "lots"} · {formatInr(selectedItem.amount)}</p><p>{selectedItem.bank_label} · {selectedItem.upi_label}</p></div>
       <h3>Progress</h3><ol className="application-timeline">{applicationHistory(selectedItem).map((event, index) => <li key={`${event.at}-${index}`}><time dateTime={event.at}>{displayTime(event.at)}</time><span>{event.label}</span></li>)}</ol>
       {selectedItem.status === "ALLOTTED" && <Link href="/portfolio">View holding →</Link>}
     </Drawer>}
