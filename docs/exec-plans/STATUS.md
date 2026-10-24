@@ -1,10 +1,11 @@
 # LotNeeti execution status
 
-## C26 Synchronize linked UPI holders on bank-holder edits — verified locally, 2026-10-24
+## C26 Synchronize linked UPI holders on bank-holder edits — deployed, 2026-10-24
 
 - Correct the server and immediate Settings state, which currently synchronize UPI holders only when completing placeholder banks. An explicit bank-holder save must synchronize all linked active/inactive UPIs in the same transaction; re-saving the same holder should repair stale links. Preserve unrelated banks, demats, UPI identifiers/limits, balances, application records, and existing workspace permissions.
 - Bank-holder saves now lock the bank and synchronize all linked UPI holders atomically, with an audit event for each changed UPI. Explicit same-holder saves repair stale links; unrelated API edits do not reassign independent holders. Settings immediately moves the matching UPI rows to the selected investor for both regular and imported banks. The form explains this behavior.
 - Full `scripts/check.sh` passed: 443 backend, 52 web and one Android test, planner matrix, Ruff/format, Django/migration checks, lint, typecheck and production/Android builds. Regression coverage includes active/inactive handles, identifier/limit/balance preservation, unrelated accounts, same-holder repair, forbidden cross-scope/viewer/inactive-owner edits, idempotence and atomic rollback. Synthetic browser bank edit updated the UPI holder immediately and survived page reload. A read-only production check of the founder account found zero mismatches; no customer data repair was needed.
+- Commit `a2d31ea` pushed and deployed using the existing release helper from the terminal (VS Code had no available window). Encrypted pre-release backup succeeded; release SHA-256 `ebd20cdeabd35d1a25a913203adf5c6adf58f9919a75b69079f8289b0622e27b`. Live backend serializer, Settings screen and ownership-helper hashes match the tested local files. All four services are active, zero migrations remain, and Home/sign-in/API health/OCR assets returned HTTPS 200. Brevo and existing automation settings remain configured. Read-only verification observed 17 investors, 10 banks, 13 plans and 171 applications; no production holder, balance or application record was edited during verification.
 
 ## C25 Compact and aligned bank statement — deployed, 2026-10-24
 
