@@ -9,6 +9,7 @@ from ipos.gmp_effective import effective_observation_value, resolve_gmp
 from ipos.models import IPO, GMPObservation
 from ipos.overrides import OVERRIDABLE_FIELDS, effective_ipo_resolution, effective_ipo_values
 from ipos.planning_window import planning_window
+from ipos.quota_terms import confirmed_shareholder_quota
 from ipos.selection import selection_status
 
 
@@ -83,6 +84,11 @@ class PublicIPOSerializer(serializers.ModelSerializer):
         model = IPO
         fields = (
             "id",
+            "shareholder_quota",
+            "shareholder_min_lots",
+            "shareholder_max_amount",
+            "shareholder_record_date",
+            "shareholder_terms_url",
             "issuer_name",
             "symbol",
             "issue_type",
@@ -132,6 +138,7 @@ class PublicIPOSerializer(serializers.ModelSerializer):
         for name in OVERRIDABLE_FIELDS.intersection(result):
             result[name] = self.fields[name].to_representation(effective[name])
         now = timezone.now()
+        result["shareholder_quota"] = confirmed_shareholder_quota(instance)
         result["status"] = selection_status(effective, at=now)
         result["plan_available"], result["planning_only"] = planning_window(
             status=result["status"], close_date=effective["close_date"], now=now

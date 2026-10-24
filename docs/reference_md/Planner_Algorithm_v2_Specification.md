@@ -148,7 +148,7 @@ Tax ranking is removed completely. Every applicant may have a direct planning pr
 
 # 7. Category rules
 
-| Hard invariant: For one IPO, one PAN can have at most one application. That application is either Retail or sHNI, never both. |
+| Hard invariant: For one IPO, one PAN can have at most one public application (Retail OR sHNI OR bHNI). A confirmed eligible shareholder may also have one separate shareholder-reservation application when that mainboard IPO explicitly permits it. |
 | --- |
 
 | Mode | Behavior |
@@ -503,3 +503,10 @@ Planner cash at cutoff before IPO blocks: ₹2,30,000
 - Every generated row has a human-readable reason and all blocking conflicts are visible before export.
 
 - A user can change bank/UPI/demat/category/lots and lock the row without losing the edit on re-plan.
+
+# Founder extension C29: Shareholder and bHNI
+
+- The legacy Retail/sHNI engine, wallet ranking, ordering, repair, DTO and hash contracts remain unchanged. With extensions disabled the wrapper returns the original proposal exactly.
+- A separate, opt-in overlay adds shareholder rows after fixing the normal plan. Per-IPO eligibility is explicitly selected from active investors; founder-confirmed issue terms and an offer-document URL are required. Use the largest affordable whole-lot quantity from the issue minimum through the ₹2 lakh maximum. All existing UPI/bank rolling limits, cash, recurring payments and funding restrictions include these extra rows.
+- bHNI Preferred attempts minimum whole-lot replacements strictly above ₹10 lakh, using only the investor’s own complete bank ASBA account; it keeps other normal mappings fixed and retains Retail when an ASBA replacement is infeasible. bHNI can also be selected manually in a draft. ASBA uses no UPI identifier and does not consume UPI count/amount limits, but its cash is reserved alongside all other applications.
+- Mixed plans use a dedicated CSV with category, lots, amount and funding method. The older CSV formats remain unchanged for existing normal plans. Public and shareholder duplicate constraints are enforced separately in the database and API.

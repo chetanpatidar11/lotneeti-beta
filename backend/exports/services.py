@@ -3,17 +3,21 @@
 from django.core.exceptions import ValidationError
 
 from accounts.models import WorkspaceMembership
+from applications.quota_rules import validate_quota_mapping
 from core.crypto import decrypt_value
 from exports.adapters import ExportArtifact, ExportRegistry, ExportRow
 from exports.demat_csv import DematCSVAdapter
 from exports.generic_csv import GenericCSVAdapter
+from exports.quota_csv import QuotaCSVAdapter
 from funding.models import BankAccount, UPIHandle
 from investors.models import DematAccount, Investor
 from ipos.models import IPO
 from planner.export_readiness import assert_exportable_plan
 from planner.models import PlanRun
 
-DEFAULT_EXPORT_REGISTRY = ExportRegistry((GenericCSVAdapter(), DematCSVAdapter()))
+DEFAULT_EXPORT_REGISTRY = ExportRegistry(
+    (GenericCSVAdapter(), DematCSVAdapter(), QuotaCSVAdapter())
+)
 
 
 def export_saved_plan(
@@ -38,11 +42,15 @@ def export_saved_plan(
             raise ValidationError("This IPO is not in the saved plan")
     if format_id == "demat_csv" and ipo_id is None:
         raise ValidationError("Choose one IPO for this export")
+    if any(row.category in {"SHARE", "BHNI"} for row in plan_rows) and format_id != "quota_csv":
+        raise ValidationError(
+            "Choose the category-aware quota CSV for shareholder or bHNI applications"
+        )
     ipo_ids = {row.ipo_ref for row in plan_rows}
     applicant_ids = {row.applicant_ref for row in plan_rows}
     demat_ids = {row.demat_ref for row in plan_rows}
     bank_ids = {row.bank_ref for row in plan_rows}
-    upi_ids = {row.upi_ref for row in plan_rows}
+    upi_ids = {row.upi_ref for row in plan_rows if row.upi_ref}
     ipos = {str(item.pk): item for item in IPO.objects.filter(pk__in=ipo_ids)}
     applicants = {
         str(item.pk): item
@@ -69,10 +77,22 @@ def export_saved_plan(
         demat = demats.get(row.demat_ref)
         bank = banks.get(row.bank_ref)
         upi = upis.get(row.upi_ref)
-        if any(item is None for item in (ipo, applicant, demat, bank, upi)):
+        if any(item is None for item in (ipo, applicant, demat, bank)) or (
+            upi is None and row.category != "BHNI"
+        ):
             raise ValidationError("A plan mapping is no longer available for export")
-        if demat.investor_id != applicant.pk or upi.bank_id != bank.pk:
+        if demat.investor_id != applicant.pk or (upi and upi.bank_id != bank.pk):
             raise ValidationError("A plan mapping does not match its applicant or bank")
+        validate_quota_mapping(
+            workspace=plan_run.workspace,
+            ipo=ipo,
+            applicant_id=applicant.pk,
+            category=row.category,
+            lots=row.lots,
+            amount=row.amount,
+            bank=bank,
+            upi=upi,
+        )
         output.append(
             ExportRow(
                 position=row.position,
@@ -90,7 +110,7 @@ def export_saved_plan(
                 client_id=decrypt_value(demat.client_id_ciphertext, purpose="demat"),
                 bank_name=bank.bank_name,
                 bank_account_number=decrypt_value(bank.account_ciphertext, purpose="bank-account"),
-                upi_handle=decrypt_value(upi.handle_ciphertext, purpose="upi"),
+                upi_handle=decrypt_value(upi.handle_ciphertext, purpose="upi") if upi else "",
             )
         )
     return registry.render(format_id, tuple(output))

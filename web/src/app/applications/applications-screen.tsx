@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { applicationHistory, type ApplicationHistoryInput } from "@/lib/application-history";
 import { formatInr } from "@/lib/money";
+import { categoryLabel } from "@/lib/application-category";
+import { amountForLots, applicationLotAmount, minimumBhniLots, minimumShniLots } from "@/lib/plan-amount";
 import { Drawer } from "@/components/drawer";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/ui";
@@ -15,6 +17,7 @@ export type ApplicationItem = ApplicationHistoryInput & {
   ipo: string;
   ipo_name: string;
   applicant_name: string;
+  applicant: string;
   bank: string;
   bank_label: string;
   upi: string;
@@ -29,7 +32,7 @@ export type ApplicationItem = ApplicationHistoryInput & {
   cancelled_at: string | null;
 };
 
-type BankOption = { id: string; bank_name: string; account_display: string; active: boolean; is_placeholder: boolean };
+type BankOption = { id: string; bank_name: string; account_display: string; active: boolean; is_placeholder: boolean; is_imported_reference: boolean; owner: string };
 type UpiOption = { id: string; bank: string; handle: string; active: boolean; verified: boolean };
 type BulkAction = "submit" | "block" | "not-allotted" | "cancel";
 type Filter = "ALL" | ApplicationItem["status"];
@@ -228,7 +231,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
     try {
       const tracked = (await materializePlanned([editItem])).get(editItem.plan_row_id) ?? editItem;
       if (tracked.id !== editItem.id) setEditId(tracked.id);
-      const response = await fetch(`/api/workspaces/${workspaceId}/applications/${tracked.id}/edit`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ category: editCategory, lots: editLots, bank: editBank, upi: editUpi }) });
+      const response = await fetch(`/api/workspaces/${workspaceId}/applications/${tracked.id}/edit`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ category: editCategory, lots: editLots, bank: editBank, upi: editCategory === "BHNI" ? null : editUpi }) });
       if (!response.ok) throw new Error(await responseError(response, "We could not save this application."));
       replaceItems([await response.json() as ApplicationItem]);
       setEditId(null);
@@ -263,7 +266,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
     {initialLoadError ? <div className="plan-error" role="alert">Applications could not be loaded. <button className="button-ghost" type="button" onClick={() => window.location.reload()}>Retry</button></div> : items.length === 0 ? <EmptyState title="No planned applications yet." detail="Save a ready plan to see its applications here." action={<Link href="/plan">Review plan →</Link>} /> : <>
       <section className="application-ipo-picker" aria-label="Application filters">
         <label>Select an IPO<select id="application-ipo-choice" value={ipoFilter} onChange={(event) => { setIpoFilter(event.target.value); setSearch(""); setSelectedIds([]); }}><option value="">Select an IPO</option>{ipoOptions.map(([id, option]) => <option key={id} value={id}>{option.name} · closes {dateLabel(option.closeDate)}</option>)}</select></label>
-        <label>Category<select value={category} onChange={(event) => { setCategory(event.target.value); setSelectedIds([]); }}><option value="ALL">All categories</option><option value="RETAIL">Retail</option><option value="SHNI">sHNI</option></select></label>
+        <label>Category<select value={category} onChange={(event) => { setCategory(event.target.value); setSelectedIds([]); }}><option value="ALL">All categories</option><option value="RETAIL">Retail</option><option value="SHNI">sHNI</option><option value="SHARE">Shareholder</option><option value="BHNI">bHNI</option></select></label>
         <label>Status<select value={filter} onChange={(event) => { setFilter(event.target.value as Filter); setSelectedIds([]); }}><option value="ALL">All</option><option value="PLANNED">Planned</option><option value="SUBMITTED">Submitted</option><option value="BLOCKED">Blocked</option><option value="ALLOTTED">Allotted</option><option value="NOT_ALLOTTED">Not allotted</option><option value="CANCELLED">Cancelled</option></select></label>
       </section>
       {!ipoFilter && <EmptyState title="Select an IPO above to view applications." detail="Each IPO has its own application list and bulk actions." />}
@@ -286,7 +289,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
           <div className="application-table-wrap"><table className="application-table"><thead><tr>{canEdit && <th scope="col" className="application-select-heading"><label className="application-select-group"><input type="checkbox" aria-label="Select all visible applications" checked={eligibleIds.length > 0 && eligibleIds.every((id) => selectedIds.includes(id))} onChange={(event) => toggleSelection(eligibleIds, event.target.checked)} disabled={busy || eligibleIds.length === 0} /></label></th>}<th scope="col">Applicant</th><th scope="col">Category</th><th scope="col">Amount</th><th scope="col">Bank / UPI</th><th scope="col">Status</th><th scope="col">Important date</th><th scope="col">Actions</th></tr></thead><tbody>{group.map((item) => { const date = importantDate(item); return <tr key={item.id}>
             {canEdit && <td data-label="Select" className="application-select-cell">{canCancel(item) && <input type="checkbox" aria-label={`Select ${item.applicant_name} for ${item.ipo_name}`} checked={selectedIds.includes(item.id)} disabled={busy} onChange={(event) => toggleSelection([item.id], event.target.checked)} />}</td>}
             <th scope="row" data-label="Applicant">{item.applicant_name}</th>
-            <td data-label="Category">{item.category === "SHNI" ? "sHNI" : "Retail"} <small>{item.lots} {item.lots === 1 ? "lot" : "lots"}</small></td>
+            <td data-label="Category">{categoryLabel(item.category)} <small>{item.lots} {item.lots === 1 ? "lot" : "lots"}</small></td>
             <td data-label="Amount" className="money-cell">{formatInr(item.amount)}</td>
             <td data-label="Bank / UPI">{item.bank_label} <small>{item.upi_label}</small></td>
             <td data-label="Status"><StatusBadge tone={statusTone(item)}>{outcomeLabel(item)}</StatusBadge></td>
@@ -306,7 +309,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
       </>}
     </>}
     {selectedItem && <Drawer title={`${selectedItem.applicant_name} · ${selectedItem.ipo_name}`} onClose={() => setSelectedId(null)}>
-      <div className="application-detail"><StatusBadge tone={statusTone(selectedItem)}>{outcomeLabel(selectedItem)}</StatusBadge><p>{selectedItem.category === "SHNI" ? "sHNI" : "Retail"} · {selectedItem.lots} {selectedItem.lots === 1 ? "lot" : "lots"} · {formatInr(selectedItem.amount)}</p><p>{selectedItem.bank_label} · {selectedItem.upi_label}</p></div>
+      <div className="application-detail"><StatusBadge tone={statusTone(selectedItem)}>{outcomeLabel(selectedItem)}</StatusBadge><p>{categoryLabel(selectedItem.category)} · {selectedItem.lots} {selectedItem.lots === 1 ? "lot" : "lots"} · {formatInr(selectedItem.amount)}</p><p>{selectedItem.bank_label} · {selectedItem.upi_label}</p></div>
       <h3>Progress</h3><ol className="application-timeline">{applicationHistory(selectedItem).map((event, index) => <li key={`${event.at}-${index}`}><time dateTime={event.at}>{displayTime(event.at)}</time><span>{event.label}</span></li>)}</ol>
       {selectedItem.status === "ALLOTTED" && <Link href="/portfolio">View holding →</Link>}
     </Drawer>}
@@ -314,13 +317,13 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
       <p className="intro">Update the application you track here. An earlier plan export will still show its original details. If this was submitted through a broker or bank, update or cancel it there separately.</p>
       {editError && <div className="plan-error" role="alert">{editError}</div>}
       {editLoading ? <p>Loading bank and UPI choices…</p> : <form className="sign-in-form" onSubmit={(event) => void saveEdit(event)}>
-        <label htmlFor="application-edit-category">Category</label><select id="application-edit-category" value={editCategory} onChange={(event) => { setEditCategory(event.target.value); if (event.target.value === "RETAIL") setEditLots(1); }}><option value="RETAIL">Retail</option><option value="SHNI">sHNI</option></select>
+        <label htmlFor="application-edit-category">Category</label><select id="application-edit-category" value={editCategory} onChange={(event) => { const category = event.target.value; setEditCategory(category); const unit = applicationLotAmount(editItem.amount, editItem.lots); setEditLots(category === "BHNI" ? minimumBhniLots(unit, 1) : category === "SHNI" ? minimumShniLots(unit, 1) : 1); if (category === "BHNI") { setEditBank(banks.find((bank) => bank.active && !bank.is_placeholder && !bank.is_imported_reference && bank.owner === editItem.applicant)?.id ?? ""); setEditUpi(""); } else { setEditUpi(upis.find((upi) => upi.bank === editBank && upi.active && upi.verified)?.id ?? ""); } }}>{editItem.category === "SHARE" ? <option value="SHARE">Shareholder</option> : <><option value="RETAIL">Retail</option><option value="SHNI">sHNI</option><option value="BHNI">bHNI (bank ASBA)</option></>}</select>
         <label htmlFor="application-edit-lots">Lots</label><input id="application-edit-lots" type="number" min="1" step="1" required value={editLots || ""} onChange={(event) => setEditLots(Number(event.target.value))} />
-        <p className="intro">Choose whole lots. Retail totals can be up to ₹2,00,000; choose sHNI for a higher amount.</p>
-        <label htmlFor="application-edit-bank">Bank account</label><select id="application-edit-bank" value={editBank} required onChange={(event) => { const bankId = event.target.value; setEditBank(bankId); setEditUpi(upis.find((upi) => upi.bank === bankId && upi.active && upi.verified)?.id ?? ""); }}>{banks.filter((bank) => bank.active && !bank.is_placeholder).map((bank) => <option key={bank.id} value={bank.id}>{bank.bank_name} · {bank.account_display}</option>)}</select>
-        <label htmlFor="application-edit-upi">UPI ID</label><select id="application-edit-upi" value={editUpi} required onChange={(event) => setEditUpi(event.target.value)}>{eligibleUpis.map((upi) => <option key={upi.id} value={upi.id}>{upi.handle}</option>)}</select>
-        <p className="application-edit-preview">Updated amount: <strong>{formatInr(String(Number(editItem.amount) / editItem.lots * editLots))}</strong></p>
-        <button type="submit" disabled={busy || !eligibleUpis.some((upi) => upi.id === editUpi)}>Save changes</button>
+        <p className="intro">Whole lots only. Retail/Shareholder: up to ₹2 lakh. sHNI: above ₹2 lakh through ₹10 lakh. bHNI: above ₹10 lakh using own-bank ASBA.</p>
+        <label htmlFor="application-edit-bank">Bank account</label><select id="application-edit-bank" value={editBank} required onChange={(event) => { const bankId = event.target.value; setEditBank(bankId); setEditUpi(upis.find((upi) => upi.bank === bankId && upi.active && upi.verified)?.id ?? ""); }}>{banks.filter((bank) => bank.active && !bank.is_placeholder && (editCategory !== "BHNI" || (!bank.is_imported_reference && bank.owner === editItem.applicant))).map((bank) => <option key={bank.id} value={bank.id}>{bank.bank_name} · {bank.account_display}</option>)}</select>
+        {editCategory === "BHNI" ? <p>Bank ASBA · UPI is not used. Choose a complete bank account owned by this investor.</p> : <><label htmlFor="application-edit-upi">UPI ID</label><select id="application-edit-upi" value={editUpi} required onChange={(event) => setEditUpi(event.target.value)}>{eligibleUpis.map((upi) => <option key={upi.id} value={upi.id}>{upi.handle}</option>)}</select></>}
+        <p className="application-edit-preview">Updated amount: <strong>{Number.isSafeInteger(editLots) && editLots > 0 ? formatInr(amountForLots(applicationLotAmount(editItem.amount, editItem.lots), 1, editLots)) : "—"}</strong></p>
+        <button type="submit" disabled={busy || (editCategory !== "BHNI" && !eligibleUpis.some((upi) => upi.id === editUpi))}>Save changes</button>
       </form>}
     </Drawer>}
     {resultItem && <Drawer title="Record application result" onClose={() => setResultId(null)}>

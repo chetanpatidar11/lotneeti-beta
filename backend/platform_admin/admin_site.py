@@ -47,6 +47,7 @@ from ipos.provider_health import (
     set_provider_enabled,
     set_provider_override,
 )
+from ipos.quota_terms import ShareholderTermsForm, set_shareholder_terms
 from ipos.tasks import run_ipo_sync
 from planner.models import PlannerPolicy, PlanRun
 from planner.policies import platform_policy, set_policy
@@ -435,6 +436,8 @@ class FounderAdminSite(AdminSite):
                         reason=request.POST.get("reason", ""),
                         actor=request.user,
                     )
+                elif request.POST.get("action") == "shareholder_terms":
+                    ipo = set_shareholder_terms(ipo=ipo, actor=request.user, data=request.POST)
                 elif request.POST.get("action") == "resume":
                     resume_ipo_auto(ipo=ipo, field_name=field_name, actor=request.user)
                 else:
@@ -502,6 +505,7 @@ class FounderAdminSite(AdminSite):
                 "fields": fields,
                 "history": history,
                 "source_rows": source_rows,
+                "shareholder_form": ShareholderTermsForm(instance=ipo),
                 "error": error,
             },
         )

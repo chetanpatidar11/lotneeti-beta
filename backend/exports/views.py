@@ -33,9 +33,9 @@ class PlanExportCreateView(APIView):
         )
         _require_writer(workspace_id, request.user)
         format_id = request.data.get("format_id", "generic_csv")
-        if format_id not in ("generic_csv", "demat_csv"):
+        if format_id not in ("generic_csv", "demat_csv", "quota_csv"):
             return Response({"detail": "Unknown export format."}, status=400)
-        ipo_id = request.data.get("ipo_id") if format_id == "demat_csv" else None
+        ipo_id = request.data.get("ipo_id") if format_id in {"demat_csv", "quota_csv"} else None
         if format_id == "demat_csv" and not isinstance(ipo_id, str):
             return Response({"detail": "Choose one IPO for export."}, status=400)
         try:

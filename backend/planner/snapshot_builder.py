@@ -225,12 +225,17 @@ def build_snapshot(
                 id=str(item.pk),
                 bank_id=str(item.bank_id),
                 amount=item.amount,
-                blocked_at=item.blocked_at or item.submitted_at,
+                blocked_at=item.blocked_at or item.submitted_at or item.planned_at,
                 release_at=expected_release_at(item.ipo.allotment_date, zone),
             )
             for item in applications
-            if item.status in {Application.Status.SUBMITTED, Application.Status.BLOCKED}
-            and (item.blocked_at or item.submitted_at) is not None
+            if (
+                item.status in {Application.Status.SUBMITTED, Application.Status.BLOCKED}
+                or (
+                    item.status == Application.Status.PLANNED and item.category in {"SHARE", "BHNI"}
+                )
+            )
+            and (item.blocked_at or item.submitted_at or item.planned_at) is not None
         ),
         rolling_usage=tuple(
             RollingUsageInput(
@@ -242,7 +247,7 @@ def build_snapshot(
                 cancelled=item.status == Application.Status.CANCELLED,
             )
             for item in applications
-            if item.submitted_at is not None
+            if item.submitted_at is not None and item.upi_id is not None
         ),
         existing_applications=tuple(
             ExistingApplicationInput(
@@ -252,5 +257,6 @@ def build_snapshot(
                 cancelled=item.status == Application.Status.CANCELLED,
             )
             for item in applications
+            if item.category != "SHARE"
         ),
     )

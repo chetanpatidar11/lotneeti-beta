@@ -98,7 +98,7 @@ class PlanRow(models.Model):
     amount = models.DecimalField(max_digits=14, decimal_places=2)
     demat_ref = models.CharField(max_length=80)
     bank_ref = models.CharField(max_length=80)
-    upi_ref = models.CharField(max_length=80)
+    upi_ref = models.CharField(max_length=80, blank=True)
     locked = models.BooleanField(default=False)
     warnings = models.JSONField(default=list)
     blocking_reasons = models.JSONField(default=list)

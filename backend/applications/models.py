@@ -34,7 +34,11 @@ class Application(models.Model):
         "funding.BankAccount", on_delete=models.PROTECT, related_name="applications"
     )
     upi = models.ForeignKey(
-        "funding.UPIHandle", on_delete=models.PROTECT, related_name="applications"
+        "funding.UPIHandle",
+        on_delete=models.PROTECT,
+        related_name="applications",
+        null=True,
+        blank=True,
     )
     category = models.CharField(max_length=8)
     lots = models.PositiveIntegerField()
@@ -56,9 +60,14 @@ class Application(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["workspace", "ipo", "applicant"],
-                condition=~Q(status="CANCELLED"),
-                name="unique_active_workspace_ipo_applicant",
-            )
+                condition=~Q(status="CANCELLED") & ~Q(category="SHARE"),
+                name="unique_active_public_ipo_applicant",
+            ),
+            models.UniqueConstraint(
+                fields=["workspace", "ipo", "applicant"],
+                condition=~Q(status="CANCELLED") & Q(category="SHARE"),
+                name="unique_active_share_ipo_applicant",
+            ),
         ]
 
     def __str__(self):
@@ -77,10 +86,16 @@ class Application(models.Model):
                 self.applicant_id,
                 self.demat_id,
                 self.bank_id,
-                self.upi_id,
             )
         ):
             return
+        if self.category == "BHNI":
+            if self.upi_id is not None or self.bank.owner_id != self.applicant_id:
+                raise ValidationError(
+                    "bHNI uses the applicant’s own bank ASBA account, without UPI"
+                )
+        elif self.upi_id is None:
+            raise ValidationError("A linked UPI is required for this category")
         row = self.plan_row
         if self.edited_at is None and (
             row.plan_run.workspace_id != self.workspace_id
@@ -88,7 +103,7 @@ class Application(models.Model):
             or str(self.applicant_id) != row.applicant_ref
             or str(self.demat_id) != row.demat_ref
             or str(self.bank_id) != row.bank_ref
-            or str(self.upi_id) != row.upi_ref
+            or (str(self.upi_id) if self.upi_id else "") != row.upi_ref
             or self.category != row.category
             or self.lots != row.lots
             or self.amount != row.amount
@@ -98,6 +113,6 @@ class Application(models.Model):
             self.applicant.workspace_id != self.workspace_id
             or self.bank.workspace_id != self.workspace_id
             or self.demat.investor_id != self.applicant_id
-            or self.upi.bank_id != self.bank_id
+            or (self.upi_id is not None and self.upi.bank_id != self.bank_id)
         ):
             raise ValidationError("Application mapping is outside its workspace")

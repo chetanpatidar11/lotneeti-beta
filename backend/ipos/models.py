@@ -49,6 +49,13 @@ class IPO(models.Model):
     publication_state = models.CharField(
         max_length=9, choices=PublicationState.choices, default=PublicationState.DRAFT
     )
+    shareholder_quota = models.BooleanField(default=False)
+    shareholder_min_lots = models.PositiveIntegerField(default=1)
+    shareholder_max_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("200000.00")
+    )
+    shareholder_record_date = models.DateField(null=True, blank=True)
+    shareholder_terms_url = models.URLField(blank=True)
     source_key = models.CharField(max_length=80)
     source_record_id = models.CharField(max_length=160)
     source_url = models.URLField(blank=True)
@@ -82,6 +89,15 @@ class IPO(models.Model):
             errors["allotment_date"] = "Allotment date cannot be before closing date."
         if self.allotment_date and self.listing_date and self.allotment_date > self.listing_date:
             errors["listing_date"] = "Listing date cannot be before allotment date."
+        if self.shareholder_quota and (
+            self.issue_type != "MAINBOARD"
+            or not self.shareholder_terms_url
+            or self.shareholder_min_lots < 1
+            or not Decimal("0") < self.shareholder_max_amount <= Decimal("200000")
+        ):
+            errors["shareholder_quota"] = (
+                "Confirm mainboard shareholder terms, minimum lots and a maximum up to ₹2,00,000."
+            )
         if errors:
             raise ValidationError(errors)
 
@@ -545,6 +561,7 @@ class IPOUserDecision(models.Model):
         RETAIL_PLUS_SHNI = "RETAIL_PLUS_SHNI", "Retail + sHNI"
         SHNI_PREFERRED = "SHNI_PREFERRED", "sHNI Preferred"
         CUSTOM = "CUSTOM", "Custom"
+        BHNI_PREFERRED = "BHNI_PREFERRED", "bHNI Preferred"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workspace = models.ForeignKey(
@@ -553,6 +570,11 @@ class IPOUserDecision(models.Model):
     ipo = models.ForeignKey(IPO, on_delete=models.CASCADE, related_name="workspace_decisions")
     decision = models.CharField(max_length=7, choices=Decision.choices, default=Decision.DEFAULT)
     mode = models.CharField(max_length=16, choices=Mode.choices, default=Mode.RETAIL_ONLY)
+    shareholder_terms_fingerprint = models.CharField(max_length=64, blank=True)
+    shareholder_preferred = models.BooleanField(default=False)
+    shareholder_eligible = models.ManyToManyField(
+        "investors.Investor", blank=True, related_name="shareholder_ipo_decisions"
+    )
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -15,23 +15,38 @@ from core.models import BetaEvent
 from funding.models import BankAccount
 from planner.capital import capital_totals
 from planner.dto import LockedRowInput
-from planner.engine import generate_proposal
-from planner.manual_plan import review_manual_rows
 from planner.models import PlanRun
 from planner.persistence import clear_plan_run, create_reviewed_plan_run
 from planner.plan_window import snapshot_is_planning_only
+from planner.quota_planning import (
+    generate_quota_proposal,
+    quota_context,
+    review_quota_rows,
+    row_issue_codes,
+)
 from planner.snapshot_builder import build_snapshot
 
 
-class LockedRowSerializer(serializers.Serializer):
+class CategoryMappingSerializer(serializers.Serializer):
+    def validate(self, attrs):
+        if attrs.get("category") == "BHNI":
+            if attrs.get("upi"):
+                raise serializers.ValidationError("bHNI uses bank ASBA, without UPI.")
+            attrs["upi"] = None
+        elif not attrs.get("upi"):
+            raise serializers.ValidationError("A linked UPI is required for this category.")
+        return attrs
+
+
+class LockedRowSerializer(CategoryMappingSerializer):
     ipo = serializers.UUIDField()
     applicant = serializers.UUIDField()
-    category = serializers.ChoiceField(choices=["RETAIL", "SHNI"])
+    category = serializers.ChoiceField(choices=["RETAIL", "SHNI", "SHARE", "BHNI"])
     lots = serializers.IntegerField(min_value=1)
     amount = serializers.DecimalField(max_digits=14, decimal_places=2)
     demat = serializers.UUIDField()
     bank = serializers.UUIDField()
-    upi = serializers.UUIDField()
+    upi = serializers.UUIDField(allow_null=True, required=False)
 
 
 class PreviewRequestSerializer(serializers.Serializer):
@@ -74,7 +89,11 @@ class PlannerPreviewView(APIView):
         }
         locks = []
         for position, item in enumerate(serializer.validated_data.get("locked_rows", [])):
-            if any(str(item[field]) not in ids for field, ids in known.items()):
+            if any(
+                str(item.get(field)) not in ids
+                for field, ids in known.items()
+                if not (field == "upi" and item["category"] == "BHNI" and not item.get("upi"))
+            ):
                 raise serializers.ValidationError(
                     {"locked_rows": "A locked mapping is outside this workspace."}
                 )
@@ -91,11 +110,11 @@ class PlannerPreviewView(APIView):
                     amount=item["amount"],
                     demat_id=str(item["demat"]),
                     bank_id=str(item["bank"]),
-                    upi_id=str(item["upi"]),
+                    upi_id=str(item["upi"]) if item.get("upi") else "",
                 )
             )
         snapshot = replace(snapshot, locked_rows=tuple(locks))
-        proposal = generate_proposal(snapshot)
+        proposal = generate_quota_proposal(snapshot, quota_context(workspace, snapshot))
         record_beta_event(workspace=workspace, event_type=BetaEvent.Type.PLAN_GENERATED)
         return Response(
             {
@@ -129,15 +148,15 @@ class PlannerPreviewView(APIView):
         )
 
 
-class EditedRowSerializer(serializers.Serializer):
+class EditedRowSerializer(CategoryMappingSerializer):
     ipo = serializers.UUIDField()
     applicant = serializers.UUIDField()
-    category = serializers.ChoiceField(choices=["RETAIL", "SHNI"])
+    category = serializers.ChoiceField(choices=["RETAIL", "SHNI", "SHARE", "BHNI"])
     lots = serializers.IntegerField(min_value=1)
     amount = serializers.DecimalField(max_digits=14, decimal_places=2, required=False)
     demat = serializers.UUIDField()
     bank = serializers.UUIDField()
-    upi = serializers.UUIDField()
+    upi = serializers.UUIDField(allow_null=True, required=False)
     locked = serializers.BooleanField(default=False)
 
 
@@ -168,7 +187,8 @@ class PlannerValidateView(APIView):
         except ImproperlyConfigured:
             return Response({"detail": "Planner policy has not been configured."}, status=503)
         try:
-            rows, audit = review_manual_rows(snapshot, serializer.validated_data["rows"])
+            context = quota_context(workspace, snapshot)
+            rows, audit = review_quota_rows(snapshot, serializer.validated_data["rows"], context)
         except ValidationError as exc:
             raise serializers.ValidationError(exc.messages) from exc
         total = audit.planned_total
@@ -193,7 +213,7 @@ class PlannerValidateView(APIView):
                         "upi": row.upi_id,
                         "locked": row.locked,
                         "warnings": row.warnings,
-                        "blocking_reasons": issues_by_row.get((row.ipo_id, row.applicant_id), []),
+                        "blocking_reasons": row_issue_codes(audit.issues, row),
                         "reasons": [],
                     }
                     for row in rows
@@ -228,7 +248,8 @@ class PlannerRunCreateView(APIView):
                     "plan_cross_funding_override"
                 ],
             )
-            rows, audit = review_manual_rows(snapshot, serializer.validated_data["rows"])
+            context = quota_context(workspace, snapshot)
+            rows, audit = review_quota_rows(snapshot, serializer.validated_data["rows"], context)
             reserve_ipo_id = serializer.validated_data.get("reserve_ipo_id")
             reserved_ipo_ids = None
             if reserve_ipo_id is not None:
@@ -282,6 +303,7 @@ class PlannerRunCreateView(APIView):
                 audit=audit,
                 actor=request.user,
                 reserved_ipo_ids=reserved_ipo_ids,
+                quota_context=context,
             )
         except ImproperlyConfigured:
             return Response({"detail": "Planner policy has not been configured."}, status=503)
@@ -308,11 +330,7 @@ class PlannerRunCreateView(APIView):
                         "upi": row.upi_id,
                         "locked": row.locked,
                         "warnings": row.warnings,
-                        "blocking_reasons": [
-                            issue.code
-                            for issue in audit.issues
-                            if issue.ipo_id == row.ipo_id and issue.applicant_id == row.applicant_id
-                        ],
+                        "blocking_reasons": row_issue_codes(audit.issues, row),
                         "reasons": [asdict(reason) for reason in row.reasons],
                     }
                     for row in rows

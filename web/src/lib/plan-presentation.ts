@@ -1,7 +1,7 @@
 export type PlanRow = {
   ipo: string;
   applicant: string;
-  category: "RETAIL" | "SHNI";
+  category: "RETAIL" | "SHNI" | "SHARE" | "BHNI";
   lots: number;
   amount: string;
   demat: string;
@@ -22,15 +22,15 @@ export type PlanPreview = {
   audit_issues: { code: string; message: string }[];
 };
 
-export function lockedMappings(rows: PlanRow[]): Pick<PlanRow, "ipo" | "applicant" | "category" | "lots" | "amount" | "demat" | "bank" | "upi">[] {
+export function lockedMappings(rows: PlanRow[]) {
   return rows.filter((row) => row.locked).map(({ ipo, applicant, category, lots, amount, demat, bank, upi }) => ({
-    ipo, applicant, category, lots, amount, demat, bank, upi,
+    ipo, applicant, category, lots, amount, demat, bank, upi: category === "BHNI" ? null : upi,
   }));
 }
 
-export function reviewedMappings(rows: PlanRow[]): Pick<PlanRow, "ipo" | "applicant" | "category" | "lots" | "amount" | "demat" | "bank" | "upi" | "locked">[] {
+export function reviewedMappings(rows: PlanRow[]) {
   return rows.map(({ ipo, applicant, category, lots, amount, demat, bank, upi, locked }) => ({
-    ipo, applicant, category, lots, amount, demat, bank, upi, locked,
+    ipo, applicant, category, lots, amount, demat, bank, upi: category === "BHNI" ? null : upi, locked,
   }));
 }
 
@@ -72,7 +72,7 @@ export function bankReasonSummary(row: PlanRow): string[] {
 }
 
 export type DematLookup = { label: string; applicant: string; active: boolean };
-export type BankLookup = { label: string; owner: string; balance: string; active: boolean; policy: string };
+export type BankLookup = { label: string; owner: string; balance: string; active: boolean; policy: string; asbaReady?: boolean };
 export type UpiLookup = { label: string; bank: string; holder: string; active: boolean; verified: boolean };
 export type FundingPreference = { bank: string; priority: number; enabled: boolean };
 
@@ -145,6 +145,9 @@ function visibleWarnings(row: PlanRow): string[] {
 }
 
 const issueMessages: Record<string, string> = {
+  SHAREHOLDER_TERMS_CHANGED: "Shareholder terms changed. Confirm eligible investors again in IPO settings.",
+  SHAREHOLDER_INELIGIBLE: "Confirm this investor’s shareholder eligibility for this IPO.",
+  ASBA_OWN_BANK_REQUIRED: "Choose a complete bank ASBA account owned by this investor.",
   APPLICANT_INACTIVE: "Choose an active applicant.",
   BANK_LIMIT_EXCEEDED: "This bank has reached its application limit.",
   BANK_PAN_RESTRICTED: "This bank is restricted to another applicant.",
@@ -154,7 +157,7 @@ const issueMessages: Record<string, string> = {
   INSUFFICIENT_BALANCE: "This bank cannot cover this application. Choose another bank or re-plan.",
   INVALID_AMOUNT: "The amount does not match the chosen lots. Review the current IPO price.",
   INVALID_BANK: "Choose an active bank.",
-  INVALID_CATEGORY: "Choose valid Retail or sHNI lots for this IPO.",
+  INVALID_CATEGORY: "Check the lot amount against the selected category’s limits.",
   INVALID_DEMAT: "Choose an active demat for this applicant.",
   INVALID_UPI: "Choose an active UPI linked to an active bank and investor.",
   IPO_NOT_SELECTED: "Select this IPO before planning an application.",

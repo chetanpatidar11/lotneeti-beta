@@ -22,6 +22,11 @@ export function minimumShniLots(upperPrice: string, lotSize: number): number {
   return Number(20000000n / (priceCents(upperPrice) * BigInt(lotSize)) + 1n);
 }
 
+export function minimumBhniLots(upperPrice: string, lotSize: number): number {
+  if (!Number.isSafeInteger(lotSize) || lotSize < 1) throw new Error("Invalid lot size");
+  return Number(100000000n / (priceCents(upperPrice) * BigInt(lotSize)) + 1n);
+}
+
 export function amountForLots(upperPrice: string, lotSize: number, lots: number): string {
   if (!Number.isSafeInteger(lotSize) || lotSize < 1 || !Number.isSafeInteger(lots) || lots < 1) {
     throw new Error("Invalid lots");
@@ -30,13 +35,20 @@ export function amountForLots(upperPrice: string, lotSize: number, lots: number)
   return centsToString(cents);
 }
 
+export function applicationLotAmount(amount: string, lots: number): string {
+  if (!Number.isSafeInteger(lots) || lots < 1) throw new Error("Invalid lots");
+  const cents = parseCents(amount);
+  if (cents % BigInt(lots) !== 0n) throw new Error("Invalid whole-lot amount");
+  return centsToString(cents / BigInt(lots));
+}
+
 export function sumAmounts(values: string[]): string {
   return centsToString(values.reduce((sum, value) => sum + parseCents(value), 0n));
 }
 
 export function peakConcurrentAmount(rows: { amount: string; closeDate: string; allotmentDate: string; category: string }[]): string {
   const events = rows.flatMap((row) => {
-    const cutoff = Date.parse(`${row.closeDate}T${row.category === "SHNI" ? "16" : "17"}:00:00+05:30`);
+    const cutoff = Date.parse(`${row.closeDate}T${["SHNI", "BHNI"].includes(row.category) ? "16" : "17"}:00:00+05:30`);
     const release = Date.parse(`${row.allotmentDate}T00:00:00+05:30`) + 86400000;
     const amount = parseCents(row.amount);
     return [{ at: cutoff, delta: amount }, { at: release, delta: -amount }];

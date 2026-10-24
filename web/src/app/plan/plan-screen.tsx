@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Drawer } from "@/components/drawer";
 import { formatInr } from "@/lib/money";
-import { amountForLots, minimumShniLots, peakConcurrentAmount, sumAmounts } from "@/lib/plan-amount";
+import { categoryLabel } from "@/lib/application-category";
+import DraftApplicationEditor from "./draft-application-editor";
+import { amountForLots, peakConcurrentAmount, sumAmounts } from "@/lib/plan-amount";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/ui";
-import { canExportPlan, issueMessage, lockedMappings, planStatus, rankedBanks, reviewedMappings, rowIssueMessages, selectableApplicants, selectableDemats, selectableUpis, type BankLookup, type DematLookup, type FundingPreference, type PlanPreview, type PlanRow, type UpiLookup } from "@/lib/plan-presentation";
+import { canExportPlan, issueMessage, lockedMappings, planStatus, reviewedMappings, rowIssueMessages, type BankLookup, type DematLookup, type FundingPreference, type PlanPreview, type PlanRow, type UpiLookup } from "@/lib/plan-presentation";
 
 export type PlanLookups = {
-  ipos: Record<string, { name: string; upperPrice: string; lotSize: number; gmpPercent: string | null; closeDate: string; allotmentDate: string }>;
+  ipos: Record<string, { name: string; upperPrice: string; lotSize: number; gmpPercent: string | null; closeDate: string; allotmentDate: string; shareholderMinLots?: number; shareholderEligible?: string[] }>;
   applicants: Record<string, { name: string; priority: number; active: boolean }>;
   demats: Record<string, DematLookup>;
   banks: Record<string, BankLookup>;
@@ -115,7 +117,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
           amount: row.amount,
           demat: row.demat,
           bank: row.bank,
-          upi: row.upi,
+          upi: row.category === "BHNI" ? null : row.upi,
           locked: row.locked,
         })) }),
       });
@@ -219,7 +221,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
       const exportResponse = await fetch(`/api/workspaces/${workspaceId}/planner/runs/${saved.id}/exports`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ format_id: "demat_csv", ipo_id: ipoId }),
+        body: JSON.stringify({ format_id: current.rows.some((row) => row.ipo === ipoId && ["SHARE", "BHNI"].includes(row.category)) ? "quota_csv" : "demat_csv", ipo_id: ipoId }),
       });
       const exportRecord = await exportResponse.json();
       if (!exportResponse.ok) throw new Error("We could not export this plan.");
@@ -273,7 +275,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
           {lookups.selectedIpos.length === 0 ? <EmptyState title={lookups.unavailableSelectedIpoCount > 0 ? "Your selected IPOs are unavailable." : "No IPOs selected."} detail={lookups.unavailableSelectedIpoCount > 0 ? "Choose an available IPO before generating a plan." : "Choose an IPO to plan applications."} action={<Link href="/ipos">Review IPOs</Link>} /> : <ul className="selected-ipo-strip">
             {lookups.selectedIpos.map((selection) => <li key={selection.ipo}>
               <strong>{lookups.ipos[selection.ipo]?.name || "Selected IPO"}</strong>
-              <span>{selection.mode === "RETAIL_ONLY" ? "Retail Only" : selection.mode === "RETAIL_PLUS_SHNI" ? "Retail + sHNI" : selection.mode === "SHNI_PREFERRED" ? "sHNI Preferred" : "Custom"}</span>
+              <span>{selection.mode === "RETAIL_ONLY" ? "Retail Only" : selection.mode === "RETAIL_PLUS_SHNI" ? "Retail + sHNI" : selection.mode === "SHNI_PREFERRED" ? "sHNI Preferred" : selection.mode === "BHNI_PREFERRED" ? "bHNI Preferred" : "Custom"}</span>
               <small>GMP {lookups.ipos[selection.ipo]?.gmpPercent ?? "—"}% · Closes {lookups.ipos[selection.ipo]?.closeDate ?? "—"}</small>
             </li>)}
           </ul>}
@@ -303,7 +305,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
           <div><span>Total applications</span><strong>{formatInr(preview.planned_total)}</strong></div>
           <div><span>Applications</span><strong>{preview.rows.length}</strong></div>
           <div><span>Applicants covered</span><strong>{new Set(preview.rows.map((row) => row.applicant)).size}</strong></div>
-          <div><span>Retail / sHNI</span><strong>{preview.rows.filter((row) => row.category === "RETAIL").length} / {preview.rows.filter((row) => row.category === "SHNI").length}</strong></div>
+          <div><span>Retail / sHNI / Shareholder / bHNI</span><strong>{["RETAIL", "SHNI", "SHARE", "BHNI"].map((category) => preview.rows.filter((row) => row.category === category).length).join(" / ")}</strong></div>
           <div><span>Status</span><strong>{validating ? "Checking" : planStatus(preview)}</strong></div>
         </div>
         <p className="plan-note">Highest amount needed at one time in this draft: <strong>{formatInr(peakConcurrentAmount(preview.rows.flatMap((row) => {
@@ -316,7 +318,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
           <ul>{preview.audit_issues.map((issue, index) => <li key={`${issue.code}-${index}`}>{issueMessage(issue.code)}</li>)}</ul>
         </div>}
         {preview.uncovered.length > 0 && <p className="plan-note">{preview.uncovered.length} applicant/IPO {preview.uncovered.length === 1 ? "pair" : "pairs"} could not be planned.</p>}
-        <details className="plan-breakdown"><summary>Plan summary by IPO and uncovered applicants</summary><div className="plan-breakdown-grid">{lookups.selectedIpos.map((selection) => { const rows = preview.rows.filter((row) => row.ipo === selection.ipo); return <div key={selection.ipo}><strong>{lookups.ipos[selection.ipo]?.name ?? "IPO"}</strong><span>{rows.length} applications · {rows.filter((row) => row.category === "RETAIL").length} Retail · {rows.filter((row) => row.category === "SHNI").length} sHNI</span><span>{formatInr(sumAmounts(rows.map((row) => row.amount)))}</span></div>; })}</div>{preview.uncovered.length > 0 && <p>{preview.uncovered.length} applicant/IPO pairs are uncovered. Review the bank and UPI details below.</p>}</details>
+        <details className="plan-breakdown"><summary>Plan summary by IPO and uncovered applicants</summary><div className="plan-breakdown-grid">{lookups.selectedIpos.map((selection) => { const rows = preview.rows.filter((row) => row.ipo === selection.ipo); return <div key={selection.ipo}><strong>{lookups.ipos[selection.ipo]?.name ?? "IPO"}</strong><span>{rows.length} applications · {rows.filter((row) => row.category === "RETAIL").length} Retail · {rows.filter((row) => row.category === "SHNI").length} sHNI · {rows.filter((row) => row.category === "SHARE").length} Shareholder · {rows.filter((row) => row.category === "BHNI").length} bHNI</span><span>{formatInr(sumAmounts(rows.map((row) => row.amount)))}</span></div>; })}</div>{preview.uncovered.length > 0 && <p>{preview.uncovered.length} applications could not be planned. Review eligibility, funds and payment details.</p>}{preview.uncovered.length > 0 && <ul>{preview.uncovered.map((item, index) => <li key={`${item.ipo_id}:${item.applicant_id}:${index}`}>{lookups.applicants[item.applicant_id]?.name ?? "Investor"} · {item.reason.startsWith("SHAREHOLDER") ? "Shareholder: check remaining funds, linked UPI limits and active demat." : issueMessage(item.reason)}</li>)}</ul>}</details>
         {preview.rows.length === 0 ? <p className="plan-empty">No applications are in this draft. Select an IPO and check your investors, banks and UPIs.</p> : <div className="draft-ipo-groups">
           {[...new Set(preview.rows.map((row) => row.ipo))].map((ipoId) => <section className="draft-ipo-group" key={ipoId}>
             <div className="draft-ipo-heading"><div><h2>{lookups.ipos[ipoId]?.name ?? "IPO"}</h2><p>{preview.rows.filter((row) => row.ipo === ipoId).length} draft applications</p></div>
@@ -326,8 +328,8 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
               <tbody>{preview.rows.map((row, index) => row.ipo !== ipoId ? null : <tr key={`${row.ipo}:${row.applicant}:${index}`}>
                 <th scope="row" data-label="Applicant">{lookups.applicants[row.applicant]?.name ?? "Applicant"}{rowIssueMessages(row).length > 0 && <small className="draft-issue">Needs review: {rowIssueMessages(row).join("; ")}</small>}{row.locked && <small>Locked for re-planning</small>}</th>
                 <td data-label="Demat">{lookups.demats[row.demat]?.label ?? "Unavailable"}</td>
-                <td data-label="UPI">{lookups.upis[row.upi]?.label ?? "Unavailable"}</td>
-                <td data-label="Category">{row.category === "SHNI" ? "sHNI" : "Retail"}</td>
+                <td data-label="UPI">{row.category === "BHNI" ? "Bank ASBA" : lookups.upis[row.upi]?.label ?? "Unavailable"}</td>
+                <td data-label="Category">{categoryLabel(row.category)}</td>
                 <td data-label="Lots">{row.lots}</td>
                 <td data-label="Amount" className="money-cell">{formatInr(row.amount)}</td>
                 <td data-label="Funding Type"><StatusBadge tone={fundingType(row, lookups) === "Own" ? "positive" : fundingType(row, lookups) === "Preferred" ? "info" : "warning"}>{fundingType(row, lookups)}</StatusBadge></td>
@@ -338,33 +340,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
         </div>}
       </section>}
       {clearOpen && <Drawer title="Clear saved plan" onClose={() => setClearOpen(false)}><div className="sign-in-form"><p>The latest saved plan will stop reserving funds. Bank balances and plan history stay as they are. Applications already being tracked keep their own reserved amounts.</p>{error && <p className="plan-error" role="alert">{error}</p>}<button type="button" disabled={busy} onClick={() => void clearSavedPlan()}>{busy ? "Clearing…" : "Clear saved plan"}</button><button className="button-secondary" type="button" disabled={busy} onClick={() => setClearOpen(false)}>Keep plan</button></div></Drawer>}
-      {editDraft && editingIndex !== null && <Drawer title="Edit draft application" onClose={() => { setEditDraft(null); setEditingIndex(null); }}><form className="sign-in-form" onSubmit={(event) => { event.preventDefault(); void saveDraftEdit(); }}>
-        <p className="intro">{lookups.ipos[editDraft.ipo]?.name ?? "IPO"}</p>
-        <label htmlFor="draft-applicant">Applicant</label><select id="draft-applicant" value={editDraft.applicant} onChange={(event) => {
-          const applicant = event.target.value;
-          const demat = selectableDemats(lookups.demats, applicant)[0];
-          const bank = rankedBanks(lookups.banks, lookups.upis, lookups.preferences[applicant] ?? [], applicant).find((option) => !option.disabled);
-          const upi = bank && selectableUpis(lookups.upis, bank.id, applicant)[0];
-          updateDraft({ applicant, demat: demat?.id ?? editDraft.demat, bank: bank?.id ?? editDraft.bank, upi: upi?.id ?? editDraft.upi });
-        }}>{!selectableApplicants(lookups.applicants).some((applicant) => applicant.id === editDraft.applicant) && <option value={editDraft.applicant} disabled>Current applicant unavailable</option>}{selectableApplicants(lookups.applicants).map((applicant) => <option key={applicant.id} value={applicant.id}>{applicant.name}</option>)}</select>
-        <label htmlFor="draft-demat">Demat</label><select id="draft-demat" value={editDraft.demat} onChange={(event) => updateDraft({ demat: event.target.value })}>{!selectableDemats(lookups.demats, editDraft.applicant).some((demat) => demat.id === editDraft.demat) && <option value={editDraft.demat} disabled>Current demat unavailable</option>}{selectableDemats(lookups.demats, editDraft.applicant).map((demat) => <option key={demat.id} value={demat.id}>{demat.label}</option>)}</select>
-        <label htmlFor="draft-category">Category</label><select id="draft-category" value={editDraft.category} onChange={(event) => {
-          const category = event.target.value as "RETAIL" | "SHNI";
-          const ipo = lookups.ipos[editDraft.ipo];
-          updateDraft({ category, lots: category === "RETAIL" ? 1 : ipo ? minimumShniLots(ipo.upperPrice, ipo.lotSize) : editDraft.lots });
-        }}><option value="RETAIL">Retail</option><option value="SHNI">sHNI</option></select>
-        <label htmlFor="draft-lots">Lots</label><input id="draft-lots" type="number" min={editDraft.category === "SHNI" && lookups.ipos[editDraft.ipo] ? minimumShniLots(lookups.ipos[editDraft.ipo].upperPrice, lookups.ipos[editDraft.ipo].lotSize) : 1} step="1" required value={editDraft.lots || ""} onChange={(event) => updateDraft({ lots: Number(event.target.value) })} />
-        <p className="intro">Choose whole lots. Retail totals can be up to ₹2,00,000; choose sHNI for a higher amount.</p>
-        <label htmlFor="draft-bank">Funding bank</label><select id="draft-bank" value={editDraft.bank} onChange={(event) => {
-          const bank = event.target.value;
-          const upi = selectableUpis(lookups.upis, bank, editDraft.applicant)[0];
-          updateDraft({ bank, upi: upi?.id ?? editDraft.upi });
-        }}>{!lookups.banks[editDraft.bank] && <option value={editDraft.bank} disabled>Current bank unavailable</option>}{rankedBanks(lookups.banks, lookups.upis, lookups.preferences[editDraft.applicant] ?? [], editDraft.applicant).map((option) => <option key={option.id} value={option.id} disabled={option.disabled}>{option.group}: {lookups.banks[option.id].label}</option>)}</select>
-        <label htmlFor="draft-upi">UPI</label><select id="draft-upi" value={editDraft.upi} onChange={(event) => updateDraft({ upi: event.target.value })}>{!selectableUpis(lookups.upis, editDraft.bank, editDraft.applicant).some((upi) => upi.id === editDraft.upi) && <option value={editDraft.upi} disabled>Current UPI unavailable</option>}{selectableUpis(lookups.upis, editDraft.bank, editDraft.applicant).map((upi) => <option key={upi.id} value={upi.id}>{upi.label}</option>)}</select>
-        <p className="intro">Amount: {lookups.ipos[editDraft.ipo] && Number.isSafeInteger(editDraft.lots) && editDraft.lots > 0 ? formatInr(amountForLots(lookups.ipos[editDraft.ipo].upperPrice, lookups.ipos[editDraft.ipo].lotSize, editDraft.lots)) : "—"}</p>
-        <label className="draft-lock-label"><input type="checkbox" checked={editDraft.locked} onChange={(event) => updateDraft({ locked: event.target.checked })} /> Keep this application when re-planning</label>
-        <button type="submit" disabled={busy || validating}>Save changes</button>
-      </form></Drawer>}
+      {editDraft && editingIndex !== null && <DraftApplicationEditor draft={editDraft} lookups={lookups} busy={busy || validating} onChange={updateDraft} onSave={saveDraftEdit} onClose={() => { setEditDraft(null); setEditingIndex(null); }} />}
       <p><Link href="/">Home</Link></p>
     </div>
   </main>;

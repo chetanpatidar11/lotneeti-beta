@@ -10,6 +10,7 @@ const item: ApplicationItem = {
   is_plan_row: false,
   ipo: "ipo-1",
   ipo_name: "Synthetic Industries",
+  applicant: "synthetic-applicant",
   applicant_name: "Synthetic Investor",
   bank: "bank-1",
   bank_label: "Example Bank ••••0001",

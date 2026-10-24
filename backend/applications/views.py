@@ -59,11 +59,11 @@ def _result(item):
         "applicant": str(item.applicant_id),
         "applicant_name": item.applicant.name,
         "bank": str(item.bank_id),
-        "upi": str(item.upi_id),
+        "upi": str(item.upi_id) if item.upi_id else "",
         "bank_label": item.bank.bank_name
         if item.bank.is_imported_reference
         else f"{item.bank.bank_name} {item.bank.account_masked}",
-        "upi_label": item.upi.handle,
+        "upi_label": item.upi.handle if item.upi_id else "Bank ASBA",
         "close_date": item.ipo.close_date,
         "allotment_date": item.ipo.allotment_date,
         "sold_quantity": sold_quantity,
@@ -93,14 +93,20 @@ def _saved_plan_rows(workspace, tracked):
         rows = [row for row in rows if row.ipo_ref in latest.reserved_ipo_ids]
     linked_rows = {item.plan_row_id for item in tracked}
     active_keys = {
-        (str(item.ipo_id), str(item.applicant_id))
+        (
+            str(item.ipo_id),
+            str(item.applicant_id),
+            "SHARE" if item.category == "SHARE" else "PUBLIC",
+        )
         for item in tracked
         if item.status != Application.Status.CANCELLED
     }
     rows = [
         row
         for row in rows
-        if row.pk not in linked_rows and (row.ipo_ref, row.applicant_ref) not in active_keys
+        if row.pk not in linked_rows
+        and (row.ipo_ref, row.applicant_ref, "SHARE" if row.category == "SHARE" else "PUBLIC")
+        not in active_keys
     ]
     ipos = {str(item.pk): item for item in IPO.objects.filter(pk__in={r.ipo_ref for r in rows})}
     investors = {
@@ -118,7 +124,7 @@ def _saved_plan_rows(workspace, tracked):
     upis = {
         str(item.pk): item
         for item in UPIHandle.objects.filter(
-            pk__in={r.upi_ref for r in rows}, bank__workspace=workspace
+            pk__in={r.upi_ref for r in rows if r.upi_ref}, bank__workspace=workspace
         )
     }
     result = []
@@ -127,7 +133,7 @@ def _saved_plan_rows(workspace, tracked):
         investor = investors.get(row.applicant_ref)
         bank = banks.get(row.bank_ref)
         upi = upis.get(row.upi_ref)
-        if not all((ipo, investor, bank, upi)):
+        if not all((ipo, investor, bank)) or (upi is None and row.category != "BHNI"):
             continue
         result.append(
             {
@@ -143,7 +149,7 @@ def _saved_plan_rows(workspace, tracked):
                 if bank.is_imported_reference
                 else f"{bank.bank_name} {bank.account_masked}",
                 "upi": row.upi_ref,
-                "upi_label": upi.handle,
+                "upi_label": upi.handle if upi else "Bank ASBA",
                 "close_date": ipo.close_date,
                 "allotment_date": ipo.allotment_date,
                 "sold_quantity": 0,
@@ -173,10 +179,19 @@ class AllotmentSerializer(serializers.Serializer):
 
 
 class ApplicationEditSerializer(serializers.Serializer):
-    category = serializers.ChoiceField(choices=["RETAIL", "SHNI"])
+    def validate(self, attrs):
+        if attrs.get("category") == "BHNI":
+            if attrs.get("upi"):
+                raise serializers.ValidationError("bHNI uses bank ASBA, without UPI.")
+            attrs["upi"] = None
+        elif not attrs.get("upi"):
+            raise serializers.ValidationError("A linked UPI is required.")
+        return attrs
+
+    category = serializers.ChoiceField(choices=["RETAIL", "SHNI", "SHARE", "BHNI"])
     lots = serializers.IntegerField(min_value=1, max_value=100000)
     bank = serializers.UUIDField()
-    upi = serializers.UUIDField()
+    upi = serializers.UUIDField(allow_null=True, required=False)
 
 
 class ApplicationBulkSerializer(serializers.Serializer):
@@ -270,7 +285,7 @@ class ApplicationActionView(APIView):
                     category=serializer.validated_data["category"],
                     lots=serializer.validated_data["lots"],
                     bank_id=serializer.validated_data["bank"],
-                    upi_id=serializer.validated_data["upi"],
+                    upi_id=serializer.validated_data.get("upi"),
                 )
             elif action == "allotted":
                 serializer = AllotmentSerializer(data=request.data)

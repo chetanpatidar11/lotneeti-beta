@@ -5,11 +5,12 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 
 from accounts.models import Workspace, WorkspaceMembership
 from applications.models import Application
+from applications.quota_rules import validate_quota_mapping
 from core.audit import record_event
 from core.beta_events import record_beta_event
 from core.models import BetaEvent
@@ -56,9 +57,24 @@ def start_tracking_plan(*, plan_run, actor, row_ids=None) -> tuple[Application, 
         )
         demat = DematAccount.objects.get(pk=row.demat_ref, investor__workspace=workspace)
         bank = BankAccount.objects.get(pk=row.bank_ref, workspace=workspace)
-        upi = UPIHandle.objects.get(pk=row.upi_ref, bank__workspace=workspace)
+        upi = (
+            UPIHandle.objects.get(pk=row.upi_ref, bank__workspace=workspace)
+            if row.upi_ref
+            else None
+        )
+        validate_quota_mapping(
+            workspace=workspace,
+            ipo=ipo,
+            applicant_id=applicant.pk,
+            category=row.category,
+            lots=row.lots,
+            amount=row.amount,
+            bank=bank,
+            upi=upi,
+        )
         existing = (
             Application.objects.filter(workspace=workspace, ipo=ipo, applicant=applicant)
+            .filter(Q(category="SHARE") if row.category == "SHARE" else ~Q(category="SHARE"))
             .exclude(status=Application.Status.CANCELLED)
             .first()
         )
@@ -108,8 +124,12 @@ def edit_application(
     _require_writer(item.workspace, actor)
     if item.status not in {Application.Status.PLANNED, Application.Status.SUBMITTED}:
         raise ValidationError("Only planned or submitted applications can be edited")
-    if category not in {"RETAIL", "SHNI"} or type(lots) is not int or lots < 1:
+    if category not in {"RETAIL", "SHNI", "SHARE", "BHNI"} or type(lots) is not int or lots < 1:
         raise ValidationError("Choose a valid category and number of lots")
+    if (category == "SHARE") != (item.category == "SHARE"):
+        raise ValidationError(
+            "Keep shareholder and public applications separate; add quota rows in a new plan"
+        )
     bank = BankAccount.objects.filter(
         pk=bank_id, workspace=item.workspace, active=True, is_placeholder=False
     ).first()
@@ -117,15 +137,36 @@ def edit_application(
         raise ValidationError("Choose an active bank account in this workspace")
     if bank.owner_id != item.applicant_id and bank_policy(bank) == "DISALLOW":
         raise ValidationError("This bank cannot fund another investor's application")
-    upi = UPIHandle.objects.filter(pk=upi_id, bank=bank, active=True, verified=True).first()
-    if upi is None:
+    upi = (
+        UPIHandle.objects.filter(pk=upi_id, bank=bank, active=True, verified=True).first()
+        if upi_id
+        else None
+    )
+    if upi is None and category != "BHNI":
         raise ValidationError("Choose an active UPI linked to that bank")
     amount = (item.amount / item.lots * lots).quantize(Decimal("0.01"))
     if category == "RETAIL" and amount > Decimal("200000.00"):
         raise ValidationError("Retail applications cannot exceed ₹2,00,000. Choose sHNI.")
     if category == "SHNI" and amount <= Decimal("200000.00"):
         raise ValidationError("sHNI applications must be above ₹2,00,000")
-    if (category, lots, bank.pk, upi.pk) == (item.category, item.lots, item.bank_id, item.upi_id):
+    validate_quota_mapping(
+        workspace=item.workspace,
+        ipo=item.ipo,
+        applicant_id=item.applicant_id,
+        category=category,
+        lots=lots,
+        amount=amount,
+        bank=bank,
+        upi=upi,
+    )
+    if category == "SHNI" and amount > Decimal("1000000"):
+        raise ValidationError("Choose bHNI for an amount above ₹10,00,000")
+    if (category, lots, bank.pk, upi.pk if upi else None) == (
+        item.category,
+        item.lots,
+        item.bank_id,
+        item.upi_id,
+    ):
         return item
     other_commitments = Application.objects.filter(
         workspace=item.workspace,
@@ -166,7 +207,7 @@ def edit_application(
                 "lots": lots,
                 "amount": str(amount),
                 "bank_id": str(bank.pk),
-                "upi_id": str(upi.pk),
+                "upi_id": str(upi.pk) if upi else "",
             },
         },
     )
@@ -198,7 +239,35 @@ def cancel_application(*, application: Application, actor) -> Application:
 
 
 def _assert_submission_limits(item, *, exclude_id=None):
-    BankAccount.objects.select_for_update().get(pk=item.bank_id)
+    locked_bank = BankAccount.objects.select_for_update().get(pk=item.bank_id)
+    item.bank = locked_bank
+    if item.category == "BHNI":
+        validate_quota_mapping(
+            workspace=item.workspace,
+            ipo=item.ipo,
+            applicant_id=item.applicant_id,
+            category=item.category,
+            lots=item.lots,
+            amount=item.amount,
+            bank=item.bank,
+            upi=None,
+        )
+        other = Application.objects.filter(
+            bank_id=item.bank_id, status__in=("PLANNED", "SUBMITTED", "BLOCKED")
+        ).exclude(pk=item.pk).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+        if item.amount + other > item.bank.current_balance:
+            raise ValidationError("Bank Balance is below the ASBA amount after other applications")
+        return
+    validate_quota_mapping(
+        workspace=item.workspace,
+        ipo=item.ipo,
+        applicant_id=item.applicant_id,
+        category=item.category,
+        lots=item.lots,
+        amount=item.amount,
+        bank=item.bank,
+        upi=item.upi,
+    )
     upi = UPIHandle.objects.get(pk=item.upi_id)
     now = timezone.now()
     config = PlannerConfig(PLANNER_VERSION, "DISALLOW", "DEFAULT")
@@ -207,6 +276,7 @@ def _assert_submission_limits(item, *, exclude_id=None):
             bank_id=item.bank_id, submitted_at__gt=now - timedelta(hours=24), submitted_at__lte=now
         )
         .exclude(status=Application.Status.CANCELLED)
+        .exclude(category="BHNI")
         .exclude(pk=exclude_id or item.pk)
     )
     check = RollingLimitTracker(

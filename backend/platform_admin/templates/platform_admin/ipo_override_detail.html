@@ -37,6 +37,10 @@
   </tbody>
 </table>
 
+<h2>Shareholder reservation terms</h2>
+<p>Enable only when the mainboard offer document permits a separate shareholder application. Account holders confirm individual eligibility in IPO settings.</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="shareholder_terms">{{ shareholder_form.as_p }}<button type="submit">Save shareholder terms</button></form>
+
 <h2>Linked source snapshots</h2>
 <p>Source records remain available for review. Only sources with documented reuse approval affect the current issue facts.</p>
 {% for row in source_rows %}

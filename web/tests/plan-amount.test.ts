@@ -22,3 +22,12 @@ test("draft peak excludes cash reused after an earlier allotment", () => {
     { amount: "100000.00", closeDate: "2026-10-29", allotmentDate: "2026-11-02", category: "RETAIL" },
   ]), "230000.00");
 });
+
+test("bHNI uses the first whole lot strictly above ten lakh", async () => {
+  const { minimumBhniLots, applicationLotAmount } = await import("../src/lib/plan-amount");
+  assert.equal(minimumBhniLots("100.00", 150), 67);
+  assert.equal(amountForLots("100.00", 150, 67), "1005000.00");
+  assert.equal(minimumBhniLots("10000.00", 1), 101);
+  assert.equal(applicationLotAmount("600.06", 2), "300.03");
+  assert.throws(() => applicationLotAmount("100.00", 3));
+});

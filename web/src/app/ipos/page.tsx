@@ -9,11 +9,13 @@ import { EmptyState, PageHeader, StatusBadge } from "@/components/ui";
 import ThresholdSetting from "./threshold-setting";
 import IPOChoice, { type IPOSelection } from "./ipo-choice";
 import IPOListView from "./ipo-list-view";
+import type { EligibleAccount } from "./shareholder-choice";
 
 type IPO = {
   id: string; issuer_name: string; symbol: string; issue_type: string; lower_price: string; upper_price: string;
   source_market: string; listing_exchanges: string; designated_exchange: string;
   lot_size: number; open_date: string; close_date: string; allotment_date: string; listing_date: string | null;
+  shareholder_quota: boolean; shareholder_min_lots: number; shareholder_max_amount: string; shareholder_record_date: string | null; shareholder_terms_url: string;
   status: string; plan_available?: boolean; planning_only?: boolean; current_gmp: string | null; current_gmp_percent: string | null; current_gmp_observed_at: string | null;
   gmp_source_count: number; gmp_source_conflict: boolean; gmp_stale_source_count: number;
   gmp_data_state: "FRESH" | "STALE" | "MISSING"; gmp_has_founder_correction: boolean;
@@ -48,8 +50,13 @@ export default async function IPOsPage({ searchParams }: { searchParams: Promise
   const ipos = (await response.json()) as IPO[];
   const workspace = await selectedWorkspace((await workspaceResponse.json()) as Workspace[]);
   let selections: IPOSelection[] = [];
+  let accounts: EligibleAccount[] = [];
   if (workspace) {
-    const selectionResponse = await fetch(backendUrl(`workspaces/${workspace.id}/ipo-decisions/`), { headers: { cookie: cookieHeader }, cache: "no-store" });
+    const [selectionResponse, investorsResponse] = await Promise.all([
+      fetch(backendUrl(`workspaces/${workspace.id}/ipo-decisions/`), { headers: { cookie: cookieHeader }, cache: "no-store" }),
+      fetch(backendUrl(`workspaces/${workspace.id}/investors/`), { headers: { cookie: cookieHeader }, cache: "no-store" }),
+    ]);
+    if (investorsResponse.ok) accounts = await investorsResponse.json() as EligibleAccount[];
     if (selectionResponse.ok) selections = (await selectionResponse.json()) as IPOSelection[];
   }
   const selectionMap = new Map(selections.map((selection) => [selection.ipo, selection]));
@@ -89,7 +96,7 @@ export default async function IPOsPage({ searchParams }: { searchParams: Promise
             <div><span>Close</span><strong>{dateLabel(ipo.close_date)}</strong></div>
             <div><span>Allotment</span><strong>{dateLabel(ipo.allotment_date)}</strong></div>
           </div>
-          {ipo.planning_only && <p className="plan-note">Select manually to create a record plan and record submission details at any time.</p>}{active && <div className="ipo-controls"><div className="ipo-gmp-detail">{ipo.gmp_has_founder_correction && <StatusBadge tone="info">Founder corrected</StatusBadge>}<Trend history={trendHistory} />{history.length > 0 && <details className="sources-disclosure"><summary>GMP history ({history.length})</summary><ol>{history.map((item) => <li key={item.id}>{observedLabel(item.observed_at)} · {formatInr(item.value_per_share)} ({item.percent}%){item.value_per_share !== item.source_value_per_share ? ` · source ${formatInr(item.source_value_per_share)}` : ""}</li>)}</ol></details>}</div>{workspace && <IPOChoice key={`${ipo.id}:${selection?.decision}:${selection?.selected}`} workspaceId={workspace.id} ipoId={ipo.id} initial={selection} automaticEnabled={workspace.auto_select_enabled && !ipo.planning_only} recordOnly={ipo.planning_only} canEdit={workspace.role !== "VIEWER"} />}</div>}
+          {ipo.planning_only && <p className="plan-note">Select manually to create a record plan and record submission details at any time.</p>}{active && <div className="ipo-controls"><div className="ipo-gmp-detail">{ipo.gmp_has_founder_correction && <StatusBadge tone="info">Founder corrected</StatusBadge>}<Trend history={trendHistory} />{history.length > 0 && <details className="sources-disclosure"><summary>GMP history ({history.length})</summary><ol>{history.map((item) => <li key={item.id}>{observedLabel(item.observed_at)} · {formatInr(item.value_per_share)} ({item.percent}%){item.value_per_share !== item.source_value_per_share ? ` · source ${formatInr(item.source_value_per_share)}` : ""}</li>)}</ol></details>}</div>{workspace && <IPOChoice key={`${ipo.id}:${selection?.decision}:${selection?.selected}`} workspaceId={workspace.id} ipoId={ipo.id} initial={selection} automaticEnabled={workspace.auto_select_enabled && !ipo.planning_only} recordOnly={ipo.planning_only} accounts={accounts} shareholderTerms={ipo.shareholder_quota ? { minimumLots: ipo.shareholder_min_lots, maximumAmount: ipo.shareholder_max_amount, recordDate: ipo.shareholder_record_date, url: ipo.shareholder_terms_url } : undefined} canEdit={workspace.role !== "VIEWER"} />}</div>}
         </article> };
       })}
     />

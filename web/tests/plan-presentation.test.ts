@@ -158,3 +158,14 @@ test("manual record selections remain available after closing while submission e
   assert.equal(result.unavailableCount, 0);
   assert.equal(canExportPlan({ status: "READY", planning_only: true, planned_total: "0", rows: [], uncovered: [], audit_issues: [] }), false);
 });
+
+test("ASBA payloads omit UPI while shareholder and public rows remain separate", () => {
+  const shareholder: PlanRow = { ...row, category: "SHARE", lots: 13, amount: "195000.00", locked: true };
+  const bhni: PlanRow = { ...row, category: "BHNI", lots: 67, amount: "1005000.00", upi: "", locked: true };
+  const mappings = reviewedMappings([row, shareholder, bhni]);
+  assert.equal(mappings.length, 3);
+  assert.equal(mappings[0].upi, row.upi);
+  assert.equal(mappings[1].category, "SHARE");
+  assert.equal(mappings[2].upi, null);
+  assert.equal(lockedMappings([bhni])[0].upi, null);
+});

@@ -16,6 +16,7 @@ from planner.coverage import CoverageRow
 from planner.dto import PlannerSnapshot, canonical_json
 from planner.engine import PLANNER_VERSION, generate_proposal
 from planner.models import PlanRow, PlanRun
+from planner.quota_planning import QUOTA_VERSION, has_quota_rows, row_issue_codes
 
 
 def _verify_scope(workspace, snapshot: PlannerSnapshot) -> None:
@@ -160,6 +161,7 @@ def create_reviewed_plan_run(
     audit: AuditResult,
     actor,
     reserved_ipo_ids: list[str] | None = None,
+    quota_context=None,
 ) -> PlanRun:
     if not WorkspaceMembership.objects.filter(
         workspace=workspace,
@@ -172,20 +174,28 @@ def create_reviewed_plan_run(
         ({row.applicant_id for row in rows}, {item.id for item in snapshot.applicants}),
         ({row.demat_id for row in rows}, {item.id for item in snapshot.demats}),
         ({row.bank_id for row in rows}, {item.id for item in snapshot.banks}),
-        ({row.upi_id for row in rows}, {item.id for item in snapshot.upis}),
+        (
+            {row.upi_id for row in rows if row.category != "BHNI"},
+            {item.id for item in snapshot.upis},
+        ),
     )
     if any(not used <= known for used, known in refs):
         raise ValidationError("A plan mapping is outside this workspace")
     if audit.planned_total != sum((row.amount for row in rows), 0):
         raise ValidationError("Plan total differs from reviewed rows")
-    input_text = canonical_json((snapshot, rows))
+    extended = quota_context is not None and (quota_context.active or has_quota_rows(rows))
+    version = QUOTA_VERSION if extended else PLANNER_VERSION
+    input_text = canonical_json((snapshot, rows, quota_context) if extended else (snapshot, rows))
+    settings_text = canonical_json(
+        (snapshot.config, quota_context) if extended else snapshot.config
+    )
     plan_run = PlanRun.objects.create(
         workspace=workspace,
         generated_by=actor,
-        planner_version=PLANNER_VERSION,
-        settings_version=f"sha256:{sha256(canonical_json(snapshot.config).encode()).hexdigest()}",
+        planner_version=version,
+        settings_version=f"sha256:{sha256(settings_text.encode()).hexdigest()}",
         input_snapshot_hash=sha256(input_text.encode()).hexdigest(),
-        output_hash=sha256(canonical_json((PLANNER_VERSION, rows, audit)).encode()).hexdigest(),
+        output_hash=sha256(canonical_json((version, rows, audit)).encode()).hexdigest(),
         input_snapshot=input_text,
         status=PlanRun.Status.READY if audit.valid else PlanRun.Status.BLOCKED,
         planned_total=audit.planned_total,
@@ -211,7 +221,7 @@ def create_reviewed_plan_run(
                 upi_ref=row.upi_id,
                 locked=row.locked,
                 warnings=list(row.warnings),
-                blocking_reasons=issues_by_row.get((row.ipo_id, row.applicant_id), []),
+                blocking_reasons=row_issue_codes(audit.issues, row),
                 reasons=[asdict(reason) for reason in row.reasons],
             )
             for position, row in enumerate(rows)

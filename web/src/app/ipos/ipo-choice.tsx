@@ -2,13 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import ShareholderChoice, { type EligibleAccount, type ShareholderTerms } from "./shareholder-choice";
 
 export type IPOSelection = {
   ipo: string;
   decision: "DEFAULT" | "APPLY" | "SKIP";
-  mode: "RETAIL_ONLY" | "RETAIL_PLUS_SHNI" | "SHNI_PREFERRED" | "CUSTOM";
+  mode: "RETAIL_ONLY" | "RETAIL_PLUS_SHNI" | "SHNI_PREFERRED" | "CUSTOM" | "BHNI_PREFERRED";
   selected: boolean;
   reason: string;
+  shareholder_preferred?: boolean;
+  shareholder_terms_changed?: boolean;
+  shareholder_eligible?: string[];
 };
 
 function autoSelectionReason(choice: IPOSelection) {
@@ -24,13 +28,15 @@ function autoSelectionReason(choice: IPOSelection) {
   }
 }
 
-export default function IPOChoice({ workspaceId, ipoId, initial, canEdit, automaticEnabled, recordOnly = false }: {
+export default function IPOChoice({ workspaceId, ipoId, initial, canEdit, automaticEnabled, recordOnly = false, shareholderTerms, accounts = [] }: {
   workspaceId: string;
   ipoId: string;
   initial: IPOSelection | undefined;
   canEdit: boolean;
   automaticEnabled: boolean;
   recordOnly?: boolean;
+  shareholderTerms?: ShareholderTerms;
+  accounts?: EligibleAccount[];
 }) {
   const [choice, setChoice] = useState<IPOSelection>(initial ?? { ipo: ipoId, decision: "DEFAULT", mode: "RETAIL_ONLY", selected: false, reason: "GMP_UNAVAILABLE" });
   const [busy, setBusy] = useState(false);
@@ -68,12 +74,16 @@ export default function IPOChoice({ workspaceId, ipoId, initial, canEdit, automa
         <option value="RETAIL_ONLY">Retail Only</option>
         <option value="RETAIL_PLUS_SHNI">Retail + sHNI</option>
         <option value="SHNI_PREFERRED">sHNI Preferred</option>
+        <option value="BHNI_PREFERRED">bHNI Preferred (bank ASBA)</option>
         <option value="CUSTOM">Custom</option>
       </select>
     </label>
     {(choice.mode === "RETAIL_PLUS_SHNI" || choice.mode === "SHNI_PREFERRED") && <p className="ipo-mode-help">{choice.mode === "RETAIL_PLUS_SHNI"
       ? "Start with Retail coverage, then try an sHNI upgrade pass where funds allow."
       : "Start with Retail coverage, then repeat upgrades to fit as many minimum sHNI applications as possible."}</p>}</div>}
+    {choice.selected && choice.mode === "BHNI_PREFERRED" && <p className="ipo-mode-help">Try the minimum whole-lot amount above ₹10 lakh using each investor’s own bank ASBA account. Keep Retail where bHNI funds are unavailable.</p>}
+    {choice.shareholder_terms_changed && <p role="alert">Shareholder terms changed. Review and confirm eligible investors again.</p>}
+    {canEdit && shareholderTerms && <ShareholderChoice key={`${choice.shareholder_preferred}:${choice.shareholder_eligible?.join(",")}`} workspaceId={workspaceId} ipoId={ipoId} initial={choice} terms={shareholderTerms} accounts={accounts} onSaved={(next) => { setChoice(next); router.refresh(); }} />}
     {message && <p role="status">{message}</p>}
   </div>;
 }
