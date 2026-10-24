@@ -1,10 +1,11 @@
 # LotNeeti execution status
 
-## C25 Compact and aligned bank statement — verified locally, 2026-10-24
+## C25 Compact and aligned bank statement — deployed, 2026-10-24
 
 - Rename Balance after to Balance, align numeric headers and amounts, and show each statement entry in two compact lines. Keep full identifiers and notes available in a transaction details panel. Preserve signed-delta mapping and all saved balance history.
 - Removed the conflicting statement-header left-alignment override and consolidated statement styles. Explicit Date / Bank / Transaction / Debit / Credit / Balance columns keep monetary headers and values right-aligned. Bank and owner share the first line; UPI uses the second. Transfer direction and counterparty identity are arranged on two lines, with full identifiers and notes retained in an accessible details drawer.
 - Verification: 50 web tests passed, including positive/negative SET, add/remove, transfer-in/out, allotment and zero-delta column mapping. Frontend lint, typecheck, production build and diff checks passed. Isolated synthetic browser checks passed at 1280 and 1440px, with uniform 55px two-line rows and no horizontal statement overflow; narrow 390px width also fits. Light/dark themes and full transfer-details drawer were checked. No backend, migration or balance changes.
+- Commit `37e77a6` pushed and deployed through the VS Code terminal after an encrypted pre-release backup. Release archive SHA-256 `e2c6431e38f79025b0aa48ba5f6c7efc5f6a28ac00856d67c1ede4e8707ba892`. Live statement-component, theme and Funds source hashes match local. API/web/worker/beat are active, zero migrations are pending, Brevo remains configured, and current account settings (including enabled automation) were preserved. Read-only checks found the existing 17 investors, 9 banks, 13 plans and 171 applications. No customer transaction or balance was edited by this release.
 
 ## C24 Funds, Applications and IPO controls — deployed, 2026-10-23
 
