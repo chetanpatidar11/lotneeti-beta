@@ -269,7 +269,8 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
       <div className="plan-creation-grid">
         <section className="plan-context-card" aria-labelledby="selected-ipos-heading">
           <h2 id="selected-ipos-heading">Selected IPOs</h2>
-          {lookups.selectedIpos.length === 0 ? <EmptyState title={lookups.unavailableSelectedIpoCount > 0 ? "Your selected IPOs are closed." : "No IPOs selected."} detail={lookups.unavailableSelectedIpoCount > 0 ? "Choose an open or upcoming IPO before generating a plan." : "Choose an IPO to plan applications."} action={<Link href="/ipos">Review IPOs</Link>} /> : <ul className="selected-ipo-strip">
+          <p><Link href="/ipos?filter=closed">Select a closed IPO manually →</Link></p>
+          {lookups.selectedIpos.length === 0 ? <EmptyState title={lookups.unavailableSelectedIpoCount > 0 ? "Your selected IPOs are unavailable." : "No IPOs selected."} detail={lookups.unavailableSelectedIpoCount > 0 ? "Choose an available IPO before generating a plan." : "Choose an IPO to plan applications."} action={<Link href="/ipos">Review IPOs</Link>} /> : <ul className="selected-ipo-strip">
             {lookups.selectedIpos.map((selection) => <li key={selection.ipo}>
               <strong>{lookups.ipos[selection.ipo]?.name || "Selected IPO"}</strong>
               <span>{selection.mode === "RETAIL_ONLY" ? "Retail Only" : selection.mode === "RETAIL_PLUS_SHNI" ? "Retail + sHNI" : selection.mode === "SHNI_PREFERRED" ? "sHNI Preferred" : "Custom"}</span>
@@ -309,7 +310,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
           const ipo = lookups.ipos[row.ipo];
           return ipo ? [{ amount: row.amount, closeDate: ipo.closeDate, allotmentDate: ipo.allotmentDate, category: row.category }] : [];
         })))}</strong>. Total applications can exceed today’s Balance when money from an earlier IPO is reused after allotment. Each bank is checked at its application cutoff.</p>
-        {!validating && <p className="plan-note" role="status">{preview.planning_only ? "Record-only plan: save and track an application already made. Export is closed; planning ends at midnight IST." : !canExportPlan(preview) ? "⚠ Blocking: Resolve issues before export." : planStatus(preview) === "Warning" ? "Ready to export. Review the highlighted issues first." : "Ready to export."}</p>}
+        {!validating && <p className="plan-note" role="status">{preview.planning_only ? "Manual record plan: save and mark applications submitted at any time. Export for new bids is closed." : !canExportPlan(preview) ? "⚠ Blocking: Resolve issues before export." : planStatus(preview) === "Warning" ? "Ready to export. Review the highlighted issues first." : "Ready to export."}</p>}
         {preview.audit_issues.length > 0 && <div className="plan-error" role="alert">
           <strong>⚠ Blocking: Resolve these issues before export</strong>
           <ul>{preview.audit_issues.map((issue, index) => <li key={`${issue.code}-${index}`}>{issueMessage(issue.code)}</li>)}</ul>

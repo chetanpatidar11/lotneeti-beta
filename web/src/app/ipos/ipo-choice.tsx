@@ -24,12 +24,13 @@ function autoSelectionReason(choice: IPOSelection) {
   }
 }
 
-export default function IPOChoice({ workspaceId, ipoId, initial, canEdit, automaticEnabled }: {
+export default function IPOChoice({ workspaceId, ipoId, initial, canEdit, automaticEnabled, recordOnly = false }: {
   workspaceId: string;
   ipoId: string;
   initial: IPOSelection | undefined;
   canEdit: boolean;
   automaticEnabled: boolean;
+  recordOnly?: boolean;
 }) {
   const [choice, setChoice] = useState<IPOSelection>(initial ?? { ipo: ipoId, decision: "DEFAULT", mode: "RETAIL_ONLY", selected: false, reason: "GMP_UNAVAILABLE" });
   const [busy, setBusy] = useState(false);
@@ -59,7 +60,7 @@ export default function IPOChoice({ workspaceId, ipoId, initial, canEdit, automa
     {automaticEnabled && choice.decision === "DEFAULT" && !choice.selected && autoSelectionReason(choice) && <p className="selection-rule">{autoSelectionReason(choice)}</p>}
     {canEdit && <div className="ipo-choice-buttons">
       {automaticEnabled && <button type="button" disabled={busy} aria-pressed={choice.decision === "DEFAULT"} onClick={() => save({ decision: "DEFAULT" })}>Automatic</button>}
-      <button type="button" disabled={busy} aria-pressed={choice.decision === "APPLY"} onClick={() => save({ decision: choice.decision === "APPLY" ? "SKIP" : "APPLY" })}>{choice.decision === "APPLY" ? "Unselect" : "Select"}</button>
+      <button type="button" disabled={busy} aria-pressed={choice.decision === "APPLY"} onClick={() => save({ decision: choice.decision === "APPLY" ? "SKIP" : "APPLY" })}>{choice.decision === "APPLY" ? "Unselect" : recordOnly ? "Select manually" : "Select"}</button>
       <button type="button" disabled={busy} aria-pressed={choice.decision === "SKIP"} onClick={() => save({ decision: "SKIP" })}>Skip</button>
     </div>}
     {choice.selected && <div className="ipo-mode-stack"><label className="ipo-mode">IPO mode

@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## C27 Manual plans after IPO closing — locally verified, 2026-10-24
+
+- Allow explicit manual selection, planning, saving and application tracking after closing without a midnight limit. Closed, allotment and listed IPOs remain excluded from automatic selection. Preserve actual exchange dates/status, export restrictions, funding/duplicate/application limits and scoped permissions.
+
+- Implemented unlimited manual availability for closed/allotment/listed IPOs, a Select manually button and direct Closed-filter link from Plan. Removed the status substitution that allowed closing-day automatic selection after 17:00 IST. Actual dates/status and record-plan export restrictions remain intact. Full `scripts/check.sh` passed: 465 backend, 52 web and one Android test, planner matrix, Ruff/format, Django/migrations, lint/typecheck and production/Android builds. New regressions cover midnight, months-old plans, all closed statuses, stale OPEN status, high-GMP automatic exclusion, preview/validate/save/track/submit, outsider denial and cancelled/draft exclusion.
+
 ## C26 Synchronize linked UPI holders on bank-holder edits — deployed, 2026-10-24
 
 - Correct the server and immediate Settings state, which currently synchronize UPI holders only when completing placeholder banks. An explicit bank-holder save must synchronize all linked active/inactive UPIs in the same transaction; re-saving the same holder should repair stale links. Preserve unrelated banks, demats, UPI identifiers/limits, balances, application records, and existing workspace permissions.

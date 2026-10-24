@@ -11,19 +11,11 @@ INDIA_TIME_ZONE = ZoneInfo("Asia/Kolkata")
 def planning_window(
     *, status: str, close_date: date, now: datetime | None = None
 ) -> tuple[bool, bool]:
-    """Return (available, planning_only) for the IPO's closing-day plan grace period."""
-    instant = now or timezone.now()
-    local_now = instant.astimezone(INDIA_TIME_ZONE)
-    today = local_now.date()
-
-    if status in {"OPEN", "UPCOMING"} and close_date >= today:
-        available = True
-    else:
-        available = status == "CLOSED" and close_date == today
-
-    if not available:
+    """Return manual availability and whether the IPO is limited to record plans."""
+    if status not in {"OPEN", "UPCOMING", "CLOSED", "ALLOTMENT", "LISTED"}:
         return False, False
 
+    instant = now or timezone.now()
     application_cutoff = datetime.combine(close_date, time(17), tzinfo=INDIA_TIME_ZONE)
-    planning_only = status == "CLOSED" or local_now >= application_cutoff
+    planning_only = status in {"CLOSED", "ALLOTMENT", "LISTED"} or instant >= application_cutoff
     return True, planning_only

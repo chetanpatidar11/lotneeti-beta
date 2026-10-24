@@ -1,4 +1,4 @@
-"""Plan-only closing-day grace metadata shared by preview and export paths."""
+"""Manual record-plan metadata shared by preview and export paths."""
 
 import json
 from datetime import datetime

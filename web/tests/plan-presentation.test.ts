@@ -149,9 +149,12 @@ test("validation issues use plain copy and unknown codes never leak", () => {
 });
 
 
-test("closing-day record selection remains available while closed submission export is blocked", () => {
+test("manual record selections remain available after closing while submission export is blocked", () => {
   const result = splitPlanningSelections([{ ipo: "closed", mode: "RETAIL_ONLY" }], { closed: "CLOSED" }, { closed: true });
   assert.equal(result.available.length, 1);
+  for (const status of ["CLOSED", "ALLOTMENT", "LISTED"]) {
+    assert.equal(splitPlanningSelections([{ ipo: "old", mode: "RETAIL_ONLY" }], { old: status }, { old: true }).available.length, 1);
+  }
   assert.equal(result.unavailableCount, 0);
   assert.equal(canExportPlan({ status: "READY", planning_only: true, planned_total: "0", rows: [], uncovered: [], audit_issues: [] }), false);
 });

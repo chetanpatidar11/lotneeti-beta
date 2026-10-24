@@ -22,7 +22,8 @@ def assert_exportable_plan(
         raise ValidationError("Resolve blocking plan issues before export")
     if not allow_record_only and stored_snapshot_is_planning_only(plan_run.input_snapshot):
         raise ValidationError(
-            "This IPO is closed. Closing-day plans are for record keeping and cannot be exported."
+            "This IPO is closed. Manual plans after closing are for record keeping "
+            "and cannot be exported."
         )
     assert_current_bank_funding_rules(plan_run, ipo_id=ipo_id)
 
