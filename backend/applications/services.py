@@ -110,8 +110,6 @@ def edit_application(
         raise ValidationError("Only planned or submitted applications can be edited")
     if category not in {"RETAIL", "SHNI"} or type(lots) is not int or lots < 1:
         raise ValidationError("Choose a valid category and number of lots")
-    if category == "RETAIL" and lots != 1:
-        raise ValidationError("Retail applications use one lot")
     bank = BankAccount.objects.filter(
         pk=bank_id, workspace=item.workspace, active=True, is_placeholder=False
     ).first()
@@ -123,6 +121,8 @@ def edit_application(
     if upi is None:
         raise ValidationError("Choose an active UPI linked to that bank")
     amount = (item.amount / item.lots * lots).quantize(Decimal("0.01"))
+    if category == "RETAIL" and amount > Decimal("200000.00"):
+        raise ValidationError("Retail applications cannot exceed ₹2,00,000. Choose sHNI.")
     if category == "SHNI" and amount <= Decimal("200000.00"):
         raise ValidationError("sHNI applications must be above ₹2,00,000")
     if (category, lots, bank.pk, upi.pk) == (item.category, item.lots, item.bank_id, item.upi_id):

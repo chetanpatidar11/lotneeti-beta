@@ -49,15 +49,15 @@ def test_category_and_lots_recalculate_exact_amount_and_revalidate_cash():
 
 @pytest.mark.django_db
 @override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="ALLOW")
-def test_invalid_retail_lots_and_duplicate_applicant_ipo_are_blocking():
+def test_retail_above_category_limit_and_duplicate_applicant_ipo_are_blocking():
     owner, workspace, investor, ipo, _ = setup_workspace()
     client = APIClient()
     client.force_authenticate(owner)
     url = reverse("planner-validate", args=[workspace.pk])
     original = edited_row(investor, ipo)
-    invalid_lots = client.post(url, {"rows": [original | {"lots": 2}]}, format="json")
+    invalid_lots = client.post(url, {"rows": [original | {"lots": 14}]}, format="json")
     assert invalid_lots.status_code == 200
-    assert invalid_lots.data["rows"][0]["amount"] == "30000.00"
+    assert invalid_lots.data["rows"][0]["amount"] == "210000.00"
     assert "INVALID_CATEGORY" in invalid_lots.data["rows"][0]["blocking_reasons"]
     duplicate = client.post(url, {"rows": [original, original]}, format="json")
     assert duplicate.status_code == 200

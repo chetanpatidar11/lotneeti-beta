@@ -30,7 +30,7 @@ The legacy planner already established useful behavior: one-PAN-per-IPO eligibil
 
 | Decision | Planner v2 rule |
 | --- | --- |
-| Retail quote | Exactly 1 lot by default. |
+| Retail quote | Automatic default is 1 lot. Manual edits may use more whole lots up to ₹2,00,000. |
 | sHNI threshold | Strictly more than ₹2,00,000. |
 | Automatic sHNI quote | Smallest whole-lot amount strictly above ₹2,00,000. Do not top up merely because more cash exists. |
 | Rolling window | 24 hours. |
@@ -330,7 +330,7 @@ Every generated row is editable before export. User changes trigger immediate va
 | --- | --- |
 | Applicant | Revalidate duplicate PAN, eligibility and demat. |
 | Category | Recalculate lots/amount and enforce Retail OR sHNI exclusivity. |
-| Lots | Recalculate amount and rolling-limit/cash impact. |
+| Lots | Allow manual whole-lot edits above the automatic defaults; recalculate amount and rolling-limit/cash impact. Retail must be at most ₹2,00,000 and sHNI strictly above ₹2,00,000. Preserve valid locked lots during re-planning. |
 | Demat | Validate ownership/active state. |
 | Bank | Recalculate available cash, owner protection and policy. |
 | UPI | Validate bank mapping, active/verified state, limits and cross-funding warning. |

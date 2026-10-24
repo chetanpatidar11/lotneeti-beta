@@ -112,7 +112,7 @@ def test_manual_lots_amount_mismatch_is_blocking_and_never_recalculated():
     row = locked_coverage(data).rows[0]
     assert row.lots == 2 and row.amount == Decimal("15000.00")
     assert "INVALID_AMOUNT" in row.blocking_reasons
-    assert "INVALID_CATEGORY" in row.blocking_reasons
+    assert "INVALID_CATEGORY" not in row.blocking_reasons
 
 
 def test_lm008_unselected_ipo_removes_old_draft_lock_from_new_plan():

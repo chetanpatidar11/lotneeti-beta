@@ -230,7 +230,7 @@ def test_edit_rejects_other_workspace_payment_mapping_and_invalid_lots():
     assert (
         client.post(
             url,
-            {"category": "RETAIL", "lots": 2, "bank": str(item.bank_id), "upi": str(item.upi_id)},
+            {"category": "RETAIL", "lots": 14, "bank": str(item.bank_id), "upi": str(item.upi_id)},
             format="json",
         ).status_code
         == 409

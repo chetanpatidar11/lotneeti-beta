@@ -291,6 +291,7 @@ class PlannerRunCreateView(APIView):
             {
                 "id": str(run.pk),
                 "status": run.status,
+                "planning_only": snapshot_is_planning_only(snapshot),
                 "planned_total": str(run.planned_total),
                 "input_snapshot_hash": run.input_snapshot_hash,
                 "output_hash": run.output_hash,

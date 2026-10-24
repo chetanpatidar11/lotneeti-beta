@@ -113,6 +113,7 @@ def test_old_closed_ipo_manual_api_flow_preview_validate_save_submit_and_scope(m
     assert validated.data["status"] == "READY"
     saved = client.post(reverse("planner-run-create", args=[workspace.pk]), payload, format="json")
     assert saved.status_code == 201, saved.data
+    assert saved.data["planning_only"] is True
     run = PlanRun.objects.get()
     with pytest.raises(ValidationError, match="record keeping"):
         assert_exportable_plan(run)

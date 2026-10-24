@@ -144,8 +144,11 @@ def audit_plan(
             expected_amount = ipo.upper_price * ipo.lot_size * row.lots
             if row.amount != expected_amount or row.amount <= 0:
                 issue("INVALID_AMOUNT", "The application amount does not match its lots.")
-            if row.category == "RETAIL" and row.lots != 1:
-                issue("INVALID_CATEGORY", "Retail applications use exactly one lot.")
+            if row.category == "RETAIL" and row.amount > Decimal("200000.00"):
+                issue(
+                    "INVALID_CATEGORY",
+                    "Retail applications cannot exceed ₹2,00,000. Choose sHNI for a higher amount.",
+                )
             if row.category == "SHNI" and row.amount <= Decimal("200000.00"):
                 issue("INVALID_CATEGORY", "sHNI applications must exceed ₹2,00,000.")
         if row.locked and row.blocking_reasons:

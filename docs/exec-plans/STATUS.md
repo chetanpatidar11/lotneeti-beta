@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## C28 Manual lot edits — locally verified, 2026-10-24
+
+- Allow whole-lot edits above automatic defaults in Edit draft application and tracked application edits. Recalculate amounts, preserve manual locks, keep automatic default sizes, and validate category amounts, cash, duplicate applications and rolling limits across preview/save/re-plan/track.
+
+- Enabled Retail lot inputs in both edit forms and safely handle an empty draft quantity. Replaced the one-lot hard rule in manual audit, lock validation, repair feasibility and tracked edits with the Retail amount ceiling; automatic default quotes remain unchanged. Added the missing record-only flag to save responses so editing/saving a closed IPO retains correct export messaging. Full `scripts/check.sh` passed: 475 backend, 52 web and one Android test plus planner matrix, lint/format/typecheck/migration checks and production/Android builds. New tests cover positive integer quantities, ₹2 lakh boundary, cash rejection, lock/re-plan preservation, saving/tracking/submitted edits and repair/audit consistency. Synthetic browser editing changed 1 lot to 2, immediately recalculated ₹15,000 to ₹30,000, survived clearing/re-entering input and remained locked through re-planning.
+
 ## C27 Manual plans after IPO closing — deployed, 2026-10-24
 
 - Allow explicit manual selection, planning, saving and application tracking after closing without a midnight limit. Closed, allotment and listed IPOs remain excluded from automatic selection. Preserve actual exchange dates/status, export restrictions, funding/duplicate/application limits and scoped permissions.

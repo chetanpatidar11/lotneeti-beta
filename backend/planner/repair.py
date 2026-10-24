@@ -51,7 +51,7 @@ def _rows_feasible(snapshot: PlannerSnapshot, rows: tuple[CoverageRow, ...]) -> 
         expected_amount = ipo.upper_price * ipo.lot_size * row.lots
         if row.lots < 1 or row.amount != expected_amount:
             return False
-        if row.category == "RETAIL" and row.lots != 1:
+        if row.category == "RETAIL" and row.amount > 200000:
             return False
         if row.category == "SHNI" and row.amount <= 200000:
             return False

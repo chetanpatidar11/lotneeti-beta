@@ -56,7 +56,7 @@ def locked_coverage(snapshot: PlannerSnapshot) -> CoverageResult:
             expected_amount = ipo.upper_price * ipo.lot_size * locked.lots
             if locked.amount != expected_amount or locked.amount <= 0:
                 reasons.append("INVALID_AMOUNT")
-            if locked.category == "RETAIL" and locked.lots != 1:
+            if locked.category == "RETAIL" and locked.amount > Decimal("200000.00"):
                 reasons.append("INVALID_CATEGORY")
             if locked.category == "SHNI" and locked.amount <= Decimal("200000.00"):
                 reasons.append("INVALID_CATEGORY")

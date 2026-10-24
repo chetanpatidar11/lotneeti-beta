@@ -253,7 +253,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
   }
 
   async function saveDraftEdit() {
-    if (editingIndex === null || !editDraft) return;
+    if (editingIndex === null || !editDraft || !Number.isSafeInteger(editDraft.lots) || editDraft.lots < 1) return;
     await updateRow(editingIndex, {
       applicant: editDraft.applicant, demat: editDraft.demat, bank: editDraft.bank,
       upi: editDraft.upi, category: editDraft.category, lots: editDraft.lots,
@@ -353,14 +353,15 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
           const ipo = lookups.ipos[editDraft.ipo];
           updateDraft({ category, lots: category === "RETAIL" ? 1 : ipo ? minimumShniLots(ipo.upperPrice, ipo.lotSize) : editDraft.lots });
         }}><option value="RETAIL">Retail</option><option value="SHNI">sHNI</option></select>
-        <label htmlFor="draft-lots">Lots</label><input id="draft-lots" type="number" min={editDraft.category === "SHNI" && lookups.ipos[editDraft.ipo] ? minimumShniLots(lookups.ipos[editDraft.ipo].upperPrice, lookups.ipos[editDraft.ipo].lotSize) : 1} step="1" value={editDraft.lots} disabled={editDraft.category === "RETAIL"} onChange={(event) => updateDraft({ lots: Number(event.target.value) })} />
+        <label htmlFor="draft-lots">Lots</label><input id="draft-lots" type="number" min={editDraft.category === "SHNI" && lookups.ipos[editDraft.ipo] ? minimumShniLots(lookups.ipos[editDraft.ipo].upperPrice, lookups.ipos[editDraft.ipo].lotSize) : 1} step="1" required value={editDraft.lots || ""} onChange={(event) => updateDraft({ lots: Number(event.target.value) })} />
+        <p className="intro">Choose whole lots. Retail totals can be up to ₹2,00,000; choose sHNI for a higher amount.</p>
         <label htmlFor="draft-bank">Funding bank</label><select id="draft-bank" value={editDraft.bank} onChange={(event) => {
           const bank = event.target.value;
           const upi = selectableUpis(lookups.upis, bank, editDraft.applicant)[0];
           updateDraft({ bank, upi: upi?.id ?? editDraft.upi });
         }}>{!lookups.banks[editDraft.bank] && <option value={editDraft.bank} disabled>Current bank unavailable</option>}{rankedBanks(lookups.banks, lookups.upis, lookups.preferences[editDraft.applicant] ?? [], editDraft.applicant).map((option) => <option key={option.id} value={option.id} disabled={option.disabled}>{option.group}: {lookups.banks[option.id].label}</option>)}</select>
         <label htmlFor="draft-upi">UPI</label><select id="draft-upi" value={editDraft.upi} onChange={(event) => updateDraft({ upi: event.target.value })}>{!selectableUpis(lookups.upis, editDraft.bank, editDraft.applicant).some((upi) => upi.id === editDraft.upi) && <option value={editDraft.upi} disabled>Current UPI unavailable</option>}{selectableUpis(lookups.upis, editDraft.bank, editDraft.applicant).map((upi) => <option key={upi.id} value={upi.id}>{upi.label}</option>)}</select>
-        <p className="intro">Amount: {lookups.ipos[editDraft.ipo] ? formatInr(amountForLots(lookups.ipos[editDraft.ipo].upperPrice, lookups.ipos[editDraft.ipo].lotSize, editDraft.lots)) : "—"}</p>
+        <p className="intro">Amount: {lookups.ipos[editDraft.ipo] && Number.isSafeInteger(editDraft.lots) && editDraft.lots > 0 ? formatInr(amountForLots(lookups.ipos[editDraft.ipo].upperPrice, lookups.ipos[editDraft.ipo].lotSize, editDraft.lots)) : "—"}</p>
         <label className="draft-lock-label"><input type="checkbox" checked={editDraft.locked} onChange={(event) => updateDraft({ locked: event.target.checked })} /> Keep this application when re-planning</label>
         <button type="submit" disabled={busy || validating}>Save changes</button>
       </form></Drawer>}
