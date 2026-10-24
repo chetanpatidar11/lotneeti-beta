@@ -151,6 +151,37 @@ def test_shareholder_maximum_precedes_public_upgrade_in_each_preferred_mode(mode
 
 
 @pytest.mark.django_db
+@override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="ALLOW")
+def test_blocked_dual_quota_plan_keeps_all_saved_applications_visible_without_tracking():
+    _, workspace, _, _, _, client = setup_quota()
+    rows = client.post(reverse("planner-preview", args=[workspace.pk]), {}, format="json").data[
+        "rows"
+    ]
+    # A reviewed but overcommitted bank/UPI mapping reproduces the reported 23-row plan.
+    first = rows[0]
+    changed = [row | {"bank": first["bank"], "upi": first["upi"]} for row in rows]
+    saved = client.post(
+        reverse("planner-run-create", args=[workspace.pk]), {"rows": changed}, format="json"
+    )
+    assert saved.status_code == 201 and saved.data["status"] == "BLOCKED"
+    run = PlanRun.objects.get()
+    result = client.get(reverse("application-list", args=[workspace.pk]))
+    assert len(result.data) == 23
+    assert sum(item["category"] == "SHARE" for item in result.data) == 8
+    assert all(item["status"] == "PLANNED" and item["is_plan_row"] for item in result.data)
+    assert {item["plan_row_id"] for item in result.data} == {
+        str(pk) for pk in run.rows.values_list("pk", flat=True)
+    }
+    assert (
+        client.post(
+            reverse("application-start-tracking", args=[workspace.pk, run.pk]), {}, format="json"
+        ).status_code
+        == 409
+    )
+    assert Application.objects.count() == 0
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize("balance,share_lots", [("60000", [1, 1]), ("90000", [3, 1])])
 @override_settings(PLANNER_PLATFORM_CROSS_FUNDING_POLICY="ALLOW")
 def test_all_shareholders_receive_minimum_before_any_increase_with_shared_funds(

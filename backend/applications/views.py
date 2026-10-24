@@ -84,9 +84,9 @@ def _result(item):
 
 
 def _saved_plan_rows(workspace, tracked):
-    """Show current reserved plan rows before they become tracked applications."""
+    """Show saved rows, including plans that still need review, without tracking them."""
     latest = PlanRun.objects.filter(workspace=workspace).first()
-    if latest is None or latest.status != PlanRun.Status.READY:
+    if latest is None or latest.status not in {PlanRun.Status.READY, PlanRun.Status.BLOCKED}:
         return []
     rows = list(latest.rows.all())
     if latest.reserved_ipo_ids is not None:

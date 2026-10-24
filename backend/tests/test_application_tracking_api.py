@@ -14,6 +14,7 @@ from applications.models import Application
 from core.models import AuditEvent
 from funding.models import BalanceChange, BankAccount
 from planner.export_readiness import assert_exportable_plan
+from planner.models import PlanRun
 from planner.persistence import create_plan_run
 
 
@@ -71,6 +72,70 @@ def test_saved_plan_projection_clears_and_foreign_rows_cannot_be_materialized():
     assert Application.objects.count() == 0
     assert client.post(reverse("planner-run-clear", args=[workspace.pk, run.pk])).status_code == 200
     assert client.get(list_url).data == []
+
+
+@pytest.mark.django_db
+def test_latest_blocked_plan_is_visible_but_cannot_be_tracked_and_respects_clear_and_reservations():
+    owner, workspace, snapshot = setup_plan()
+    old = create_plan_run(workspace=workspace, snapshot=snapshot, actor=owner)
+    low_cash = replace(snapshot, banks=(replace(snapshot.banks[0], balance=Decimal("0")),))
+    # Retain the previously reviewed mapping in a saved plan that now fails cash validation.
+    from planner.audit import audit_plan
+    from planner.coverage import CoverageRow
+    from planner.persistence import create_reviewed_plan_run
+
+    previous = old.rows.get()
+    rows = (
+        CoverageRow(
+            previous.ipo_ref,
+            previous.applicant_ref,
+            previous.category,
+            previous.lots,
+            previous.amount,
+            previous.demat_ref,
+            previous.bank_ref,
+            previous.upi_ref,
+        ),
+    )
+    run = create_reviewed_plan_run(
+        workspace=workspace,
+        snapshot=low_cash,
+        rows=rows,
+        audit=audit_plan(low_cash, rows, reported_planned_total=rows[0].amount),
+        actor=owner,
+    )
+    assert run.status == PlanRun.Status.BLOCKED
+    client = APIClient()
+    client.force_authenticate(owner)
+    list_url = reverse("application-list", args=[workspace.pk])
+    data = client.get(list_url).data
+    assert len(data) == 1
+    assert data[0]["plan_row_id"] == str(run.rows.get().pk)
+    assert data[0]["status"] == "PLANNED" and data[0]["is_plan_row"] is True
+    assert data[0]["plan_row_id"] != str(previous.pk)
+    assert Application.objects.count() == 0
+    track_url = reverse("application-start-tracking", args=[workspace.pk, run.pk])
+    denied = client.post(track_url, {"row_ids": [data[0]["plan_row_id"]]}, format="json")
+    assert denied.status_code == 409
+    assert Application.objects.count() == 0
+    run.reserved_ipo_ids = []
+    run.save(update_fields=["reserved_ipo_ids"])
+    assert client.get(list_url).data == []
+    run.reserved_ipo_ids = [previous.ipo_ref]
+    run.save(update_fields=["reserved_ipo_ids"])
+    assert len(client.get(list_url).data) == 1
+    viewer = User.objects.create_user(email="blocked-plan-viewer@example.test")
+    WorkspaceMembership.objects.create(workspace=workspace, user=viewer, role="VIEWER")
+    client.force_authenticate(viewer)
+    assert len(client.get(list_url).data) == 1
+    assert client.post(track_url, {}).status_code == 403
+    outsider = User.objects.create_user(email="blocked-plan-outsider@example.test")
+    client.force_authenticate(outsider)
+    assert client.get(list_url).status_code == 404
+    client.force_authenticate(owner)
+    assert client.post(reverse("planner-run-clear", args=[workspace.pk, run.pk])).status_code == 200
+    assert client.get(list_url).data == []
+    assert run.rows.count() == 1
 
 
 @pytest.mark.django_db

@@ -142,6 +142,7 @@ input[type="checkbox"] { min-height: auto; accent-color: var(--accent); }
 .drawer-body .sign-in-form { margin: 0; }
 .plan-error { padding: 12px 14px; border: 1px solid #824343; border-radius: 7px; background: #352123; color: #f2b8b6; }
 .plan-note, .plan-empty { padding: 12px 14px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-raised); color: var(--muted); }
+.plan-review-notice { margin-bottom: 16px; border-color: var(--warning); }
 .status { margin-top: 16px; color: var(--warning); font-size: 12px; }
 .status.connected { color: var(--positive); }
 .status-dot { background: currentColor; }

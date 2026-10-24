@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { applicationHistory, type ApplicationHistoryInput } from "@/lib/application-history";
 import { formatInr } from "@/lib/money";
+import { savedApplicationNeedsReview } from "@/lib/application-plan";
 import { categoryLabel } from "@/lib/application-category";
 import { amountForLots, applicationLotAmount, minimumBhniLots, minimumShniLots } from "@/lib/plan-amount";
 import { Drawer } from "@/components/drawer";
@@ -136,6 +137,8 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
     (current[item.ipo] ??= []).push(item);
     return current;
   }, {}));
+  const needsPlanReview = (item: ApplicationItem) => savedApplicationNeedsReview(item.is_plan_row, latestRun.status);
+  const canSelect = (item: ApplicationItem) => canCancel(item) && !needsPlanReview(item);
   const eligibleUpis = upis.filter((upi) => upi.bank === editBank && upi.active && upi.verified);
 
   function replaceItems(changed: ApplicationItem[]) {
@@ -150,7 +153,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
   async function materializePlanned(chosen: ApplicationItem[]): Promise<Map<string, ApplicationItem>> {
     const drafts = chosen.filter((item) => item.is_plan_row);
     if (drafts.length === 0) return new Map();
-    if (!latestRun.id || latestRun.status !== "READY") throw new Error("This plan is no longer available. Refresh Applications.");
+    if (!latestRun.id || latestRun.status !== "READY") throw new Error("This saved plan needs review. Resolve its issues in Plan before updating applications.");
     const response = await fetch(`/api/workspaces/${workspaceId}/planner/runs/${latestRun.id}/track`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -263,6 +266,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
     <PageHeader eyebrow="Execution" title="Applications" description="Manage planned applications by IPO, then record submission and results." />
     {error && <div className="plan-error" role="alert">{error}</div>}
     {message && <p className="plan-success" role="status">{message}</p>}
+    {latestRun.status === "BLOCKED" && !initialLoadError && <div className="plan-note plan-review-notice" role="status"><strong>Your saved plan needs review.</strong> Its planned applications are shown below. Resolve the funding or bank/UPI-limit issues in Plan before marking them submitted. <Link href="/plan">Review plan →</Link></div>}
     {initialLoadError ? <div className="plan-error" role="alert">Applications could not be loaded. <button className="button-ghost" type="button" onClick={() => window.location.reload()}>Retry</button></div> : items.length === 0 ? <EmptyState title="No planned applications yet." detail="Save a ready plan to see its applications here." action={<Link href="/plan">Review plan →</Link>} /> : <>
       <section className="application-ipo-picker" aria-label="Application filters">
         <label>Select an IPO<select id="application-ipo-choice" value={ipoFilter} onChange={(event) => { setIpoFilter(event.target.value); setSearch(""); setSelectedIds([]); }}><option value="">Select an IPO</option>{ipoOptions.map(([id, option]) => <option key={id} value={id}>{option.name} · closes {dateLabel(option.closeDate)}</option>)}</select></label>
@@ -283,23 +287,23 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
       </div>
       {canEdit && selectedItems.length > 0 && <div className="application-bulk" role="group" aria-label="Selected application actions"><strong>{selectedItems.length} selected</strong><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "PLANNED")} onClick={() => void bulkUpdate("submit", selectedIds)}>Mark submitted</button><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "SUBMITTED")} onClick={() => void bulkUpdate("block", selectedIds)}>Mark blocked</button><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "BLOCKED")} onClick={() => void bulkUpdate("not-allotted", selectedIds)}>Not allotted</button><button type="button" className="button-danger" disabled={busy || !selectedItems.every(canCancel)} onClick={() => setPendingCancelIds(selectedIds)}>Cancel selected</button><button type="button" className="button-ghost" onClick={() => setSelectedIds([])}>Clear</button></div>}
       {groups.length === 0 ? <EmptyState title="No applications match these filters." detail="Try a different IPO, status or search." /> : groups.map(([ipoId, group]) => {
-        const eligibleIds = group.filter(canCancel).map((item) => item.id);
+        const eligibleIds = group.filter(canSelect).map((item) => item.id);
         return <section className="application-ipo-group" key={ipoId} aria-label={`${group[0].ipo_name} applications`}>
           <header className="application-ipo-heading"><div><h2>{group[0].ipo_name}</h2><p>{group.length} {group.length === 1 ? "application" : "applications"} · Closes {dateLabel(group[0].close_date)}</p></div>{canEdit && eligibleIds.length > 0 && <label className="application-select-group application-select-mobile"><input type="checkbox" aria-label="Select all visible applications" checked={eligibleIds.every((id) => selectedIds.includes(id))} onChange={(event) => toggleSelection(eligibleIds, event.target.checked)} disabled={busy} /></label>}</header>
           <div className="application-table-wrap"><table className="application-table"><thead><tr>{canEdit && <th scope="col" className="application-select-heading"><label className="application-select-group"><input type="checkbox" aria-label="Select all visible applications" checked={eligibleIds.length > 0 && eligibleIds.every((id) => selectedIds.includes(id))} onChange={(event) => toggleSelection(eligibleIds, event.target.checked)} disabled={busy || eligibleIds.length === 0} /></label></th>}<th scope="col">Applicant</th><th scope="col">Category</th><th scope="col">Amount</th><th scope="col">Bank / UPI</th><th scope="col">Status</th><th scope="col">Important date</th><th scope="col">Actions</th></tr></thead><tbody>{group.map((item) => { const date = importantDate(item); return <tr key={item.id}>
-            {canEdit && <td data-label="Select" className="application-select-cell">{canCancel(item) && <input type="checkbox" aria-label={`Select ${item.applicant_name} for ${item.ipo_name}`} checked={selectedIds.includes(item.id)} disabled={busy} onChange={(event) => toggleSelection([item.id], event.target.checked)} />}</td>}
+            {canEdit && <td data-label="Select" className="application-select-cell">{canSelect(item) && <input type="checkbox" aria-label={`Select ${item.applicant_name} for ${item.ipo_name}`} checked={selectedIds.includes(item.id)} disabled={busy} onChange={(event) => toggleSelection([item.id], event.target.checked)} />}</td>}
             <th scope="row" data-label="Applicant">{item.applicant_name}</th>
             <td data-label="Category">{categoryLabel(item.category)} <small>{item.lots} {item.lots === 1 ? "lot" : "lots"}</small></td>
             <td data-label="Amount" className="money-cell">{formatInr(item.amount)}</td>
             <td data-label="Bank / UPI">{item.bank_label} <small>{item.upi_label}</small></td>
-            <td data-label="Status"><StatusBadge tone={statusTone(item)}>{outcomeLabel(item)}</StatusBadge></td>
+            <td data-label="Status"><StatusBadge tone={needsPlanReview(item) ? "warning" : statusTone(item)}>{needsPlanReview(item) ? "Needs review" : outcomeLabel(item)}</StatusBadge></td>
             <td data-label="Important date">{date.label && <small>{date.label}</small>} {date.value}</td>
             <td data-label="Actions"><div className="application-row-actions">
-              {canEdit && item.status === "PLANNED" && <button type="button" disabled={busy} onClick={() => void update(item, "submit")}>Mark submitted</button>}
+              {canEdit && !needsPlanReview(item) && item.status === "PLANNED" && <button type="button" disabled={busy} onClick={() => void update(item, "submit")}>Mark submitted</button>}
               {canEdit && item.status === "SUBMITTED" && <button type="button" disabled={busy} onClick={() => void update(item, "block")}>Mark blocked</button>}
               {canEdit && item.status === "BLOCKED" && <button type="button" disabled={busy} onClick={() => { setResultError(""); setResultId(item.id); }}>Record result</button>}
-              {canEdit && (item.status === "PLANNED" || item.status === "SUBMITTED") && <button type="button" className="button-secondary" disabled={busy} onClick={() => void openEdit(item)}>Edit</button>}
-              {canEdit && canCancel(item) && <button type="button" className="button-ghost-danger" disabled={busy} onClick={() => setPendingCancelIds([item.id])}>Cancel</button>}
+              {canEdit && !needsPlanReview(item) && (item.status === "PLANNED" || item.status === "SUBMITTED") && <button type="button" className="button-secondary" disabled={busy} onClick={() => void openEdit(item)}>Edit</button>}
+              {canEdit && canSelect(item) && <button type="button" className="button-ghost-danger" disabled={busy} onClick={() => setPendingCancelIds([item.id])}>Cancel</button>}
               {item.status === "ALLOTTED" && <Link className="button-secondary" href="/portfolio">View holding</Link>}
               <button type="button" className="button-ghost" onClick={() => setSelectedId(item.id)}>Details</button>
             </div></td>
@@ -309,7 +313,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
       </>}
     </>}
     {selectedItem && <Drawer title={`${selectedItem.applicant_name} · ${selectedItem.ipo_name}`} onClose={() => setSelectedId(null)}>
-      <div className="application-detail"><StatusBadge tone={statusTone(selectedItem)}>{outcomeLabel(selectedItem)}</StatusBadge><p>{categoryLabel(selectedItem.category)} · {selectedItem.lots} {selectedItem.lots === 1 ? "lot" : "lots"} · {formatInr(selectedItem.amount)}</p><p>{selectedItem.bank_label} · {selectedItem.upi_label}</p></div>
+      <div className="application-detail"><StatusBadge tone={needsPlanReview(selectedItem) ? "warning" : statusTone(selectedItem)}>{needsPlanReview(selectedItem) ? "Needs review" : outcomeLabel(selectedItem)}</StatusBadge><p>{categoryLabel(selectedItem.category)} · {selectedItem.lots} {selectedItem.lots === 1 ? "lot" : "lots"} · {formatInr(selectedItem.amount)}</p><p>{selectedItem.bank_label} · {selectedItem.upi_label}</p></div>
       <h3>Progress</h3><ol className="application-timeline">{applicationHistory(selectedItem).map((event, index) => <li key={`${event.at}-${index}`}><time dateTime={event.at}>{displayTime(event.at)}</time><span>{event.label}</span></li>)}</ol>
       {selectedItem.status === "ALLOTTED" && <Link href="/portfolio">View holding →</Link>}
     </Drawer>}

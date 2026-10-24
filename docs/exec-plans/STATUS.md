@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## C31 Show saved plans that need review in Applications — locally verified, 2026-10-24
+
+- The founder's 23-row plan is saved as BLOCKED with cash and rolling-limit conflicts. The Applications projection currently omits every row unless the latest plan is READY. Show current reserved rows from saved blocked plans as well, with a clear Needs review state and a route back to Plan; retain the existing server denial of tracking/submission until the whole plan is ready. Preserve mappings, quantities, balances, application records, latest-plan scoping and cleared/partial-reservation behavior.
+- The latest saved blocked rows now appear as Planned in the normal IPO/category/status filters, with Needs review badges and a notice linking to Plan. Saved rows cannot be selected, edited, cancelled or marked submitted while the plan is unready; already tracked applications retain their normal actions. The existing server tracking gate still rejects blocked plans. Cleared and unreserved rows remain hidden; older plans do not reappear.
+- Full `scripts/check.sh` passed: 507 backend, 56 web and one Android test, frozen planner matrix, Ruff/format, Django/migration drift, lint/typecheck and production/Android builds. Regressions cover a blocked 15-public/8-shareholder plan, read-only listing, no materialization, viewer/outsider scope, latest-only, clear and reservations. Synthetic browser verified all 23 rows with Needs review and Details only, then Generate/Save produced a Ready plan and restored all 23 Mark submitted buttons. Read-only production checks confirmed the old saved mappings fail funding/limit checks while a fresh 23-row proposal and save review pass. No production plan was regenerated or overwritten.
+
 ## C30 Shareholder priority before public upgrades — deployed, 2026-10-24
 
 - For shareholder-preferred IPOs, reserve normal Retail coverage, add minimum shareholder coverage for all eligible investors, maximize shareholder lots, then use residual funding for public sHNI/bHNI upgrades. Preserve manual locks, explicit modes, cash/UPI limits and the unchanged legacy engine/default flow. Move Shareholder preferred to the left of the IPO controls and explain the priority order.

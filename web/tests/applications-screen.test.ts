@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ApplicationsScreen, { type ApplicationItem } from "../src/app/applications/applications-screen";
+import { savedApplicationNeedsReview } from "../src/lib/application-plan";
 
 const item: ApplicationItem = {
   id: "application-1",
@@ -67,4 +68,28 @@ test("IPO choices put the latest closing issue first", () => {
   }));
   assert.ok(page.indexOf("Newer Issue") < page.indexOf("Middle Issue"));
   assert.ok(page.indexOf("Middle Issue") < page.indexOf("Synthetic Industries"));
+});
+
+test("saved blocked plans show a review message and retain their IPO choice", () => {
+  const page = renderToStaticMarkup(createElement(ApplicationsScreen, {
+    workspaceId: "workspace-1",
+    canEdit: true,
+    initialItems: [{ ...item, is_plan_row: true }],
+    latestRun: { id: "blocked-plan", status: "BLOCKED" },
+  }));
+  assert.match(page, /Your saved plan needs review/);
+  assert.match(page, /Its planned applications are shown below/);
+  assert.match(page, /funding or bank\/UPI-limit issues/);
+  assert.match(page, /href="\/plan"/);
+  assert.match(page, /Synthetic Industries/);
+  assert.doesNotMatch(page, /No planned applications yet/);
+});
+
+test("unready saved rows require review while tracked applications stay usable", () => {
+  for (const status of ["BLOCKED", "CLEARED", null]) {
+    assert.equal(savedApplicationNeedsReview(true, status), true);
+    assert.equal(savedApplicationNeedsReview(false, status), false);
+  }
+  assert.equal(savedApplicationNeedsReview(true, "READY"), false);
+  assert.equal(savedApplicationNeedsReview(false, "READY"), false);
 });
