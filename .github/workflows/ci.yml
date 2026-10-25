@@ -65,6 +65,8 @@ jobs:
           python backend/manage.py migrate --noinput
           python backend/manage.py check
       - name: Test, lint, typecheck, migration drift, and build
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
         run: bash scripts/check.sh
       - name: Verify application lifecycle and row locks on PostgreSQL
         run: >-
