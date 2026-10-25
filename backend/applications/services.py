@@ -145,7 +145,7 @@ def edit_application(
     *, application: Application, actor, category: str, lots: int, bank_id, upi_id, record_only=False
 ) -> Application:
     item = (
-        Application.objects.select_for_update()
+        Application.objects.select_for_update(of=("self",))
         .select_related("ipo", "bank", "upi")
         .get(pk=application.pk)
     )

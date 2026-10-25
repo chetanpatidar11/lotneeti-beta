@@ -337,7 +337,9 @@ class ApplicationBulkView(APIView):
         try:
             with transaction.atomic():
                 items = list(
-                    Application.objects.select_for_update()
+                    # UPI is optional for ASBA. PostgreSQL cannot lock the
+                    # nullable side of its outer join; lock applications only.
+                    Application.objects.select_for_update(of=("self",))
                     .select_related("ipo", "applicant", "bank", "upi")
                     .filter(workspace=workspace, pk__in=ids)
                     .order_by("pk")

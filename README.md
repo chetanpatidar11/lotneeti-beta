@@ -57,3 +57,8 @@ Backend verification:
 
 After installing backend and web dependencies, run every Sprint 0 gate with
 `bash scripts/check.sh`. CI also starts PostgreSQL and Redis and applies migrations.
+CI additionally runs application lifecycle tests on a separate PostgreSQL test
+database to exercise row locking. With the local PostgreSQL service running,
+run these using `.venv/bin/python -m pytest backend/tests/test_application*.py
+--ds=config.settings.test_postgres`. Django creates and drops a database prefixed
+with `test_`; use a development database role with permission to create databases.

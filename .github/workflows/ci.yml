@@ -66,3 +66,10 @@ jobs:
           python backend/manage.py check
       - name: Test, lint, typecheck, migration drift, and build
         run: bash scripts/check.sh
+      - name: Verify application lifecycle and row locks on PostgreSQL
+        run: >-
+          python -m pytest backend/tests/test_application_bulk.py
+          backend/tests/test_application_management.py
+          backend/tests/test_application_recording.py
+          backend/tests/test_application_tracking_api.py
+          --ds=config.settings.test_postgres
