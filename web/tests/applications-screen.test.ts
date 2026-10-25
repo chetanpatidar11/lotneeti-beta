@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import ApplicationsScreen, { type ApplicationItem } from "../src/app/applications/applications-screen";
+import ApplicationsScreen, { AllotmentForm, type ApplicationItem } from "../src/app/applications/applications-screen";
 import { savedApplicationNeedsReview } from "../src/lib/application-plan";
 
 const item: ApplicationItem = {
@@ -20,6 +20,7 @@ const item: ApplicationItem = {
   category: "RETAIL",
   lots: 1,
   max_quantity: 100,
+  upper_price: "150.00",
   amount: "15000.00",
   status: "PLANNED",
   planned_at: "2026-09-28T10:00:00Z",
@@ -70,19 +71,25 @@ test("IPO choices put the latest closing issue first", () => {
   assert.ok(page.indexOf("Middle Issue") < page.indexOf("Synthetic Industries"));
 });
 
-test("saved blocked plans show a review message and retain their IPO choice", () => {
+test("saved blocked plans retain their IPO choice without the warnings banner", () => {
   const page = renderToStaticMarkup(createElement(ApplicationsScreen, {
     workspaceId: "workspace-1",
     canEdit: true,
     initialItems: [{ ...item, is_plan_row: true }],
     latestRun: { id: "blocked-plan", status: "BLOCKED" },
   }));
-  assert.match(page, /Plan saved with warnings/);
-  assert.match(page, /Your planned applications are shown below/);
-  assert.match(page, /You can record submission, blocked funds, edits and cancellation without clearing the warnings/);
-  assert.match(page, /href="\/plan"/);
+  assert.doesNotMatch(page, /Plan saved with warnings|Your planned applications are shown below|Review warnings/);
   assert.match(page, /Synthetic Industries/);
   assert.doesNotMatch(page, /No planned applications yet/);
+});
+
+test("result form calculates the cost instead of requiring a manually entered amount", () => {
+  const form = renderToStaticMarkup(createElement(AllotmentForm, { item, busy: false, onSave: () => {} }));
+  assert.match(form, /Upper-band price/);
+  assert.match(form, /Allotted shares/);
+  assert.match(form, /Allotment amount/);
+  assert.match(form, /readOnly=""/);
+  assert.doesNotMatch(form, /Actual cost/);
 });
 
 test("unready saved rows require review while tracked applications stay usable", () => {

@@ -25,7 +25,7 @@ from applications.services import (
 from funding.models import BankAccount, UPIHandle
 from investors.models import Investor
 from ipos.models import IPO
-from ipos.overrides import published_ipos
+from ipos.overrides import effective_ipo_values, published_ipos
 from planner.models import PlanRun
 from portfolio.models import Sale
 from portfolio.reports import profit_report
@@ -46,7 +46,7 @@ def _writer(workspace, user):
         raise PermissionDenied("Only workspace owners and operators can update applications.")
 
 
-def _result(item):
+def _result(item, *, upper_price=None):
     sold_quantity = getattr(item, "sold_quantity", None)
     if sold_quantity is None:
         sold_quantity = item.sales.aggregate(total=Sum("quantity", default=0))["total"]
@@ -70,6 +70,9 @@ def _result(item):
         "category": item.category,
         "lots": item.lots,
         "max_quantity": item.lots * item.ipo.lot_size,
+        "upper_price": upper_price
+        if upper_price is not None
+        else str(effective_ipo_values(item.ipo)["upper_price"]),
         "amount": str(item.amount),
         "status": item.status,
         "planned_at": item.planned_at,
@@ -81,6 +84,12 @@ def _result(item):
         "allotted_quantity": item.allotted_quantity,
         "actual_cost": str(item.actual_cost) if item.actual_cost is not None else None,
     }
+
+
+def _results(items):
+    ipos = {item.ipo_id: item.ipo for item in items}
+    prices = {pk: str(effective_ipo_values(ipo)["upper_price"]) for pk, ipo in ipos.items()}
+    return [_result(item, upper_price=prices[item.ipo_id]) for item in items]
 
 
 def _saved_plan_rows(workspace, tracked):
@@ -109,6 +118,7 @@ def _saved_plan_rows(workspace, tracked):
         not in active_keys
     ]
     ipos = {str(item.pk): item for item in IPO.objects.filter(pk__in={r.ipo_ref for r in rows})}
+    prices = {pk: str(effective_ipo_values(ipo)["upper_price"]) for pk, ipo in ipos.items()}
     investors = {
         str(item.pk): item
         for item in Investor.objects.filter(
@@ -156,6 +166,7 @@ def _saved_plan_rows(workspace, tracked):
                 "category": row.category,
                 "lots": row.lots,
                 "max_quantity": row.lots * ipo.lot_size,
+                "upper_price": prices[row.ipo_ref],
                 "amount": str(row.amount),
                 "status": Application.Status.PLANNED,
                 "planned_at": latest.generated_at,
@@ -231,7 +242,7 @@ class ApplicationListView(APIView):
             .select_related("ipo", "applicant", "bank", "upi")
             .annotate(sold_quantity=Sum("sales__quantity", default=0))
         )
-        return Response(_saved_plan_rows(workspace, items) + [_result(item) for item in items])
+        return Response(_saved_plan_rows(workspace, items) + _results(items))
 
 
 class StartTrackingView(APIView):
@@ -259,7 +270,7 @@ class StartTrackingView(APIView):
             )
         except ValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=409)
-        return Response([_result(item) for item in tracked], status=201)
+        return Response(_results(tracked), status=201)
 
 
 class ApplicationActionView(APIView):
@@ -362,7 +373,7 @@ class ApplicationBulkView(APIView):
                 ]
         except ValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=409)
-        return Response([_result(item) for item in changed])
+        return Response(_results(changed))
 
 
 class WorkspaceOperationsView(APIView):

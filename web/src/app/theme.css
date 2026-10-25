@@ -1177,6 +1177,16 @@ html[data-theme="dark"] body > #main-content > .page:not(.auth-page) > .shell { 
   .application-table th::before, .application-table td::before { content: none; }
   .application-row-actions button, .application-row-actions a { min-height: 30px; }
 }
+.application-block-action { background: #b45309; border-color: #b45309; color: #fff; }
+.application-table .application-applicant small { display: block; margin-top: 2px; font-size: 9px; font-weight: 500; color: var(--muted); }
+.application-block-action:hover:not(:disabled) { background: #92400e; border-color: #92400e; }
+.application-result-action { background: #15803d; border-color: #15803d; color: #fff; }
+.application-result-action:hover:not(:disabled) { background: #166534; border-color: #166534; }
+html[data-theme="dark"] .application-block-action { background: #fbbf24; border-color: #fbbf24; color: #422006; }
+html[data-theme="dark"] .application-block-action:hover:not(:disabled) { background: #fcd34d; }
+html[data-theme="dark"] .application-result-action { background: #86efac; border-color: #86efac; color: #052e16; }
+html[data-theme="dark"] .application-result-action:hover:not(:disabled) { background: #bbf7d0; }
+.allotment-form input[readonly] { background: var(--surface-soft); font-weight: 700; }
 .application-ipo-picker .application-picker-eyebrow { display: none; }
 .application-ipo-heading > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; }
 .application-ipo-heading p { margin: 0; }

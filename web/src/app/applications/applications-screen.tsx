@@ -6,6 +6,8 @@ import { applicationHistory, type ApplicationHistoryInput } from "@/lib/applicat
 import { formatInr } from "@/lib/money";
 import { savedApplicationNeedsReview } from "@/lib/application-plan";
 import { categoryLabel } from "@/lib/application-category";
+import { newestApplicationFirst } from "@/lib/application-order";
+import { applicationResultAmount } from "@/lib/application-result";
 import { amountForLots, applicationLotAmount, minimumBhniLots, minimumShniLots } from "@/lib/plan-amount";
 import { Drawer } from "@/components/drawer";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
@@ -29,6 +31,7 @@ export type ApplicationItem = ApplicationHistoryInput & {
   category: string;
   lots: number;
   max_quantity: number;
+  upper_price: string;
   edited_at: string | null;
   cancelled_at: string | null;
 };
@@ -83,16 +86,17 @@ async function responseError(response: Response, fallback: string): Promise<stri
   return typeof body?.detail === "string" ? body.detail : typeof body?.message === "string" ? body.message : fallback;
 }
 
-function AllotmentForm({ item, busy, onSave }: { item: ApplicationItem; busy: boolean; onSave: (quantity: number, actualCost: string) => void }) {
+export function AllotmentForm({ item, busy, onSave }: { item: ApplicationItem; busy: boolean; onSave: (quantity: number, actualCost: string) => void }) {
   const [quantity, setQuantity] = useState("");
-  const [actualCost, setActualCost] = useState("");
+  const actualCost = applicationResultAmount(item.upper_price, Number(quantity), item.max_quantity);
   return <form className="allotment-form" onSubmit={(event) => {
     event.preventDefault();
-    onSave(Number(quantity), actualCost);
+    if (actualCost !== null) onSave(Number(quantity), actualCost);
   }}>
+    <p>Upper-band price: <strong>{formatInr(item.upper_price)}</strong> per share</p>
     <label>Allotted shares<input type="number" min="1" max={item.max_quantity} step="1" required value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label>
-    <label>Actual cost (₹)<input type="number" min="0.01" step="0.01" required value={actualCost} onChange={(event) => setActualCost(event.target.value)} /></label>
-    <button type="submit" disabled={busy}>Mark Allotted</button>
+    <label>Allotment amount (₹)<input type="text" readOnly value={actualCost ?? ""} placeholder="Enter allotted shares" /></label>
+    <button type="submit" className="application-result-action" disabled={busy || actualCost === null}>Mark Allotted</button>
   </form>;
 }
 
@@ -132,7 +136,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
   const ipoOptions = [...new Map(items.map((item) => [item.ipo, { name: item.ipo_name, closeDate: item.close_date }])).entries()]
     .sort((left, right) => right[1].closeDate.localeCompare(left[1].closeDate) || left[1].name.localeCompare(right[1].name));
   const ipoItems = items.filter((item) => item.ipo === ipoFilter);
-  const visible = ipoItems.filter((item) => (category === "ALL" || item.category === category) && filterMatches(item, filter) && `${item.applicant_name} ${item.upi_label}`.toLowerCase().includes(search.toLowerCase().trim()));
+  const visible = ipoItems.filter((item) => (category === "ALL" || item.category === category) && filterMatches(item, filter) && `${item.applicant_name} ${item.upi_label}`.toLowerCase().includes(search.toLowerCase().trim())).sort(newestApplicationFirst);
   const groups = Object.entries(visible.reduce<Record<string, ApplicationItem[]>>((current, item) => {
     (current[item.ipo] ??= []).push(item);
     return current;
@@ -252,7 +256,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
         body: JSON.stringify({ quantity, actual_cost: actualCost }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error("We could not record this allotment. Check the quantity and actual cost.");
+      if (!response.ok) throw new Error(typeof result.detail === "string" ? result.detail : "We could not record this allotment. Check the allotted shares and calculated amount.");
       setItems((current) => current.map((entry) => entry.id === item.id ? result as ApplicationItem : entry));
       setResultId(null);
     } catch (caught) {
@@ -266,7 +270,6 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
     <PageHeader eyebrow="Execution" title="Applications" description="Manage planned applications by IPO, then record submission and results." />
     {error && <div className="plan-error" role="alert">{error}</div>}
     {message && <p className="plan-success" role="status">{message}</p>}
-    {latestRun.status === "BLOCKED" && !initialLoadError && <div className="plan-note plan-review-notice" role="status"><strong>Plan saved with warnings.</strong> Your planned applications are shown below. You can record submission, blocked funds, edits and cancellation without clearing the warnings. <Link href="/plan">Review warnings →</Link></div>}
     {initialLoadError ? <div className="plan-error" role="alert">Applications could not be loaded. <button className="button-ghost" type="button" onClick={() => window.location.reload()}>Retry</button></div> : items.length === 0 ? <EmptyState title="No planned applications yet." detail="Save a ready plan to see its applications here." action={<Link href="/plan">Review plan →</Link>} /> : <>
       <section className="application-ipo-picker" aria-label="Application filters">
         <label>Select an IPO<select id="application-ipo-choice" value={ipoFilter} onChange={(event) => { setIpoFilter(event.target.value); setSearch(""); setSelectedIds([]); }}><option value="">Select an IPO</option>{ipoOptions.map(([id, option]) => <option key={id} value={id}>{option.name} · closes {dateLabel(option.closeDate)}</option>)}</select></label>
@@ -285,14 +288,14 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
       <div className="application-filters">
         <label>Search<input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setSelectedIds([]); }} placeholder="Applicant or UPI" /></label>
       </div>
-      {canEdit && selectedItems.length > 0 && <div className="application-bulk" role="group" aria-label="Selected application actions"><strong>{selectedItems.length} selected</strong><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "PLANNED")} onClick={() => void bulkUpdate("submit", selectedIds)}>Mark submitted</button><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => ["PLANNED", "SUBMITTED"].includes(item.status))} onClick={() => void bulkUpdate("block", selectedIds)}>Mark blocked</button><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "BLOCKED")} onClick={() => void bulkUpdate("not-allotted", selectedIds)}>Not allotted</button><button type="button" className="button-danger" disabled={busy || !selectedItems.every(canCancel)} onClick={() => setPendingCancelIds(selectedIds)}>Cancel selected</button><button type="button" className="button-ghost" onClick={() => setSelectedIds([])}>Clear</button></div>}
+      {canEdit && selectedItems.length > 0 && <div className="application-bulk" role="group" aria-label="Selected application actions"><strong>{selectedItems.length} selected</strong><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "PLANNED")} onClick={() => void bulkUpdate("submit", selectedIds)}>Mark submitted</button><button type="button" className="application-block-action" disabled={busy || !selectedItems.every((item) => ["PLANNED", "SUBMITTED"].includes(item.status))} onClick={() => void bulkUpdate("block", selectedIds)}>Mark blocked</button><button type="button" className="button-secondary" disabled={busy || !selectedItems.every((item) => item.status === "BLOCKED")} onClick={() => void bulkUpdate("not-allotted", selectedIds)}>Not allotted</button><button type="button" className="button-danger" disabled={busy || !selectedItems.every(canCancel)} onClick={() => setPendingCancelIds(selectedIds)}>Cancel selected</button><button type="button" className="button-ghost" onClick={() => setSelectedIds([])}>Clear</button></div>}
       {groups.length === 0 ? <EmptyState title="No applications match these filters." detail="Try a different IPO, status or search." /> : groups.map(([ipoId, group]) => {
         const eligibleIds = group.filter(canSelect).map((item) => item.id);
         return <section className="application-ipo-group" key={ipoId} aria-label={`${group[0].ipo_name} applications`}>
           <header className="application-ipo-heading"><div><h2>{group[0].ipo_name}</h2><p>{group.length} {group.length === 1 ? "application" : "applications"} · Closes {dateLabel(group[0].close_date)}</p></div>{canEdit && eligibleIds.length > 0 && <label className="application-select-group application-select-mobile"><input type="checkbox" aria-label="Select all visible applications" checked={eligibleIds.every((id) => selectedIds.includes(id))} onChange={(event) => toggleSelection(eligibleIds, event.target.checked)} disabled={busy} /></label>}</header>
           <div className="application-table-wrap"><table className="application-table"><thead><tr>{canEdit && <th scope="col" className="application-select-heading"><label className="application-select-group"><input type="checkbox" aria-label="Select all visible applications" checked={eligibleIds.length > 0 && eligibleIds.every((id) => selectedIds.includes(id))} onChange={(event) => toggleSelection(eligibleIds, event.target.checked)} disabled={busy || eligibleIds.length === 0} /></label></th>}<th scope="col">Applicant</th><th scope="col">Category</th><th scope="col">Amount</th><th scope="col">Bank / UPI</th><th scope="col">Status</th><th scope="col">Important date</th><th scope="col">Actions</th></tr></thead><tbody>{group.map((item) => { const date = importantDate(item); return <tr key={item.id}>
             {canEdit && <td data-label="Select" className="application-select-cell">{canSelect(item) && <input type="checkbox" aria-label={`Select ${item.applicant_name} for ${item.ipo_name}`} checked={selectedIds.includes(item.id)} disabled={busy} onChange={(event) => toggleSelection([item.id], event.target.checked)} />}</td>}
-            <th scope="row" data-label="Applicant">{item.applicant_name}</th>
+            <th scope="row" data-label="Applicant" className="application-applicant">{item.applicant_name} <small>{item.submitted_at ? "Applied" : "Planned"} {displayTime(item.submitted_at ?? item.planned_at)}</small></th>
             <td data-label="Category">{categoryLabel(item.category)} <small>{item.lots} {item.lots === 1 ? "lot" : "lots"}</small></td>
             <td data-label="Amount" className="money-cell">{formatInr(item.amount)}</td>
             <td data-label="Bank / UPI">{item.bank_label} <small>{item.upi_label}</small></td>
@@ -300,8 +303,8 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
             <td data-label="Important date">{date.label && <small>{date.label}</small>} {date.value}</td>
             <td data-label="Actions"><div className="application-row-actions">
               {canEdit && item.status === "PLANNED" && <button type="button" disabled={busy} onClick={() => void update(item, "submit")}>Mark submitted</button>}
-              {canEdit && ["PLANNED", "SUBMITTED"].includes(item.status) && <button type="button" disabled={busy} onClick={() => void update(item, "block")}>Mark blocked</button>}
-              {canEdit && item.status === "BLOCKED" && <button type="button" disabled={busy} onClick={() => { setResultError(""); setResultId(item.id); }}>Record result</button>}
+              {canEdit && ["PLANNED", "SUBMITTED"].includes(item.status) && <button type="button" className="application-block-action" disabled={busy} onClick={() => void update(item, "block")}>Mark blocked</button>}
+              {canEdit && item.status === "BLOCKED" && <button type="button" className="application-result-action" disabled={busy} onClick={() => { setResultError(""); setResultId(item.id); }}>Record result</button>}
               {canEdit && ["PLANNED", "SUBMITTED", "BLOCKED"].includes(item.status) && <button type="button" className="button-secondary" disabled={busy} onClick={() => void openEdit(item)}>Edit</button>}
               {canEdit && canSelect(item) && <button type="button" className="button-ghost-danger" disabled={busy} onClick={() => setPendingCancelIds([item.id])}>Cancel</button>}
               {item.status === "ALLOTTED" && <Link className="button-secondary" href="/portfolio">View holding</Link>}
@@ -323,7 +326,6 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
       {editLoading ? <p>Loading bank and UPI choices…</p> : <form className="sign-in-form" onSubmit={(event) => void saveEdit(event)}>
         <label htmlFor="application-edit-category">Category</label><select id="application-edit-category" value={editCategory} onChange={(event) => { const category = event.target.value; setEditCategory(category); const unit = applicationLotAmount(editItem.amount, editItem.lots); setEditLots(category === "BHNI" ? minimumBhniLots(unit, 1) : category === "SHNI" ? minimumShniLots(unit, 1) : 1); if (category === "BHNI") { setEditBank(banks.find((bank) => bank.active && !bank.is_placeholder && !bank.is_imported_reference && bank.owner === editItem.applicant)?.id ?? ""); setEditUpi(""); } else { setEditUpi(upis.find((upi) => upi.bank === editBank && upi.active && upi.verified)?.id ?? ""); } }}>{editItem.category === "SHARE" ? <option value="SHARE">Shareholder</option> : <><option value="RETAIL">Retail</option><option value="SHNI">sHNI</option><option value="BHNI">bHNI (bank ASBA)</option></>}</select>
         <label htmlFor="application-edit-lots">Lots</label><input id="application-edit-lots" type="number" min="1" step="1" required value={editLots || ""} onChange={(event) => setEditLots(Number(event.target.value))} />
-        <p className="intro">Whole lots only. Retail/Shareholder: up to ₹2 lakh. sHNI: above ₹2 lakh through ₹10 lakh. bHNI: above ₹10 lakh using own-bank ASBA.</p>
         <label htmlFor="application-edit-bank">Bank account</label><select id="application-edit-bank" value={editBank} required onChange={(event) => { const bankId = event.target.value; setEditBank(bankId); setEditUpi(upis.find((upi) => upi.bank === bankId && upi.active && upi.verified)?.id ?? ""); }}>{banks.filter((bank) => bank.active && !bank.is_placeholder && (editCategory !== "BHNI" || (!bank.is_imported_reference && bank.owner === editItem.applicant))).map((bank) => <option key={bank.id} value={bank.id}>{bank.bank_name} · {bank.account_display}</option>)}</select>
         {editCategory === "BHNI" ? <p>Bank ASBA · UPI is not used. Choose a complete bank account owned by this investor.</p> : <><label htmlFor="application-edit-upi">UPI ID</label><select id="application-edit-upi" value={editUpi} required onChange={(event) => setEditUpi(event.target.value)}>{eligibleUpis.map((upi) => <option key={upi.id} value={upi.id}>{upi.handle}</option>)}</select></>}
         <p className="application-edit-preview">Updated amount: <strong>{Number.isSafeInteger(editLots) && editLots > 0 ? formatInr(amountForLots(applicationLotAmount(editItem.amount, editItem.lots), 1, editLots)) : "—"}</strong></p>

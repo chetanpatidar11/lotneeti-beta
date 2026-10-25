@@ -73,5 +73,6 @@ jobs:
           python -m pytest backend/tests/test_application_bulk.py
           backend/tests/test_application_management.py
           backend/tests/test_application_recording.py
+          backend/tests/test_application_result_price.py
           backend/tests/test_application_tracking_api.py
           --ds=config.settings.test_postgres
