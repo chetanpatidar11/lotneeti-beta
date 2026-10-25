@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { balanceActionLabel, formatInr, sumInr } from "@/lib/money";
+import { availableInr, balanceActionLabel, formatInr, sumInr } from "@/lib/money";
 import { bankIdentifiers } from "@/lib/bank-display";
 import { Drawer } from "@/components/drawer";
 import { EmptyState, PageHeader, SectionHeading, StatusBadge } from "@/components/ui";
@@ -60,8 +60,8 @@ export default function FundsScreen({ workspace, investors, initialBanks, statem
     balance: sumInr(banks.map((bank) => bank.current_balance)),
     blocked: sumInr(banks.map((bank) => capitalLines[bank.id]?.blocked)),
     planned: sumInr(banks.map((bank) => capitalLines[bank.id]?.planned)),
-    available: sumInr(banks.map((bank) => capitalLines[bank.id]?.available)),
   };
+  const totalAvailable = availableInr(totals.balance, totals.blocked, totals.planned);
 
   async function refreshCapital() {
     try {
@@ -155,7 +155,7 @@ export default function FundsScreen({ workspace, investors, initialBanks, statem
     {tab === "accounts" && <>
       {canEdit && banks.length > 0 && <div className="funds-actions" role="group" aria-label="Balance actions">{(["add", "remove", "set", "transfer"] as Action[]).map((item) => <button key={item} className={item === "add" ? "" : "button-secondary"} type="button" disabled={item === "transfer" && banks.length < 2} title={item === "transfer" && banks.length < 2 ? "Add another active bank to record a transfer" : undefined} onClick={() => { setAction(item); setActionBankId(""); setDestinationBankId(""); setAmount(""); setDescription(""); }}>{actionLabel(item)}</button>)}</div>}
       {banks.length === 0 ? <EmptyState title="No active bank accounts" detail={investors.length === 0 ? "Add or activate an investor, then link a bank." : "Add a bank or activate an account in Settings."} action={<Link href="/settings/investors">Investor settings</Link>} /> :
-        <div className="compact-table-wrap funds-table-wrap"><table className="compact-table funds-table"><thead><tr><th>Owner / bank / UPI</th><th>Balance</th><th>Blocked</th><th>Planned</th><th>Available</th><th>State</th></tr></thead><tbody>{banks.map((bank) => { const line = capitalLines[bank.id]; return <tr key={bank.id}><th scope="row" className="funds-owner-cell"><strong>{bank.bank_name}</strong><span>{investors.find((item) => item.id === bank.owner)?.name ?? "Owner"} · {bankIdentifiers(bank.account_display, bank.linked_upis)}</span></th><td>{formatInr(bank.current_balance)}</td><td>{line ? formatInr(line.blocked) : "—"}</td><td>{line ? formatInr(line.planned) : "—"}</td><td className="positive-cell">{line ? formatInr(line.available) : "—"}</td><td><StatusBadge tone={bank.active ? "positive" : "neutral"}>{bank.active ? "Active" : "Paused"}</StatusBadge></td></tr>; })}</tbody><tfoot><tr><th scope="row">Total</th><td>{formatInr(totals.balance)}</td><td>{formatInr(totals.blocked)}</td><td>{formatInr(totals.planned)}</td><td className="positive-cell">{formatInr(totals.available)}</td><td>—</td></tr></tfoot></table></div>}
+        <div className="compact-table-wrap funds-table-wrap"><table className="compact-table funds-table"><thead><tr><th>Owner / bank / UPI</th><th>Balance</th><th>Blocked</th><th>Planned</th><th>Available</th><th>State</th></tr></thead><tbody>{banks.map((bank) => { const line = capitalLines[bank.id]; return <tr key={bank.id}><th scope="row" className="funds-owner-cell"><strong>{bank.bank_name}</strong><span>{investors.find((item) => item.id === bank.owner)?.name ?? "Owner"} · {bankIdentifiers(bank.account_display, bank.linked_upis)}</span></th><td>{formatInr(bank.current_balance)}</td><td>{line ? formatInr(line.blocked) : "—"}</td><td>{line ? formatInr(line.planned) : "—"}</td><td className="positive-cell">{line ? formatInr(line.available) : "—"}</td><td><StatusBadge tone={bank.active ? "positive" : "neutral"}>{bank.active ? "Active" : "Paused"}</StatusBadge></td></tr>; })}</tbody><tfoot><tr><th scope="row">Total</th><td>{formatInr(totals.balance)}</td><td>{formatInr(totals.blocked)}</td><td>{formatInr(totals.planned)}</td><td className="positive-cell">{formatInr(totalAvailable)}</td><td>—</td></tr></tfoot></table></div>}
     </>}
     {tab === "statement" && <section className="section-panel funds-statement"><SectionHeading title="Bank statement" detail={`${statementTotal} recorded movement${statementTotal === 1 ? "" : "s"} across your banks`} />
       <label className="funds-filter">Bank account<select value={statementBankId} onChange={(event) => setStatementBankId(event.target.value)}><option value="">All banks</option>{statementBankChoices.map((bank) => <option key={bank.id} value={bank.id}>{bank.bank_name} · {bank.account_display}</option>)}</select></label>

@@ -358,6 +358,15 @@ class WorkspaceCapitalView(APIView):
         planned_by_bank = {}
         applications = list(Application.objects.filter(workspace=workspace))
         tracked_by_row = {item.plan_row_id: item for item in applications}
+        active_keys = {
+            (
+                str(item.ipo_id),
+                str(item.applicant_id),
+                "SHARE" if item.category == "SHARE" else "PUBLIC",
+            )
+            for item in applications
+            if item.status != Application.Status.CANCELLED
+        }
         for item in applications:
             bank_id = str(item.bank_id)
             if item.status in {Application.Status.PLANNED, Application.Status.SUBMITTED}:
@@ -370,6 +379,12 @@ class WorkspaceCapitalView(APIView):
                 ):
                     continue
                 if row.pk in tracked_by_row:
+                    continue
+                if (
+                    row.ipo_ref,
+                    row.applicant_ref,
+                    "SHARE" if row.category == "SHARE" else "PUBLIC",
+                ) in active_keys:
                     continue
                 planned_by_bank[row.bank_ref] = planned_by_bank.get(row.bank_ref, 0) + row.amount
         blocked_by_bank = {}

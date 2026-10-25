@@ -11,7 +11,7 @@ from planner.capital import capital_totals
 from planner.persistence import create_plan_run
 
 
-def test_bank_level_available_never_goes_negative_and_blocks_reduce_it():
+def test_aggregate_available_deducts_overassigned_banks_before_clamping():
     totals = capital_totals(
         {"a": Decimal("10000.00"), "b": Decimal("30000.00")},
         blocked_by_bank={"a": Decimal("4000.00")},
@@ -20,7 +20,25 @@ def test_bank_level_available_never_goes_negative_and_blocks_reduce_it():
     assert totals.balance == Decimal("40000.00")
     assert totals.blocked == Decimal("4000.00")
     assert totals.planned == Decimal("20000.00")
-    assert totals.available == Decimal("25000.00")
+    assert totals.available == Decimal("16000.00")
+
+
+def test_reported_capital_amounts_net_to_97761_instead_of_302288():
+    totals = capital_totals(
+        {"a": Decimal("1000000.00"), "b": Decimal("1179101.00")},
+        blocked_by_bank={"a": Decimal("1204527.00"), "b": Decimal("876813.00")},
+        planned_by_bank={},
+    )
+    assert totals.balance == Decimal("2179101.00")
+    assert totals.blocked == Decimal("2081340.00")
+    assert totals.planned == Decimal("0.00")
+    assert totals.available == Decimal("97761.00")
+    single = capital_totals(
+        {"a": Decimal("1000000.00")},
+        blocked_by_bank={"a": Decimal("1204527.00")},
+        planned_by_bank={},
+    )
+    assert single.available == Decimal("0.00")
 
 
 @pytest.mark.django_db

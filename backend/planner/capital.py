@@ -19,20 +19,12 @@ def capital_totals(
     planned_by_bank: dict[str, Decimal],
 ) -> CapitalTotals:
     zero = Decimal("0.00")
+    balance = sum(balances.values(), zero)
+    blocked = sum((blocked_by_bank.get(bank_id, zero) for bank_id in balances), zero)
+    planned = sum((planned_by_bank.get(bank_id, zero) for bank_id in balances), zero)
     return CapitalTotals(
-        balance=sum(balances.values(), zero),
-        blocked=sum((blocked_by_bank.get(bank_id, zero) for bank_id in balances), zero),
-        planned=sum((planned_by_bank.get(bank_id, zero) for bank_id in balances), zero),
-        available=sum(
-            (
-                max(
-                    zero,
-                    balance
-                    - blocked_by_bank.get(bank_id, zero)
-                    - planned_by_bank.get(bank_id, zero),
-                )
-                for bank_id, balance in balances.items()
-            ),
-            zero,
-        ),
+        balance=balance,
+        blocked=blocked,
+        planned=planned,
+        available=max(zero, balance - blocked - planned),
     )

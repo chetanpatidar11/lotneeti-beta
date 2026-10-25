@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { backendUrl } from "@/lib/backend";
-import { formatInr, sumInr } from "@/lib/money";
+import { availableInr, formatInr, sumInr } from "@/lib/money";
 import { selectedWorkspace } from "@/lib/workspace";
 import { EmptyState, MetricCard, PageHeader, SectionHeading, StatusBadge } from "@/components/ui";
 import LiveSyncButton from "./live-sync-button";
@@ -57,8 +57,8 @@ export default async function HomePage() {
     balance: sumInr((banks ?? []).map((bank) => capital?.by_bank?.[bank.id]?.balance ?? bank.current_balance)),
     blocked: sumInr((banks ?? []).map((bank) => capital?.by_bank?.[bank.id]?.blocked)),
     planned: sumInr((banks ?? []).map((bank) => capital?.by_bank?.[bank.id]?.planned)),
-    available: sumInr((banks ?? []).map((bank) => capital?.by_bank?.[bank.id]?.available)),
   };
+  const bankAvailable = availableInr(bankTotals.balance, bankTotals.blocked, bankTotals.planned);
   const paymentLists = await Promise.all((banks ?? []).map((bank) => getData<Payment[]>(`${prefix}/banks/${bank.id}/recurring-debits/`, cookieHeader)));
   const payments = paymentLists.flatMap((items) => items ?? []);
   const selected = new Map((decisions ?? []).map((item) => [item.ipo, item]));
@@ -106,7 +106,7 @@ export default async function HomePage() {
       </section>
     </div>
     <section className="home-panel" style={{ marginTop: 16 }}><SectionHeading title="Bank availability" detail="Money by account" action={<Link href="/funds">Manage funds →</Link>} />
-      {(banks ?? []).length === 0 ? <EmptyState title="No bank accounts yet." detail="Add a bank and set its Balance to start planning." action={<Link href="/funds">Add bank</Link>} /> : <div className="compact-table-wrap"><table className="compact-table"><thead><tr><th>Bank</th><th>Balance</th><th>Blocked</th><th>Planned</th><th>Available</th></tr></thead><tbody>{(banks ?? []).map((bank) => { const line = capital?.by_bank?.[bank.id]; return <tr key={bank.id}><th scope="row">{bank.bank_name}<span> · {bank.account_display}</span></th><td>{formatInr(line?.balance ?? bank.current_balance)}</td><td>{line ? formatInr(line.blocked) : "—"}</td><td>{line ? formatInr(line.planned) : "—"}</td><td className="positive-cell">{line ? formatInr(line.available) : "—"}</td></tr>; })}</tbody><tfoot><tr><th scope="row">Total</th><td>{formatInr(bankTotals.balance)}</td><td>{formatInr(bankTotals.blocked)}</td><td>{formatInr(bankTotals.planned)}</td><td className="positive-cell">{formatInr(bankTotals.available)}</td></tr></tfoot></table></div>}
+      {(banks ?? []).length === 0 ? <EmptyState title="No bank accounts yet." detail="Add a bank and set its Balance to start planning." action={<Link href="/funds">Add bank</Link>} /> : <div className="compact-table-wrap"><table className="compact-table"><thead><tr><th>Bank</th><th>Balance</th><th>Blocked</th><th>Planned</th><th>Available</th></tr></thead><tbody>{(banks ?? []).map((bank) => { const line = capital?.by_bank?.[bank.id]; return <tr key={bank.id}><th scope="row">{bank.bank_name}<span> · {bank.account_display}</span></th><td>{formatInr(line?.balance ?? bank.current_balance)}</td><td>{line ? formatInr(line.blocked) : "—"}</td><td>{line ? formatInr(line.planned) : "—"}</td><td className="positive-cell">{line ? formatInr(line.available) : "—"}</td></tr>; })}</tbody><tfoot><tr><th scope="row">Total</th><td>{formatInr(bankTotals.balance)}</td><td>{formatInr(bankTotals.blocked)}</td><td>{formatInr(bankTotals.planned)}</td><td className="positive-cell">{formatInr(bankAvailable)}</td></tr></tfoot></table></div>}
     </section>
   </div></main>;
 }

@@ -68,11 +68,14 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
         run: bash scripts/check.sh
-      - name: Verify application lifecycle and row locks on PostgreSQL
+      - name: Verify application lifecycle, capital and row locks on PostgreSQL
         run: >-
           python -m pytest backend/tests/test_application_bulk.py
           backend/tests/test_application_management.py
           backend/tests/test_application_recording.py
           backend/tests/test_application_result_price.py
           backend/tests/test_application_tracking_api.py
+          backend/tests/test_capital_api.py
+          backend/tests/test_capital_resaved_plan.py
+          backend/tests/test_clear_saved_plan.py
           --ds=config.settings.test_postgres
