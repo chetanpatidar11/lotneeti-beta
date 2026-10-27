@@ -1,6 +1,6 @@
 # LotNeeti execution status
 
-## C37 Record sale defaults, estimated charges and bold dates — verified, release pending, 2026-10-27
+## C37 Record sale defaults, estimated charges and bold dates — deployed, 2026-10-27
 
 - Founder requests editable sale defaults, Shares sold matching allotted holdings, charges estimated from the supplied NSE delivery example (zero brokerage/stamp duty, ₹15.34 DP including GST, STT 0.1%, exchange 0.00345%, SEBI ₹10/crore and GST 18% on exchange/SEBI), and bold dates throughout the website. Default only unsold shares to prevent overselling after a partial sale, use today’s Indian date, retain manual price entry and charge override, exact paise rounding and existing sale validation/P&L. Website only; preserve mobile, backend financial records and planner rules.
 
@@ -9,6 +9,9 @@
 - Record sale now selects an available holding, prefills its unsold allotted quantity and today’s date in Asia/Kolkata, and resets defaults when opening or changing applications. Shares/date remain editable; the actual sale price is entered by the user. Charges auto-update from quantity × price until manually overridden. A Use estimated charges action restores estimation, and an expandable itemized breakdown shows the supplied rates. DP GST is included only once; the note explains editing DP if already paid for that stock/day. Existing backend sale recording/P&L and all planner/mobile code remain unchanged.
 - Estimator uses integer paise with half-up rounding per fee, including ₹13.66 STT, ₹0.47 exchange, ₹0.01 SEBI, ₹0.09 GST and ₹15.34 DP for the supplied ₹13,655 example: total ₹29.57. Invalid/fractional share quantities and invalid prices do not produce an estimate. Dates now use semantic time markup and bold normal text contrast across Home, IPO facts/calendar/history/eligibility, Plan, Applications, Funds statements/details/archive/payments and Portfolio; date inputs share the same bold styling.
 - Checks passed: website lint/typecheck, all 69 website tests and final production build; six existing backend allotment/sale/P&L tests passed. Browser verified initial 12 remaining shares, today’s date, quantity/price edits, exact example breakdown, manual ₹35 charges persisting after edits, restoring the estimate, saving a synthetic sale with ₹29.57 charges, and reopening with only the two remaining shares. Recorded date text, date inputs, statement dates and statement times have computed weight 700 and full contrast in light/dark themes. Saved screenshots use isolated synthetic data. No production financial records were edited.
+
+
+- Commit `36fc59b` pushed and deployed after a successful encrypted backup. Archive SHA-256 `bb52e91a307229c1cc69c7fac47d94b330ec81724e43af746f2d2d71215556e8`. All deployed source hashes match, including every changed website runtime file; backend/planner/quota/lifecycle files remain unchanged. Four services active, zero pending migrations, Brevo configured, HTTPS Home/sign-in/API health 200. Read-only production verification still reports 17 investors, 10 banks, 15 plans and 194 applications with valid lot-size responses and correct net capital. No production application, allotment, sale or balance was changed for testing. Browser preview closed and preview servers stopped; no mobile work.
 
 ## C36 Portfolio tabs, sale layout and allotment defaults — deployed, 2026-10-27
 
