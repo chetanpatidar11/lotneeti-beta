@@ -1,6 +1,6 @@
 # LotNeeti execution status
 
-## C36 Portfolio tabs, sale layout and allotment defaults — verified, release pending, 2026-10-27
+## C36 Portfolio tabs, sale layout and allotment defaults — deployed, 2026-10-27
 
 - Founder requests three separate Portfolio tabs (Allotted holdings, Realized results, Recorded sales), repair of the overlapping sale drawer in the screenshot, and category defaults when recording allotment: Retail one lot, sHNI applied lots, bHNI minimum sHNI lots, shareholder manual. Lots and actual amount must remain editable. Keep share entry/partial allotment support, upper-band recalculation, server validation/debit/unblock and sale profit rules. Website/backend only; do not change or test mobile or alter planner account selection. Preserve production records during verification.
 
@@ -9,6 +9,9 @@
 - Application results expose IPO lot size. Retail defaults to one lot, sHNI to applied lots, bHNI to the minimum sHNI quantity (strictly above ₹2 lakh), and shareholder stays blank. Lots, shares and actual cost are editable; changing lots/shares recalculates exact upper-band cost. Positive whole shares and positive cost within the application amount remain required, with server lifecycle/debit/unblock validation unchanged. Partial-share allotments remain supported.
 - Checks passed: 529 backend tests; 64 website tests; Ruff/format, planner matrix (115 P0 + 5 P1), Django checks/no migration drift, website lint/typecheck/production build. A separate PostgreSQL test database on the production host passed 33 application/result/capital/sales/P&L cases, including custom allotment cost and exactly-once debit. No production database records were altered. All 13 protected selection engine files, quota algorithm and application lifecycle services match the preceding deployed hashes; no mobile files or checks changed.
 - Synthetic browser flow verified all four defaults for a 12-share IPO, editing Retail to two lots/24 shares and custom ₹40,000 cost, one balance debit, a partial sale of 12 shares at ₹2,000 with ₹100 charges, remaining holdings of 12 shares and ₹3,900 profit/19.50% ROI across the three tabs. Saved screenshots show the clean sale drawer, editable allotment and Portfolio views. Server access recovered through the existing operator-IP refresh helper, retaining one restricted /32 SSH rule. Release follows an encrypted backup.
+
+
+- Commit `5ce8200` pushed and deployed after a successful encrypted backup. Release archive SHA-256 `4f933edddf586940cd7c391275080666d5ba1616438a2b721d84d6815c49fbee`. Deployed hashes match, including unchanged protected planner/quota/lifecycle files. All four services are active; zero migrations pending; Brevo remains configured; Home/sign-in/API health return HTTPS 200. Read-only API verification confirms positive lot sizes and matching maximum quantities on all 194 application rows, and aggregate Available equals Balance less active commitments. Production counts remain 17 investors, 10 banks, 15 plans and 194 applications. Six result/sale/P&L cases passed again with imports asserted to use the deployed backend and a separate PostgreSQL database; test database and isolated runner were removed. Light/dark browser checks passed, and local preview servers were stopped. Verification did not edit production balances, application statuses, allotments or sales.
 
 ## C35 Available balance after saving edited plans — deployed, 2026-10-25
 
