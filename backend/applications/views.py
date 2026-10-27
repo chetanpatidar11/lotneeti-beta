@@ -69,6 +69,7 @@ def _result(item, *, upper_price=None):
         "sold_quantity": sold_quantity,
         "category": item.category,
         "lots": item.lots,
+        "lot_size": item.ipo.lot_size,
         "max_quantity": item.lots * item.ipo.lot_size,
         "upper_price": upper_price
         if upper_price is not None
@@ -165,6 +166,7 @@ def _saved_plan_rows(workspace, tracked):
                 "sold_quantity": 0,
                 "category": row.category,
                 "lots": row.lots,
+                "lot_size": ipo.lot_size,
                 "max_quantity": row.lots * ipo.lot_size,
                 "upper_price": prices[row.ipo_ref],
                 "amount": str(row.amount),

@@ -7,7 +7,7 @@ import { formatInr } from "@/lib/money";
 import { savedApplicationNeedsReview } from "@/lib/application-plan";
 import { categoryLabel } from "@/lib/application-category";
 import { newestApplicationFirst } from "@/lib/application-order";
-import { applicationResultAmount } from "@/lib/application-result";
+import { applicationResultAmount, defaultAllotmentShares, validAllotmentAmount } from "@/lib/application-result";
 import { amountForLots, applicationLotAmount, minimumBhniLots, minimumShniLots } from "@/lib/plan-amount";
 import { Drawer } from "@/components/drawer";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
@@ -30,6 +30,7 @@ export type ApplicationItem = ApplicationHistoryInput & {
   sold_quantity: number;
   category: string;
   lots: number;
+  lot_size: number;
   max_quantity: number;
   upper_price: string;
   edited_at: string | null;
@@ -87,16 +88,24 @@ async function responseError(response: Response, fallback: string): Promise<stri
 }
 
 export function AllotmentForm({ item, busy, onSave }: { item: ApplicationItem; busy: boolean; onSave: (quantity: number, actualCost: string) => void }) {
-  const [quantity, setQuantity] = useState("");
-  const actualCost = applicationResultAmount(item.upper_price, Number(quantity), item.max_quantity);
+  const [quantity, setQuantity] = useState(() => String(defaultAllotmentShares(item) ?? ""));
+  const [actualCost, setActualCost] = useState(() => applicationResultAmount(item.upper_price, defaultAllotmentShares(item) ?? 0, item.max_quantity) ?? "");
+  const shares = Number(quantity);
+  const lots = Number.isSafeInteger(shares) && shares > 0 && shares % item.lot_size === 0 ? String(shares / item.lot_size) : "";
+  const valid = applicationResultAmount(item.upper_price, shares, item.max_quantity) !== null && validAllotmentAmount(actualCost, item.amount);
+  function changeShares(value: string) {
+    setQuantity(value);
+    setActualCost(applicationResultAmount(item.upper_price, Number(value), item.max_quantity) ?? "");
+  }
   return <form className="allotment-form" onSubmit={(event) => {
     event.preventDefault();
-    if (actualCost !== null) onSave(Number(quantity), actualCost);
+    if (valid) onSave(shares, actualCost);
   }}>
     <p>Upper-band price: <strong>{formatInr(item.upper_price)}</strong> per share</p>
-    <label>Allotted shares<input type="number" min="1" max={item.max_quantity} step="1" required value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label>
-    <label>Allotment amount (₹)<input type="text" readOnly value={actualCost ?? ""} placeholder="Enter allotted shares" /></label>
-    <button type="submit" className="application-result-action" disabled={busy || actualCost === null}>Mark Allotted</button>
+    <label>Allotted lots<input type="number" min="1" max={Math.floor(item.max_quantity / item.lot_size)} step="1" value={lots} placeholder="Enter lots" onChange={(event) => { const value = Number(event.target.value); changeShares(event.target.value !== "" && Number.isSafeInteger(value) ? String(value * item.lot_size) : ""); }} /></label>
+    <label>Allotted shares<input type="number" min="1" max={item.max_quantity} step="1" required value={quantity} placeholder="Enter shares" onChange={(event) => changeShares(event.target.value)} /></label>
+    <label>Allotment amount (₹)<input type="number" min="0.01" max={item.amount} step="0.01" required value={actualCost} onChange={(event) => setActualCost(event.target.value)} /></label>
+    <button type="submit" className="application-result-action" disabled={busy || !valid}>Mark Allotted</button>
   </form>;
 }
 
@@ -337,7 +346,7 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
       {resultError && <div className="plan-error" role="alert">{resultError}</div>}
       <p>Recording the result releases the full application block. An allotment also deducts the actual cost from Balance.</p>
       <div className="result-options"><h3>Not allotted</h3><button className="button-secondary" type="button" disabled={busy} onClick={() => void update(resultItem, "not-allotted")}>Record not allotted</button></div>
-      <div className="result-options"><h3>Allotted</h3><AllotmentForm item={resultItem} busy={busy} onSave={(quantity, actualCost) => void recordAllotment(resultItem, quantity, actualCost)} /></div>
+      <div className="result-options"><h3>Allotted</h3><AllotmentForm key={resultItem.id} item={resultItem} busy={busy} onSave={(quantity, actualCost) => void recordAllotment(resultItem, quantity, actualCost)} /></div>
     </Drawer>}
     {pendingCancelIds.length > 0 && <ConfirmationDialog title={`Cancel ${pendingCancelIds.length} ${pendingCancelIds.length === 1 ? "application" : "applications"}?`} description="Cancelled applications leave the active list and stop using planning slots. The record stays in history. If an application was sent to a broker or bank, cancel it there too and confirm any blocked funds are released." confirmLabel="Cancel application" busy={busy} onCancel={() => setPendingCancelIds([])} onConfirm={() => void bulkUpdate("cancel", pendingCancelIds)} />}
   </div></main>;

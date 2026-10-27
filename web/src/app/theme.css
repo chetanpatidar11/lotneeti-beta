@@ -467,9 +467,17 @@ html:not([data-theme="dark"]) .settings-funding-row:hover:not(:disabled) > span:
 .profit-groups h3 { margin: 12px 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .profit-groups .profit-line { margin: 4px 0; padding: 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-raised); }
 .portfolio-sales-table { min-width: 760px; }
-.sale-drawer-form { display: grid; grid-template-columns: 1fr; gap: 12px; margin: 0; padding: 0; border: 0; background: transparent; }
-.sale-drawer-form label { display: grid; gap: 5px; }
-.sale-drawer-form input, .sale-drawer-form select { width: 100%; }
+.portfolio-sales-table small { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
+.app-drawer .sale-drawer-form { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 14px; width: 100%; max-width: none; margin: 0; padding: 0; border: 0; background: transparent; box-shadow: none; }
+.app-drawer .sale-drawer-form > * { grid-column: 1; min-width: 0; }
+.app-drawer .sale-drawer-form label { display: grid; gap: 6px; }
+.app-drawer .sale-drawer-form input, .app-drawer .sale-drawer-form select { width: 100%; min-width: 0; }
+.portfolio-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.portfolio-tabs a { display: inline-flex; align-items: center; min-height: 40px; padding: 9px 14px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--text); font-weight: 700; text-decoration: none; }
+.portfolio-tabs a[aria-current="page"] { border-color: var(--info); background: var(--accent-deep); color: var(--info); }
+.portfolio-tabs a:hover { border-color: var(--info); }
+.portfolio-panel .profit-line { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.portfolio-panel .profit-line strong { grid-column: 1 / -1; }
 .sale-preview-note { margin: 0; color: var(--muted); font-size: 12px; }
 .application-card h2 { font-size: 13px; }
 .application-card p { margin: 3px 0; }
@@ -480,8 +488,9 @@ html:not([data-theme="dark"]) .settings-funding-row:hover:not(:disabled) > span:
 .application-history { grid-column: 1 / -1; padding-top: 8px; border-color: var(--border); }
 .application-history summary { min-height: 28px; font-size: 11px; color: var(--muted); }
 .application-history time { color: var(--faint); }
-.allotment-form { margin: 0; }
-.allotment-form input { width: 100px; }
+.allotment-form { display: grid; gap: 12px; margin: 0; }
+.allotment-form label { display: grid; gap: 5px; min-width: 0; }
+.allotment-form input { width: 100%; min-width: 0; }
 .sale-form { display: grid; max-width: none; margin: 12px 0; padding: 14px; grid-template-columns: repeat(5, minmax(0, 1fr)) auto; align-items: end; }
 .sale-form h2 { grid-column: 1 / -1; }
 .sale-form label { min-width: 0; }

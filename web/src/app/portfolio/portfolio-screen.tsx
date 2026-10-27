@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { formatInr } from "@/lib/money";
+import { portfolioTabs, portfolioTabHref, type PortfolioTab } from "@/lib/portfolio-tabs";
 import { Drawer } from "@/components/drawer";
 import { EmptyState, MetricCard, PageHeader, SectionHeading, StatusBadge } from "@/components/ui";
 
@@ -53,7 +54,11 @@ function remaining(application: AllottedApplication, sales: SaleItem[]): number 
   return (application.allotted_quantity ?? 0) - sales.filter((sale) => sale.application === application.id).reduce((sum, sale) => sum + sale.quantity, 0);
 }
 
-export default function PortfolioScreen({ workspaceId, canEdit, initialApplications, initialSales, report, fromDate, toDate, initialLoadError = false }: {
+export function PortfolioTabs({ activeTab, fromDate, toDate }: { activeTab: PortfolioTab; fromDate: string; toDate: string }) {
+  return <nav className="portfolio-tabs" aria-label="Portfolio sections">{portfolioTabs.map((tab) => <Link key={tab.id} href={portfolioTabHref(tab.id, fromDate, toDate)} aria-current={activeTab === tab.id ? "page" : undefined}>{tab.label}</Link>)}</nav>;
+}
+
+export default function PortfolioScreen({ workspaceId, canEdit, initialApplications, initialSales, report, fromDate, toDate, activeTab = "holdings", initialLoadError = false }: {
   workspaceId: string;
   canEdit: boolean;
   initialApplications: AllottedApplication[];
@@ -61,6 +66,7 @@ export default function PortfolioScreen({ workspaceId, canEdit, initialApplicati
   report: ProfitReport | null;
   fromDate: string;
   toDate: string;
+  activeTab?: PortfolioTab;
   initialLoadError?: boolean;
 }) {
   const router = useRouter();
@@ -78,6 +84,10 @@ export default function PortfolioScreen({ workspaceId, canEdit, initialApplicati
 
   function openSale(id = "") {
     setApplicationId(id);
+    setQuantity("");
+    setPrice("");
+    setSoldOn("");
+    setCharges("");
     setSaleFormOpen(true);
     setError("");
   }
@@ -92,7 +102,7 @@ export default function PortfolioScreen({ workspaceId, canEdit, initialApplicati
         body: JSON.stringify({ application: applicationId, quantity: Number(quantity), price_per_share: price, sold_on: soldOn, charges: charges || "0.00" }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error("We could not record this sale. Check the shares, price and charges.");
+      if (!response.ok) throw new Error("We could not record this sale. Check the shares, price, sale date and charges.");
       setSales((current) => [result as SaleItem, ...current]);
       router.refresh();
       setSaleFormOpen(false);
@@ -111,23 +121,24 @@ export default function PortfolioScreen({ workspaceId, canEdit, initialApplicati
 
   return <main className="page"><div className="shell portfolio-shell">
     <PageHeader eyebrow="Holdings & sales" title="Portfolio" description="Allotted shares and realized results." action={canEdit && available.length > 0 ? <button type="button" onClick={() => openSale()}>Record sale</button> : undefined} />
-    {error && <div role="alert" className="plan-error">{error}</div>}
-    {report ? <section className="metric-grid portfolio-metrics" aria-label="Realized profit summary">
-      <MetricCard label="Realized Profit" value={formatInr(report.workspace.realized_profit)} tone="accent" note={`${report.sale_count} ${report.sale_count === 1 ? "sale" : "sales"} in period`} />
-      <MetricCard label="Sale Proceeds" value={formatInr(report.workspace.gross_proceeds)} />
-      <MetricCard label="Actual IPO Cost" value={formatInr(report.workspace.ipo_cost)} />
-      <MetricCard label="Charges" value={formatInr(report.workspace.charges)} />
-    </section> : <div role="alert" className="plan-error">Profit results could not be loaded. <Link href="/portfolio">Retry</Link></div>}
-    <section className="section-panel portfolio-panel"><SectionHeading title="Allotted holdings" detail="Shares available to sell" action={<Link href="/applications">Applications →</Link>} />
+    {error && !saleFormOpen && <div role="alert" className="plan-error">{error}</div>}
+    <PortfolioTabs activeTab={activeTab} fromDate={fromDate} toDate={toDate} />
+    {activeTab === "holdings" && <section className="section-panel portfolio-panel" aria-label="Allotted holdings"><SectionHeading title="Allotted holdings" detail="Shares available to sell" action={<Link href="/applications">Applications →</Link>} />
       {available.length === 0 ? <EmptyState title="No allotted shares are awaiting sale." detail="Record an allotment result to see holdings here." /> : <div className="holding-list">{available.map((item) => <div className="holding-row" key={item.id}><div><strong>{item.ipo_name}</strong><small>{item.applicant_name}</small></div><span><StatusBadge tone="info">{remaining(item, sales)} shares left</StatusBadge></span>{canEdit && <button type="button" className="button-secondary" onClick={() => openSale(item.id)}>Sell shares</button>}</div>)}</div>}
-    </section>
-    <section className="section-panel portfolio-panel"><SectionHeading title="Realized results" detail="Grouped by IPO and investor" />
-      <form method="get" action="/portfolio" className="profit-period"><label>From<input type="date" name="from_date" defaultValue={fromDate} /></label><label>To<input type="date" name="to_date" defaultValue={toDate} /></label><button type="submit">Show period</button><Link href="/portfolio">All dates</Link></form>
+    </section>}
+    {activeTab === "results" && <section className="section-panel portfolio-panel" aria-label="Realized results"><SectionHeading title="Realized results" detail="Grouped by IPO and investor" />
+      {report ? <section className="metric-grid portfolio-metrics" aria-label="Realized profit summary">
+        <MetricCard label="Realized Profit" value={formatInr(report.workspace.realized_profit)} tone="accent" note={`${report.sale_count} ${report.sale_count === 1 ? "sale" : "sales"} in period`} />
+        <MetricCard label="Sale Proceeds" value={formatInr(report.workspace.gross_proceeds)} />
+        <MetricCard label="Actual IPO Cost" value={formatInr(report.workspace.ipo_cost)} />
+        <MetricCard label="Charges" value={formatInr(report.workspace.charges)} />
+      </section> : <div role="alert" className="plan-error">Profit results could not be loaded. <Link href={portfolioTabHref("results", fromDate, toDate)}>Retry</Link></div>}
+      <form method="get" action="/portfolio" className="profit-period"><input type="hidden" name="tab" value="results" /><label>From<input type="date" name="from_date" defaultValue={fromDate} /></label><label>To<input type="date" name="to_date" defaultValue={toDate} /></label><button type="submit">Show period</button><Link href={portfolioTabHref("results")}>All dates</Link></form>
       {report && (report.by_ipo.length > 0 || report.by_investor.length > 0) ? <div className="profit-groups"><div><h3>By IPO</h3>{report.by_ipo.map((item) => <ProfitLine key={item.id} label={item.name} totals={item} />)}</div><div><h3>By investor</h3>{report.by_investor.map((item) => <ProfitLine key={item.id} label={item.name} totals={item} />)}</div></div> : <EmptyState title="No sales in this period." />}
-    </section>
-    <section className="section-panel portfolio-panel"><SectionHeading title="Recorded sales" detail="Exact cost and profit after each sale" />
+    </section>}
+    {activeTab === "sales" && <section className="section-panel portfolio-panel" aria-label="Recorded sales"><SectionHeading title="Recorded sales" detail="Exact cost and profit after each sale" />
       {sales.length === 0 ? <EmptyState title="No sales recorded yet." /> : <div className="compact-table-wrap"><table className="compact-table portfolio-sales-table"><thead><tr><th scope="col">IPO / investor</th><th scope="col">Sold</th><th scope="col">Proceeds</th><th scope="col">IPO cost</th><th scope="col">Charges</th><th scope="col">Profit / ROI</th></tr></thead><tbody>{sales.map((sale) => <tr key={sale.id}><th scope="row">{sale.ipo_name}<small>{sale.applicant_name} · {new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${sale.sold_on}T00:00:00Z`))}</small></th><td>{sale.quantity} shares</td><td>{formatInr(sale.gross_proceeds)}</td><td>{formatInr(sale.ipo_cost)}</td><td>{formatInr(sale.charges)}</td><td className="positive-cell">{formatInr(sale.realized_profit)}<small>{sale.roi_percent === null ? "ROI —" : `${sale.roi_percent}% ROI`}</small></td></tr>)}</tbody></table></div>}
-    </section>
+    </section>}
     {saleFormOpen && <Drawer title="Record sale" onClose={() => setSaleFormOpen(false)}><form className="sale-form sale-drawer-form" onSubmit={(event) => void record(event)}>
       {error && <p role="alert" className="plan-error">{error}</p>}
       <label>Allotted application<select required value={applicationId} onChange={(event) => setApplicationId(event.target.value)}><option value="">Choose application</option>{available.map((item) => <option key={item.id} value={item.id}>{item.ipo_name} · {item.applicant_name} · {remaining(item, sales)} shares left</option>)}</select></label>

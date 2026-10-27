@@ -19,6 +19,7 @@ const item: ApplicationItem = {
   upi_label: "••••@example",
   category: "RETAIL",
   lots: 1,
+  lot_size: 100,
   max_quantity: 100,
   upper_price: "150.00",
   amount: "15000.00",
@@ -83,12 +84,15 @@ test("saved blocked plans retain their IPO choice without the warnings banner", 
   assert.doesNotMatch(page, /No planned applications yet/);
 });
 
-test("result form calculates the cost instead of requiring a manually entered amount", () => {
+test("result form prefills Retail and allows editing lots, shares and amount", () => {
   const form = renderToStaticMarkup(createElement(AllotmentForm, { item, busy: false, onSave: () => {} }));
   assert.match(form, /Upper-band price/);
   assert.match(form, /Allotted shares/);
+  assert.match(form, /Allotted lots/);
   assert.match(form, /Allotment amount/);
-  assert.match(form, /readOnly=""/);
+  assert.doesNotMatch(form, /readOnly/);
+  assert.match(form, /value="100"/);
+  assert.match(form, /value="15000.00"/);
   assert.doesNotMatch(form, /Actual cost/);
 });
 

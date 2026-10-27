@@ -2,11 +2,12 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { backendUrl } from "@/lib/backend";
 import { selectedWorkspace } from "@/lib/workspace";
+import { portfolioTab } from "@/lib/portfolio-tabs";
 import PortfolioScreen, { type AllottedApplication, type ProfitReport, type SaleItem } from "./portfolio-screen";
 
 type Workspace = { id: string; role: string };
 
-export default async function PortfolioPage({ searchParams }: { searchParams: Promise<{ from_date?: string; to_date?: string }> }) {
+export default async function PortfolioPage({ searchParams }: { searchParams: Promise<{ tab?: string; from_date?: string; to_date?: string }> }) {
   const period = await searchParams;
   const cookieHeader = (await cookies()).toString();
   if (!cookieHeader.includes("sessionid=")) redirect("/sign-in");
@@ -26,5 +27,5 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
   const applications = applicationsResponse.ok ? ((await applicationsResponse.json()) as AllottedApplication[]) : [];
   const sales = salesResponse.ok ? ((await salesResponse.json()) as SaleItem[]) : [];
   const report = reportResponse.ok ? ((await reportResponse.json()) as ProfitReport) : null;
-  return <PortfolioScreen workspaceId={workspace.id} canEdit={workspace.role !== "VIEWER"} initialApplications={applications} initialSales={sales} report={report} fromDate={period.from_date ?? ""} toDate={period.to_date ?? ""} initialLoadError={!applicationsResponse.ok || !salesResponse.ok} />;
+  return <PortfolioScreen workspaceId={workspace.id} canEdit={workspace.role !== "VIEWER"} initialApplications={applications} initialSales={sales} report={report} fromDate={period.from_date ?? ""} toDate={period.to_date ?? ""} activeTab={portfolioTab(period.tab, Boolean(period.from_date || period.to_date))} initialLoadError={!applicationsResponse.ok || !salesResponse.ok} />;
 }
