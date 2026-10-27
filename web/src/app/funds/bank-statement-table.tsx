@@ -61,7 +61,7 @@ export default function BankStatementTable({ changes }: { changes: StatementChan
       </table>
     </div>
     {selected && <Drawer title="Transaction details" onClose={() => setSelected(null)}><dl className="statement-detail-list">
-      <div><dt>Date</dt><dd>{new Date(selected.created_at).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "short" })}</dd></div>
+      <div><dt>Date</dt><dd><time dateTime={selected.created_at}>{new Date(selected.created_at).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "short" })}</time></dd></div>
       <div><dt>Bank / owner</dt><dd>{selected.bank_name} · {selected.owner_name}</dd></div>
       <div><dt>Account / UPI</dt><dd>{bankIdentifiers(selected.account_display ?? selected.account_masked, selected.linked_upis)}</dd></div>
       <div><dt>Transaction</dt><dd>{balanceActionLabel(selected.operation)}</dd></div>

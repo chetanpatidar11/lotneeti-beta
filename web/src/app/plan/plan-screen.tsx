@@ -276,7 +276,7 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
             {lookups.selectedIpos.map((selection) => <li key={selection.ipo}>
               <strong>{lookups.ipos[selection.ipo]?.name || "Selected IPO"}</strong>
               <span>{selection.mode === "RETAIL_ONLY" ? "Retail Only" : selection.mode === "RETAIL_PLUS_SHNI" ? "Retail + sHNI" : selection.mode === "SHNI_PREFERRED" ? "sHNI Preferred" : selection.mode === "BHNI_PREFERRED" ? "bHNI Preferred" : "Custom"}</span>
-              <small>GMP {lookups.ipos[selection.ipo]?.gmpPercent ?? "—"}% · Closes {lookups.ipos[selection.ipo]?.closeDate ?? "—"}</small>
+              <small>GMP {lookups.ipos[selection.ipo]?.gmpPercent ?? "—"}% · Closes <time dateTime={lookups.ipos[selection.ipo]?.closeDate}>{lookups.ipos[selection.ipo]?.closeDate ?? "—"}</time></small>
             </li>)}
           </ul>}
           <Link href="/ipos">Change selection or mode →</Link>

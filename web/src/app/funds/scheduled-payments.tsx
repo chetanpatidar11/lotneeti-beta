@@ -146,7 +146,7 @@ export default function ScheduledPayments({
         <ul className="change-list">
           {payments.map((payment) => (
             <li key={payment.id}>
-              <span><strong>{payment.name}</strong><br /><small>{banks.find((bank) => bank.id === payment.bank_id)?.label} · {payment.frequency.toLowerCase()} · Next {payment.next_due_date}</small> <StatusBadge tone={payment.active ? "positive" : "neutral"}>{payment.active ? "Active" : "Paused"}</StatusBadge></span>
+              <span><strong>{payment.name}</strong><br /><small>{banks.find((bank) => bank.id === payment.bank_id)?.label} · {payment.frequency.toLowerCase()} · Next <time dateTime={payment.next_due_date}>{payment.next_due_date}</time></small> <StatusBadge tone={payment.active ? "positive" : "neutral"}>{payment.active ? "Active" : "Paused"}</StatusBadge></span>
               <span>{formatInr(payment.amount)}<br />
                 {canEdit && <span className="payment-buttons">
                   <button type="button" aria-label={`Edit ${payment.name}`} disabled={busy} onClick={() => startEdit(payment)}>Edit</button>

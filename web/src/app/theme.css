@@ -1257,3 +1257,13 @@ html[data-theme="dark"] .application-result-action:hover:not(:disabled) { backgr
   .statement-details-button { width: 18px; }
   .funds-statement-table .statement-money { padding-inline: 2px; white-space: normal; overflow-wrap: anywhere; font-size: 8px; }
 }
+
+/* Dates stay legible inside muted secondary text in both themes. */
+html body :is(.page, .landing-page) time, html body :is(.page, .landing-page) time > *, html body .date-value,
+html body input[type="date"], html body input[type="datetime-local"] { font-weight: 700; color: var(--text); }
+.sale-charge-estimate { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
+.sale-charge-estimate summary { color: var(--text); font-weight: 700; cursor: pointer; }
+.sale-charge-estimate dl { display: grid; gap: 8px; margin: 12px 0; }
+.sale-charge-estimate dl > div { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+.sale-charge-estimate dd { margin: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sale-charge-estimate p { font-size: 12px; color: var(--muted); }

@@ -38,7 +38,7 @@ export default function ShareholderChoice({ workspaceId, ipoId, accounts, initia
       Shareholder preferred{initial.shareholder_preferred ? ` · ${initial.shareholder_eligible?.length ?? 0} eligible` : ""}
     </button>
     {open && <Drawer title="Shareholder eligibility" onClose={() => setOpen(false)}><form className="sign-in-form" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-      <p>Confirm which investors held the required shares{terms.recordDate ? ` on ${terms.recordDate}` : " on the record date in the offer document"}. Eligibility is separate for each IPO.</p>
+      <p>Confirm which investors held the required shares{terms.recordDate ? <> on <time dateTime={terms.recordDate}>{terms.recordDate}</time></> : " on the record date in the offer document"}. Eligibility is separate for each IPO.</p>
       <p><a href={terms.url} target="_blank" rel="noopener noreferrer">View shareholder terms ↗</a></p>
       <label className="draft-lock-label"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /> Add shareholder applications</label>
       <p>First cover investors with one Retail lot and eligible investors with the minimum shareholder lots. Then increase shareholder lots up to {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Number(terms.maximumAmount))}, before using remaining funds for public sHNI/bHNI upgrades in your selected IPO mode. Minimum: {terms.minimumLots} lot{terms.minimumLots === 1 ? "" : "s"}.</p>

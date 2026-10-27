@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { formatInr } from "@/lib/money";
+import { estimatedSaleCharges, indiaSaleDate, unsoldShares } from "@/lib/sale-defaults";
 import { portfolioTabs, portfolioTabHref, type PortfolioTab } from "@/lib/portfolio-tabs";
 import { Drawer } from "@/components/drawer";
 import { EmptyState, MetricCard, PageHeader, SectionHeading, StatusBadge } from "@/components/ui";
@@ -51,7 +52,7 @@ function ProfitLine({ label, totals }: { label: string; totals: ProfitTotals }) 
 }
 
 function remaining(application: AllottedApplication, sales: SaleItem[]): number {
-  return (application.allotted_quantity ?? 0) - sales.filter((sale) => sale.application === application.id).reduce((sum, sale) => sum + sale.quantity, 0);
+  return unsoldShares(application.id, application.allotted_quantity, sales);
 }
 
 export function PortfolioTabs({ activeTab, fromDate, toDate }: { activeTab: PortfolioTab; fromDate: string; toDate: string }) {
@@ -75,19 +76,27 @@ export default function PortfolioScreen({ workspaceId, canEdit, initialApplicati
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
   const [soldOn, setSoldOn] = useState("");
-  const [charges, setCharges] = useState("");
+  const [manualCharges, setManualCharges] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saleFormOpen, setSaleFormOpen] = useState(false);
   const available = initialApplications.filter((item) => item.status === "ALLOTTED" && remaining(item, sales) > 0);
   const selected = available.find((item) => item.id === applicationId);
 
-  function openSale(id = "") {
+  const estimate = estimatedSaleCharges(price, Number(quantity));
+  const charges = manualCharges ?? estimate?.total ?? "";
+
+  function selectApplication(id: string) {
     setApplicationId(id);
-    setQuantity("");
+    const application = available.find((item) => item.id === id);
+    setQuantity(application ? String(remaining(application, sales)) : "");
+    setManualCharges(null);
+  }
+
+  function openSale(id = available[0]?.id ?? "") {
+    selectApplication(id);
     setPrice("");
-    setSoldOn("");
-    setCharges("");
+    setSoldOn(indiaSaleDate());
     setSaleFormOpen(true);
     setError("");
   }
@@ -109,7 +118,7 @@ export default function PortfolioScreen({ workspaceId, canEdit, initialApplicati
       setApplicationId("");
       setQuantity("");
       setPrice("");
-      setCharges("");
+      setManualCharges(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "We could not record this sale.");
     } finally {
@@ -137,16 +146,22 @@ export default function PortfolioScreen({ workspaceId, canEdit, initialApplicati
       {report && (report.by_ipo.length > 0 || report.by_investor.length > 0) ? <div className="profit-groups"><div><h3>By IPO</h3>{report.by_ipo.map((item) => <ProfitLine key={item.id} label={item.name} totals={item} />)}</div><div><h3>By investor</h3>{report.by_investor.map((item) => <ProfitLine key={item.id} label={item.name} totals={item} />)}</div></div> : <EmptyState title="No sales in this period." />}
     </section>}
     {activeTab === "sales" && <section className="section-panel portfolio-panel" aria-label="Recorded sales"><SectionHeading title="Recorded sales" detail="Exact cost and profit after each sale" />
-      {sales.length === 0 ? <EmptyState title="No sales recorded yet." /> : <div className="compact-table-wrap"><table className="compact-table portfolio-sales-table"><thead><tr><th scope="col">IPO / investor</th><th scope="col">Sold</th><th scope="col">Proceeds</th><th scope="col">IPO cost</th><th scope="col">Charges</th><th scope="col">Profit / ROI</th></tr></thead><tbody>{sales.map((sale) => <tr key={sale.id}><th scope="row">{sale.ipo_name}<small>{sale.applicant_name} · {new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${sale.sold_on}T00:00:00Z`))}</small></th><td>{sale.quantity} shares</td><td>{formatInr(sale.gross_proceeds)}</td><td>{formatInr(sale.ipo_cost)}</td><td>{formatInr(sale.charges)}</td><td className="positive-cell">{formatInr(sale.realized_profit)}<small>{sale.roi_percent === null ? "ROI —" : `${sale.roi_percent}% ROI`}</small></td></tr>)}</tbody></table></div>}
+      {sales.length === 0 ? <EmptyState title="No sales recorded yet." /> : <div className="compact-table-wrap"><table className="compact-table portfolio-sales-table"><thead><tr><th scope="col">IPO / investor</th><th scope="col">Sold</th><th scope="col">Proceeds</th><th scope="col">IPO cost</th><th scope="col">Charges</th><th scope="col">Profit / ROI</th></tr></thead><tbody>{sales.map((sale) => <tr key={sale.id}><th scope="row">{sale.ipo_name}<small>{sale.applicant_name} · <time dateTime={sale.sold_on}>{new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${sale.sold_on}T00:00:00Z`))}</time></small></th><td>{sale.quantity} shares</td><td>{formatInr(sale.gross_proceeds)}</td><td>{formatInr(sale.ipo_cost)}</td><td>{formatInr(sale.charges)}</td><td className="positive-cell">{formatInr(sale.realized_profit)}<small>{sale.roi_percent === null ? "ROI —" : `${sale.roi_percent}% ROI`}</small></td></tr>)}</tbody></table></div>}
     </section>}
     {saleFormOpen && <Drawer title="Record sale" onClose={() => setSaleFormOpen(false)}><form className="sale-form sale-drawer-form" onSubmit={(event) => void record(event)}>
       {error && <p role="alert" className="plan-error">{error}</p>}
-      <label>Allotted application<select required value={applicationId} onChange={(event) => setApplicationId(event.target.value)}><option value="">Choose application</option>{available.map((item) => <option key={item.id} value={item.id}>{item.ipo_name} · {item.applicant_name} · {remaining(item, sales)} shares left</option>)}</select></label>
+      <label>Allotted application<select required value={applicationId} onChange={(event) => selectApplication(event.target.value)}><option value="">Choose application</option>{available.map((item) => <option key={item.id} value={item.id}>{item.ipo_name} · {item.applicant_name} · {remaining(item, sales)} shares left</option>)}</select></label>
       <label>Shares sold<input required type="number" min="1" max={selected ? remaining(selected, sales) : undefined} step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label>
       <label>Sale price per share (₹)<input required type="number" min="0.01" step="0.01" value={price} onChange={(event) => setPrice(event.target.value)} /></label>
       <label>Sale date<input required type="date" value={soldOn} onChange={(event) => setSoldOn(event.target.value)} /></label>
-      <label>Charges (₹)<input type="number" min="0" step="0.01" value={charges} onChange={(event) => setCharges(event.target.value)} /></label>
-      <p className="sale-preview-note">The recorded sale will show exact proceeds, allocated IPO cost, charges, profit and ROI.</p>
+      <label>Charges (₹)<input type="number" min="0" step="0.01" value={charges} onChange={(event) => setManualCharges(event.target.value)} /></label>
+      {manualCharges !== null && <button type="button" className="button-ghost" onClick={() => setManualCharges(null)}>Use estimated charges</button>}
+      {estimate ? <details className="sale-charge-estimate"><summary>Estimated charges: {formatInr(estimate.total)}</summary><dl>{[
+        ["Brokerage", estimate.brokerage], ["DP (includes GST)", estimate.dp], ["STT · 0.1%", estimate.stt],
+        ["NSE exchange · 0.00345%", estimate.exchange], ["SEBI · ₹10 per crore", estimate.sebi],
+        ["GST · 18% on exchange + SEBI", estimate.gst], ["Stamp duty", estimate.stamp],
+      ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{formatInr(value)}</dd></div>)}</dl><p>Includes ₹15.34 DP per stock per day. Edit Charges to match your bill, including any DP charge already paid for the same stock today.</p></details> : <p className="sale-preview-note">Enter the sale price to estimate charges.</p>}
+      <p className="sale-preview-note">Charges use your supplied NSE delivery rates. All details are editable before saving.</p>
       <button type="submit" disabled={busy || !selected}>Record sale</button>
     </form></Drawer>}
   </div></main>;
