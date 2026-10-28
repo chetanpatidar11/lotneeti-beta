@@ -1,6 +1,8 @@
 # LotNeeti execution status
 
-## C38 Website security fixes and full member detail display — verified locally, 2026-10-28
+## C38 Website security fixes and full member detail display — deployment verification in progress, 2026-10-28
+
+- Production deployment verification caught Node22 fetch replacing the public Host header with the loopback destination, producing Django DisallowedHost. The private auth request now uses native HTTP, preserving Host, scheme and visitor IP, with a30-second timeout,1MiB response budget, no redirects and separate Set-Cookie values. Real loopback connection tests verify the on-wire headers/body/cookies and reject non-loopback targets. All73 website tests, lint/typecheck and production build pass; no backend/security-check relaxation is required. A focused website redeployment is underway after the successful pre-release backup.
 
 - Founder authorizes fixing the four medium findings from scan `f491833b-c8aa-4a7d-a705-b6f76bda304d` and replaces Viewer masking with full account-detail display for authenticated workspace members. Preserve tenant isolation, read-only Viewer mutations, encrypted storage, private responses and existing planner account selection. Mobile is excluded.
 - Patch boundaries: private auth transport; account-import throttling and row budget; bounded/fair recurring catch-up plus exact arithmetic cash projection; early planner input budgets and duplicate-lock lane rejection. No deployment performed.

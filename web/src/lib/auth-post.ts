@@ -3,6 +3,7 @@ import { copyAuthCookies } from "./auth-cookies";
 import { AUTH_REQUEST_HEADER } from "./auth-request";
 import { frontendBaseUrl } from "./backend";
 import { authTransport } from "./auth-transport";
+import { privateAuthPost } from "./private-auth-post";
 
 export async function authPost(request: Request, path: string, withCookies = false): Promise<NextResponse> {
   const origin = new URL(frontendBaseUrl).origin;
@@ -19,13 +20,16 @@ export async function authPost(request: Request, path: string, withCookies = fal
   }
   try {
     const transport = authTransport(path, request.headers.get("x-real-ip"));
-    const response = await fetch(transport.url, {
-      method: "POST",
-      headers: transport.headers,
-      body: await request.text(),
-      cache: "no-store",
-      redirect: "error",
-    });
+    const body = await request.text();
+    const response = process.env.NODE_ENV === "production"
+      ? await privateAuthPost(transport.url, transport.headers, body)
+      : await fetch(transport.url, {
+        method: "POST",
+        headers: transport.headers,
+        body,
+        cache: "no-store",
+        redirect: "error",
+      });
     const result = new NextResponse(await response.text(), {
       status: response.status,
       headers: { "content-type": "application/json", "cache-control": "no-store" },
