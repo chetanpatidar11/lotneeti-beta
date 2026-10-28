@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from accounts.models import Workspace, WorkspaceMembership
 from accounts.permissions import WorkspaceDataPermission
 from investors.account_imports import (
+    MAX_ACCOUNT_ROWS,
     AccountImportError,
     confirm_batch,
     create_image_preview,
@@ -23,21 +24,30 @@ def _can_reveal(workspace, user):
     return WorkspaceMembership.objects.filter(
         workspace=workspace,
         user=user,
-        role__in=(WorkspaceMembership.Role.OWNER, WorkspaceMembership.Role.OPERATOR),
     ).exists()
+
+
+class ImportMappingField(serializers.DictField):
+    def to_internal_value(self, data):
+        if isinstance(data, dict) and len(data) > MAX_ACCOUNT_ROWS:
+            raise serializers.ValidationError(f"Use at most {MAX_ACCOUNT_ROWS} rows per import.")
+        return super().to_internal_value(data)
 
 
 class AccountImportConfirmSerializer(serializers.Serializer):
     row_numbers = serializers.ListField(
-        child=serializers.IntegerField(min_value=1), required=False, allow_empty=False
+        child=serializers.IntegerField(min_value=1),
+        required=False,
+        allow_empty=False,
+        max_length=MAX_ACCOUNT_ROWS,
     )
-    bank_details = serializers.DictField(
+    bank_details = ImportMappingField(
         child=serializers.DictField(
             child=serializers.CharField(allow_blank=True, trim_whitespace=True)
         ),
         required=False,
     )
-    shared_upi_owners = serializers.DictField(child=serializers.CharField(), required=False)
+    shared_upi_owners = ImportMappingField(child=serializers.CharField(), required=False)
 
 
 class AccountImportListView(APIView):
@@ -103,9 +113,13 @@ class AccountImportPreviewView(APIView):
 
     def get(self, request, workspace_id, pk):
         batch = self.get_batch(request, workspace_id, pk)
-        return Response(
-            preview_payload(batch, reveal_details=_can_reveal(batch.workspace, request.user))
-        )
+        try:
+            payload = preview_payload(
+                batch, reveal_details=_can_reveal(batch.workspace, request.user)
+            )
+        except AccountImportError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        return Response(payload)
 
     def post(self, request, workspace_id, pk):
         batch = self.get_batch(request, workspace_id, pk)

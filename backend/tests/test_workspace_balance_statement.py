@@ -36,6 +36,7 @@ def test_statement_combines_banks_and_filters_with_workspace_scope():
     url = reverse("workspace-balance-statement", args=[workspace.pk])
     all_rows = client.get(url)
     assert all_rows.status_code == 200
+    assert all_rows["Cache-Control"] == "private, no-store"
     assert all_rows.data["total"] == 2
     assert {row["bank_id"] for row in all_rows.data["results"]} == {str(first.pk), str(second.pk)}
     filtered = client.get(url, {"bank": str(first.pk)})
@@ -47,8 +48,8 @@ def test_statement_combines_banks_and_filters_with_workspace_scope():
     WorkspaceMembership.objects.create(workspace=workspace, user=viewer, role="VIEWER")
     client.force_authenticate(viewer)
     masked = client.get(url, {"bank": str(first.pk)}).data["results"][0]
-    assert masked["linked_upis"] == ["••••@upi.test"]
-    assert masked["account_display"] == first.account_masked
+    assert masked["linked_upis"] == ["demo@upi.test"]
+    assert masked["account_display"] == "DEMO-ACCOUNT-0001"
     client.force_authenticate(owner)
     assert client.get(url, {"page": "0"}).status_code == 400
     assert client.get(url, {"bank": "not-a-bank"}).status_code == 400

@@ -6,6 +6,53 @@ import pytest
 from planner.cash import PlannedAllocation, cash_at_cutoff, expected_release_at
 from planner.dto import BankInput, CashBlockInput, RecurringDebitInput
 
+
+@pytest.mark.parametrize("frequency", ["DAILY", "WEEKLY", "MONTHLY"])
+def test_ancient_payment_projection_counts_exactly_without_date_iteration(frequency, monkeypatch):
+    from dataclasses import replace
+
+    from planner.cash import _occurrences_through
+
+    payment = replace(
+        debit(frequency=frequency), start_date=date(1, 1, 31), next_due_date=date(1, 1, 1)
+    )
+    monkeypatch.setattr("planner.cash._next_due", lambda *_: pytest.fail("Unbounded iteration"))
+    through = date(2026, 10, 27)
+    expected = {
+        "DAILY": (through - date(1, 1, 1)).days + 1,
+        "WEEKLY": (through - date(1, 1, 1)).days // 7 + 1,
+        "MONTHLY": 2025 * 12 + 9,
+    }[frequency]
+    assert _occurrences_through(payment, through) == expected
+    result = cash_at_cutoff(
+        bank=bank(), cutoff=datetime(2026, 10, 27, tzinfo=IST), recurring_debits=(payment,)
+    )
+    assert result.scheduled_payments == payment.amount * expected
+
+
+@pytest.mark.parametrize("frequency", ["DAILY", "WEEKLY", "MONTHLY"])
+def test_arithmetic_payment_count_matches_recurrence_across_boundaries(frequency):
+    from dataclasses import replace
+
+    from planner.cash import _next_due, _occurrences_through
+
+    for anchor in (5, 28, 29, 30, 31):
+        for first in (date(2024, 1, 15), date(2024, 1, anchor)):
+            payment = replace(
+                debit(frequency=frequency), start_date=date(2024, 1, anchor), next_due_date=first
+            )
+            for offset in (0, 13, 31, 45, 60, 365, 400):
+                through = first + timedelta(days=offset)
+                for end in (None, first + timedelta(days=44)):
+                    payment = replace(payment, end_date=end)
+                    expected = 0
+                    due = first
+                    while due <= through and (end is None or due <= end):
+                        expected += 1
+                        due = _next_due(payment, due)
+                    assert _occurrences_through(payment, through) == expected
+
+
 IST = timezone(timedelta(hours=5, minutes=30))
 CUTOFF = datetime(2026, 10, 6, 17, tzinfo=IST)
 

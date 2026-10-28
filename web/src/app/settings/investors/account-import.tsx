@@ -5,8 +5,8 @@ import { emptyImageRow, ImageImportRow, importFields, rowsFromImageTsv } from ".
 
 type ImportRow = {
   row_number: number; name: string; pan_masked: string; pan_display: string; type: string;
-  dpid_masked: string; client_id_masked: string; client_id_display: string; upi_id: string;
-  account_masked: string; bank_name: string; payment_reference: string;
+  dpid_masked: string; dpid_display?: string; client_id_masked: string; client_id_display: string; upi_id: string;
+  account_masked: string; account_display?: string; bank_name: string; payment_reference: string;
   payment_pending: boolean; shared_upi: boolean; using_upi_as_account: boolean; errors: string[];
 };
 type ImportPreview = {
@@ -189,9 +189,9 @@ export default function AccountImport({ workspaceId, canEdit, investors }: { wor
           return <tr key={row.row_number}>
             <td data-label="Import"><input type="checkbox" aria-label={`Import row ${row.row_number} for ${row.name}`} checked={checked} disabled={!canEdit || busy || !canSelect || preview.status === "CONFIRMED"} onChange={(event) => setSelected((current) => event.target.checked ? [...current, row.row_number] : current.filter((number) => number !== row.row_number))} /></td>
             <td data-label="Name" title={row.name}>{row.name}</td><td data-label="PAN">{row.pan_display}</td>
-            <td data-label="Demat" title={`${row.type} · ${row.dpid_masked} · ${row.client_id_display}`}>{row.type} · {row.dpid_masked} · {row.client_id_display}</td>
+            <td data-label="Demat" title={`${row.type} · ${row.dpid_display ?? row.dpid_masked} · ${row.client_id_display}`}>{row.type} · {row.dpid_display ?? row.dpid_masked} · {row.client_id_display}</td>
             <td data-label="UPI" title={row.upi_id}>{row.upi_id}</td>
-            <td data-label="Bank details"><span>{row.bank_name} · {row.account_masked}</span></td>
+            <td data-label="Bank details"><span>{row.bank_name} · {row.account_display ?? row.account_masked}</span></td>
             <td data-label="Status">{preview.status === "CONFIRMED" && checked ? "Imported" : canSelect ? checked && !ownerChoice(row.upi_id, selectedGroups[row.upi_id] ?? []) ? "Choose owner" : "Ready" : <details className="import-row-errors"><summary>{row.errors.length} {row.errors.length === 1 ? "issue" : "issues"}</summary><ul>{row.errors.map((error) => <li key={error}>{error}</li>)}</ul></details>}</td>
           </tr>;
         })}</tbody>

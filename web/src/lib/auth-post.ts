@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { copyAuthCookies } from "./auth-cookies";
 import { AUTH_REQUEST_HEADER } from "./auth-request";
-import { backendUrl, frontendBaseUrl } from "./backend";
+import { frontendBaseUrl } from "./backend";
+import { authTransport } from "./auth-transport";
 
 export async function authPost(request: Request, path: string, withCookies = false): Promise<NextResponse> {
   const origin = new URL(frontendBaseUrl).origin;
@@ -17,15 +18,13 @@ export async function authPost(request: Request, path: string, withCookies = fal
     return NextResponse.json({ message: "Invalid request origin." }, { status: 403 });
   }
   try {
-    const response = await fetch(backendUrl(path), {
+    const transport = authTransport(path, request.headers.get("x-real-ip"));
+    const response = await fetch(transport.url, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        origin,
-        ...(request.headers.get("x-real-ip") ? { "x-real-ip": request.headers.get("x-real-ip")! } : {}),
-      },
+      headers: transport.headers,
       body: await request.text(),
       cache: "no-store",
+      redirect: "error",
     });
     const result = new NextResponse(await response.text(), {
       status: response.status,

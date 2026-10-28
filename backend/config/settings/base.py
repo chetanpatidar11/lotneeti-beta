@@ -128,7 +128,8 @@ CELERY_BEAT_SCHEDULE = {
     },
     "post-due-recurring-debits": {
         "task": "funding.tasks.run_due_recurring_debits",
-        "schedule": crontab(hour=0, minute=5),
+        # Small fair batches resume without a single unbounded catch-up job.
+        "schedule": crontab(minute="*/5"),
     },
     "sync-daily-ipo-data": {
         "task": "ipos.tasks.sync_daily_ipo_data",

@@ -94,7 +94,8 @@ def test_demat_workspace_scope_and_viewer_write_denial():
     client.force_authenticate(viewer)
     viewer_detail = client.get(detail_url)
     assert viewer_detail.status_code == 200
-    assert "dp_id" not in viewer_detail.data
-    assert "client_id" not in viewer_detail.data
-    assert viewer_detail.data["client_id_display"] == "••••0002"
+    assert viewer_detail.data["dp_id"] == "DEMO-DP-0001"
+    assert viewer_detail.data["client_id"] == "DEMO-CLIENT-0002"
+    assert viewer_detail.data["client_id_display"] == "DEMO-CLIENT-0002"
+    assert viewer_detail.data["dp_id_display"] == "DEMO-DP-0001"
     assert client.patch(detail_url, {"active": False}).status_code == 403

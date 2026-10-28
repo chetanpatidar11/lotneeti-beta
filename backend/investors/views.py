@@ -4,7 +4,7 @@ from rest_framework import mixins, serializers, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import Workspace, WorkspaceMembership
+from accounts.models import Workspace
 from accounts.permissions import WorkspaceDataPermission
 from core.audit import record_event
 from funding.serializers import BankAccountSerializer, UPIHandleSerializer
@@ -135,15 +135,10 @@ class InvestorViewSet(
 
     def get_serializer_context(self):
         workspace = self.get_workspace()
-        can_reveal = WorkspaceMembership.objects.filter(
-            workspace=workspace,
-            user=self.request.user,
-            role__in=(WorkspaceMembership.Role.OWNER, WorkspaceMembership.Role.OPERATOR),
-        ).exists()
         return {
             **super().get_serializer_context(),
             "workspace": workspace,
-            "reveal_details": can_reveal,
+            "reveal_details": True,
         }
 
     def perform_create(self, serializer):
@@ -192,16 +187,11 @@ class DematAccountViewSet(
 
     def get_serializer_context(self):
         investor = self.get_investor()
-        can_edit = WorkspaceMembership.objects.filter(
-            workspace=investor.workspace,
-            user=self.request.user,
-            role__in=(WorkspaceMembership.Role.OWNER, WorkspaceMembership.Role.OPERATOR),
-        ).exists()
         return {
             **super().get_serializer_context(),
             "investor": investor,
-            "reveal_details": self.action == "retrieve" and can_edit,
-            "display_details": can_edit,
+            "reveal_details": self.action == "retrieve",
+            "display_details": True,
         }
 
     def perform_create(self, serializer):

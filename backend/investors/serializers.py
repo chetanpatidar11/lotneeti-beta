@@ -94,6 +94,7 @@ class DematAccountSerializer(serializers.ModelSerializer):
     dp_id = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=32)
     client_id = serializers.CharField(write_only=True, required=False, max_length=32)
     dp_id_masked = serializers.CharField(read_only=True)
+    dp_id_display = serializers.SerializerMethodField()
     client_id_masked = serializers.CharField(read_only=True)
     client_id_display = serializers.SerializerMethodField()
 
@@ -104,6 +105,7 @@ class DematAccountSerializer(serializers.ModelSerializer):
             "depository",
             "dp_id",
             "dp_id_masked",
+            "dp_id_display",
             "client_id",
             "client_id_masked",
             "client_id_display",
@@ -118,6 +120,15 @@ class DematAccountSerializer(serializers.ModelSerializer):
         if self.context.get("display_details"):
             return decrypt_value(instance.client_id_ciphertext, purpose="demat")
         return instance.client_id_masked
+
+    def get_dp_id_display(self, instance):
+        if self.context.get("display_details"):
+            return (
+                decrypt_value(instance.dp_id_ciphertext, purpose="demat")
+                if instance.dp_id_ciphertext
+                else "—"
+            )
+        return instance.dp_id_masked
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

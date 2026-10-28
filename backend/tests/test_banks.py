@@ -107,8 +107,8 @@ def test_bank_workspace_scope_and_viewer_write_denial():
     client.force_authenticate(viewer)
     viewer_detail = client.get(detail_url)
     assert viewer_detail.status_code == 200
-    assert "account_number" not in viewer_detail.data
-    assert viewer_detail.data["account_display"] == "••••0001"
+    assert viewer_detail.data["account_number"] == "DEMO-ACCOUNT-0001"
+    assert viewer_detail.data["account_display"] == "DEMO-ACCOUNT-0001"
     viewer_list = client.get(reverse("bank-list", args=[workspace.pk]))
-    assert viewer_list.data[0]["account_display"] == "••••0001"
+    assert viewer_list.data[0]["account_display"] == "DEMO-ACCOUNT-0001"
     assert client.patch(detail_url, {"active": False}).status_code == 403

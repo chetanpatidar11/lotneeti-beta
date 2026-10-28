@@ -49,12 +49,33 @@ class LockedRowSerializer(CategoryMappingSerializer):
     upi = serializers.UUIDField(allow_null=True, required=False)
 
 
+MAX_LOCKED_ROWS = 100
+MAX_EDITED_ROWS = 500
+
+
 class PreviewRequestSerializer(serializers.Serializer):
-    ipo_ids = serializers.ListField(child=serializers.UUIDField(), required=False, allow_empty=True)
-    locked_rows = LockedRowSerializer(many=True, required=False)
+    ipo_ids = serializers.ListField(
+        child=serializers.UUIDField(), required=False, allow_empty=True, max_length=100
+    )
+    locked_rows = LockedRowSerializer(many=True, required=False, max_length=MAX_LOCKED_ROWS)
     plan_cross_funding_override = serializers.ChoiceField(
         choices=["DEFAULT", "ALLOW", "WARN", "DISALLOW"], default="DEFAULT"
     )
+
+    def validate_locked_rows(self, rows):
+        seen = set()
+        for row in rows:
+            key = (
+                row["ipo"],
+                row["applicant"],
+                "SHARE" if row["category"] == "SHARE" else "PUBLIC",
+            )
+            if key in seen:
+                raise serializers.ValidationError(
+                    "Keep one public and one shareholder application per applicant and IPO."
+                )
+            seen.add(key)
+        return rows
 
 
 class PlannerPreviewView(APIView):
@@ -161,7 +182,7 @@ class EditedRowSerializer(CategoryMappingSerializer):
 
 
 class ValidateRequestSerializer(serializers.Serializer):
-    rows = EditedRowSerializer(many=True)
+    rows = EditedRowSerializer(many=True, max_length=MAX_EDITED_ROWS)
     reserve_ipo_id = serializers.UUIDField(required=False)
     plan_cross_funding_override = serializers.ChoiceField(
         choices=["DEFAULT", "ALLOW", "WARN", "DISALLOW"], default="DEFAULT"

@@ -41,6 +41,7 @@ EXPECTED_HEADERS = (
 REQUIRED_HEADERS = EXPECTED_HEADERS[:6]
 OPTIONAL_HEADERS = EXPECTED_HEADERS[6:]
 MAX_EXTRACTED_ROWS = 100
+MAX_ACCOUNT_ROWS = MAX_EXTRACTED_ROWS
 PAN_PATTERN = re.compile(r"^[A-Z]{5}[0-9]{4}[A-Z]$")
 UPI_PATTERN = re.compile(r"^[a-z0-9._-]+@[a-z0-9._-]+$")
 MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -131,7 +132,10 @@ def _read_rows(workbook_bytes: bytes) -> list[dict[str, str]]:
 
     rows = []
     seen_row_numbers = set()
-    for row in root.iter(_tag("row")):
+    for position, row in enumerate(root.iter(_tag("row"))):
+        # Count physical rows too: blank/sparse rows must not bypass the work budget.
+        if position > MAX_ACCOUNT_ROWS:
+            raise AccountImportError(f"Import at most {MAX_ACCOUNT_ROWS} accounts at a time.")
         values = {}
         for cell in row.findall(_tag("c")):
             column = _column_number(cell.attrib.get("r", ""))
@@ -150,6 +154,8 @@ def _read_rows(workbook_bytes: bytes) -> list[dict[str, str]]:
                 raise AccountImportError("The workbook contains a duplicate or invalid row number.")
             seen_row_numbers.add(row_number)
             rows.append({"row_number": row_number, "values": values})
+            if len(rows) > MAX_ACCOUNT_ROWS + 1:
+                raise AccountImportError(f"Import at most {MAX_ACCOUNT_ROWS} accounts at a time.")
     if not rows:
         raise AccountImportError("The workbook has no rows.")
     if rows[0]["row_number"] != 1:
@@ -274,6 +280,10 @@ def preview_payload(batch: AccountImportBatch, *, reveal_details: bool = False) 
         if batch.status == AccountImportBatch.Status.PREVIEWED
         else []
     )
+    if len(rows) > MAX_ACCOUNT_ROWS:
+        raise AccountImportError(
+            f"Re-upload this workbook in groups of at most {MAX_ACCOUNT_ROWS} accounts."
+        )
     upi_counts = {}
     for row in rows:
         upi_counts[row["UPI ID"]] = upi_counts.get(row["UPI ID"], 0) + 1
@@ -291,6 +301,7 @@ def preview_payload(batch: AccountImportBatch, *, reveal_details: bool = False) 
                 "pan_display": row["PAN"] if reveal_details else _mask(row["PAN"], prefix="******"),
                 "type": row["Type"],
                 "dpid_masked": _mask(row["DPID"]),
+                "dpid_display": (row["DPID"] or "—") if reveal_details else _mask(row["DPID"]),
                 "client_id_masked": _mask(row["CLIENT ID"]),
                 "client_id_display": row["CLIENT ID"]
                 if reveal_details
@@ -300,9 +311,14 @@ def preview_payload(batch: AccountImportBatch, *, reveal_details: bool = False) 
                 "account_masked": (
                     _mask(row["Account Number"]) if row["Account Number"] else row["UPI ID"]
                 ),
+                "account_display": (
+                    row["Account Number"] or row["UPI ID"]
+                    if reveal_details
+                    else _mask(row["Account Number"])
+                ),
                 "bank_name": row["Bank Name"] or "BANK",
                 "payment_reference": (
-                    "••••" + row["UPI ID"].split("@", 1)[0][-4:]
+                    (row["UPI ID"] if reveal_details else _masked_upi(row["UPI ID"]))
                     if not row["Account Number"]
                     else ""
                 ),
@@ -317,13 +333,22 @@ def preview_payload(batch: AccountImportBatch, *, reveal_details: bool = False) 
 
 
 def _create_preview(*, workspace, actor, source_filename, source_hash, rows):
+    if len(rows) > MAX_ACCOUNT_ROWS:
+        raise AccountImportError(f"Import at most {MAX_ACCOUNT_ROWS} accounts at a time.")
+    hashes = {
+        pan_hash_for_workspace(workspace.pk, row["PAN"])
+        for row in rows
+        if PAN_PATTERN.fullmatch(row["PAN"])
+    }
+    existing_hashes = set(
+        Investor.objects.filter(workspace=workspace, pan_lookup_hash__in=hashes).values_list(
+            "pan_lookup_hash", flat=True
+        )
+    )
     for row in rows:
         if (
             PAN_PATTERN.fullmatch(row["PAN"])
-            and Investor.objects.filter(
-                workspace=workspace,
-                pan_lookup_hash=pan_hash_for_workspace(workspace.pk, row["PAN"]),
-            ).exists()
+            and pan_hash_for_workspace(workspace.pk, row["PAN"]) in existing_hashes
         ):
             row["errors"].append("PAN already belongs to an investor in this workspace.")
     batch = AccountImportBatch.objects.create(
@@ -399,6 +424,10 @@ def confirm_batch(
     if batch.status != AccountImportBatch.Status.PREVIEWED:
         raise AccountImportError("This import preview has already been confirmed.")
     rows = json.loads(decrypt_value(batch.rows_ciphertext, purpose="account-import"))
+    if len(rows) > MAX_ACCOUNT_ROWS:
+        raise AccountImportError(
+            f"Re-upload this workbook in groups of at most {MAX_ACCOUNT_ROWS} accounts."
+        )
     bank_details = bank_details or {}
     shared_upi_owners = shared_upi_owners or {}
     selected_numbers = {row["row_number"] for row in rows if not row["errors"]}

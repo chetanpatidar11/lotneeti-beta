@@ -50,6 +50,26 @@ def _next_due(schedule: RecurringDebitInput, due: date) -> date:
     raise ValueError("Unsupported recurring payment frequency")
 
 
+def _occurrences_through(schedule: RecurringDebitInput, through: date) -> int:
+    """Count exactly without work proportional to an untrusted historical date."""
+    due = schedule.next_due_date
+    if schedule.end_date is not None:
+        through = min(through, schedule.end_date)
+    if due > through:
+        return 0
+    if schedule.frequency == "DAILY":
+        return (through - due).days + 1
+    if schedule.frequency == "WEEKLY":
+        return (through - due).days // 7 + 1
+    if schedule.frequency == "MONTHLY":
+        months = (through.year - due.year) * 12 + through.month - due.month
+        if months == 0:
+            return 1
+        last_day = min(schedule.start_date.day, calendar.monthrange(through.year, through.month)[1])
+        return 1 + months - int(through.day < last_day)
+    raise ValueError("Unsupported recurring payment frequency")
+
+
 def cash_at_cutoff(
     *,
     bank: BankInput,
@@ -84,10 +104,7 @@ def cash_at_cutoff(
     for debit in recurring_debits:
         if not debit.active or debit.bank_id != bank.id:
             continue
-        due = debit.next_due_date
-        while due <= cutoff_date and (debit.end_date is None or due <= debit.end_date):
-            scheduled += debit.amount
-            due = _next_due(debit, due)
+        scheduled += debit.amount * _occurrences_through(debit, cutoff_date)
 
     raw = bank.balance - blocked - planned - scheduled
     return CashAtCutoff(

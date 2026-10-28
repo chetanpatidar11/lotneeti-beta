@@ -113,7 +113,7 @@ def test_investor_access_is_scoped_and_viewer_is_read_only():
     assert client.patch(detail_url, {"name": "Changed"}).status_code == 403
 
     client.force_authenticate(viewer)
-    assert client.get(list_url).data[0]["pan_display"] == "******001A"
+    assert client.get(list_url).data[0]["pan_display"] == SYNTHETIC_PAN
     assert client.get(detail_url).status_code == 200
     assert client.patch(detail_url, {"name": "Changed"}).status_code == 403
     assert client.post(list_url, {"name": "New", "pan": "TESTX0002B"}).status_code == 403

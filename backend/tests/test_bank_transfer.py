@@ -209,7 +209,7 @@ def test_transfer_details_remain_in_deleted_bank_history():
 
 
 @pytest.mark.django_db
-def test_statement_resolves_full_transfer_upi_for_existing_history_and_masks_viewers():
+def test_statement_resolves_full_transfer_details_for_all_workspace_members():
     from funding.models import UPIHandle
 
     owner, workspace, investor, source, destination, client, _ = setup_transfer()
@@ -225,6 +225,6 @@ def test_statement_resolves_full_transfer_upi_for_existing_history_and_masks_vie
     WorkspaceMembership.objects.create(workspace=workspace, user=viewer, role="VIEWER")
     client.force_authenticate(viewer)
     row = next(row for row in client.get(url).data["results"] if row["operation"] == "TRANSFER_OUT")
-    assert "synthetic.destination@exampleupi" not in row["counterparty_label"]
-    assert "SYNTHETIC-ACCOUNT-002" not in row["counterparty_label"]
-    assert "••••@exampleupi" in row["counterparty_label"]
+    assert "synthetic.destination@exampleupi" in row["counterparty_label"]
+    assert "SYNTHETIC-ACCOUNT-002" in row["counterparty_label"]
+    assert "••••@exampleupi" not in row["counterparty_label"]

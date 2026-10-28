@@ -15,6 +15,33 @@ def clean_cache():
     cache.clear()
 
 
+@pytest.mark.django_db
+@override_settings(
+    RATE_LIMIT_ENABLED=True,
+    RATE_LIMIT_RULES={"auth_password": (1, 60)},
+    RATE_LIMIT_TRUSTED_PROXY_IPS={"127.0.0.1"},
+    ALLOWED_HOSTS=["beta.example.test"],
+    FRONTEND_BASE_URL="https://beta.example.test",
+    SECURE_SSL_REDIRECT=True,
+    SECURE_PROXY_SSL_HEADER=("HTTP_X_FORWARDED_PROTO", "https"),
+)
+def test_private_auth_transport_preserves_production_host_tls_and_individual_limits(client):
+    statuses = []
+    for visitor in ("198.51.100.1", "198.51.100.2", "198.51.100.1"):
+        response = client.post(
+            "/api/v1/auth/password/login/",
+            data={},
+            content_type="application/json",
+            REMOTE_ADDR="127.0.0.1",
+            HTTP_X_REAL_IP=visitor,
+            HTTP_HOST="beta.example.test",
+            HTTP_X_FORWARDED_PROTO="https",
+            HTTP_ORIGIN="https://beta.example.test",
+        )
+        statuses.append(response.status_code)
+    assert statuses == [400, 400, 429]
+
+
 @override_settings(
     RATE_LIMIT_ENABLED=True,
     RATE_LIMIT_RULES={
@@ -42,6 +69,8 @@ def test_sensitive_routes_are_limited_and_retry_after_is_returned():
         ("get", "/admin/"),
         ("get", "/api/v1/platform/"),
         ("post", "/api/v1/workspaces/abc/imports/"),
+        ("post", "/api/v1/workspaces/abc/account-imports/"),
+        ("post", "/api/v1/workspaces/abc/account-imports/batch-id/"),
         ("post", "/api/v1/workspaces/abc/planner/preview/"),
         ("post", "/api/v1/workspaces/abc/planner/runs/abc/exports/"),
         ("get", "/api/v1/workspaces/abc/planner/runs/abc/exports/def/download/"),

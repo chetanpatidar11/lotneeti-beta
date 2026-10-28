@@ -18,6 +18,29 @@ from planner.models import PlanRun
 from planner.persistence import create_plan_run
 
 
+@pytest.mark.django_db
+def test_full_bank_labels_for_saved_and_tracked_rows_keep_viewer_read_only():
+    owner, workspace, snapshot = setup_plan()
+    run = create_plan_run(workspace=workspace, snapshot=snapshot, actor=owner)
+    viewer = User.objects.create_user(email="full-detail-viewer@example.test")
+    WorkspaceMembership.objects.create(workspace=workspace, user=viewer, role="VIEWER")
+    client = APIClient()
+    client.force_authenticate(viewer)
+    url = reverse("application-list", args=[workspace.pk])
+    saved = client.get(url)
+    assert saved.status_code == 200
+    assert "DEMO-ACCOUNT-0001" in saved.data[0]["bank_label"]
+    track = reverse("application-start-tracking", args=[workspace.pk, run.pk])
+    assert client.post(track, {}, format="json").status_code == 403
+    client.force_authenticate(owner)
+    assert client.post(track, {}, format="json").status_code == 201
+    client.force_authenticate(viewer)
+    tracked = client.get(url)
+    assert tracked.status_code == 200
+    assert not tracked.data[0]["is_plan_row"]
+    assert "DEMO-ACCOUNT-0001" in tracked.data[0]["bank_label"]
+
+
 def assert_single_bank_capital(response, *, bank, balance, blocked, planned, available):
     expected = {
         "balance": balance,

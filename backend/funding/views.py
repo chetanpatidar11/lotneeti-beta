@@ -3,7 +3,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import mixins, viewsets
 
-from accounts.models import Workspace, WorkspaceMembership
+from accounts.models import Workspace
 from accounts.permissions import WorkspaceDataPermission
 from core.audit import record_event
 from funding.models import BankAccount, FundingPreference, RecurringDebit, UPIHandle
@@ -47,16 +47,11 @@ class BankAccountViewSet(
 
     def get_serializer_context(self):
         workspace = self.get_workspace()
-        can_edit = WorkspaceMembership.objects.filter(
-            workspace=workspace,
-            user=self.request.user,
-            role__in=(WorkspaceMembership.Role.OWNER, WorkspaceMembership.Role.OPERATOR),
-        ).exists()
         return {
             **super().get_serializer_context(),
             "workspace": workspace,
-            "reveal_details": self.action == "retrieve" and can_edit,
-            "display_details": can_edit,
+            "reveal_details": self.action == "retrieve",
+            "display_details": True,
             "restricted_bank_names": restricted_bank_names(),
         }
 

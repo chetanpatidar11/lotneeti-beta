@@ -175,7 +175,7 @@ def shared_upi_without_banks_upload():
     return SimpleUploadedFile("SharedUPI.xlsx", output.getvalue())
 
 
-def seventeen_rows_six_upis_upload():
+def seventeen_rows_six_upis_upload(count=17):
     output = io.BytesIO()
     with (
         zipfile.ZipFile(io.BytesIO(SAMPLE.read_bytes())) as source_zip,
@@ -187,7 +187,7 @@ def seventeen_rows_six_upis_upload():
                 header = re.search(rb'<row r="1".*?</row>', contents)
                 assert header is not None
                 rows = []
-                for index in range(17):
+                for index in range(count):
                     row_number = index + 2
                     cells = {
                         "A": f"Person {index + 1}",
@@ -236,8 +236,11 @@ def test_sample_account_workbook_previews_authorized_ids_and_confirms_only_selec
     WorkspaceMembership.objects.create(workspace=workspace, user=viewer, role="VIEWER")
     client.force_authenticate(viewer)
     masked = client.get(reverse("account-import-preview", args=[workspace.pk, batch.pk]))
-    assert masked.data["rows"][0]["pan_display"] == "******234F"
-    assert masked.data["rows"][0]["client_id_display"] == masked.data["rows"][0]["client_id_masked"]
+    assert masked.data["rows"][0]["pan_display"] == "ABCDE1234F"
+    assert (
+        masked.data["rows"][0]["client_id_display"] == preview.data["rows"][0]["client_id_display"]
+    )
+    assert masked.data["rows"][0]["account_display"] == "123456789"
     client.force_authenticate(owner)
     confirmed = client.post(
         reverse("account-import-preview", args=[workspace.pk, batch.pk]),

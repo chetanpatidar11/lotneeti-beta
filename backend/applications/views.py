@@ -22,6 +22,7 @@ from applications.services import (
     mark_submitted,
     start_tracking_plan,
 )
+from core.crypto import decrypt_value
 from funding.models import BankAccount, UPIHandle
 from investors.models import Investor
 from ipos.models import IPO
@@ -46,6 +47,13 @@ def _writer(workspace, user):
         raise PermissionDenied("Only workspace owners and operators can update applications.")
 
 
+def _bank_label(bank):
+    if bank.is_imported_reference:
+        return bank.bank_name
+    account = decrypt_value(bank.account_ciphertext, purpose="bank-account")
+    return f"{bank.bank_name} {account}"
+
+
 def _result(item, *, upper_price=None):
     sold_quantity = getattr(item, "sold_quantity", None)
     if sold_quantity is None:
@@ -60,9 +68,7 @@ def _result(item, *, upper_price=None):
         "applicant_name": item.applicant.name,
         "bank": str(item.bank_id),
         "upi": str(item.upi_id) if item.upi_id else "",
-        "bank_label": item.bank.bank_name
-        if item.bank.is_imported_reference
-        else f"{item.bank.bank_name} {item.bank.account_masked}",
+        "bank_label": _bank_label(item.bank),
         "upi_label": item.upi.handle if item.upi_id else "Bank ASBA",
         "close_date": item.ipo.close_date,
         "allotment_date": item.ipo.allotment_date,
@@ -156,9 +162,7 @@ def _saved_plan_rows(workspace, tracked):
                 "applicant": row.applicant_ref,
                 "applicant_name": investor.name,
                 "bank": row.bank_ref,
-                "bank_label": bank.bank_name
-                if bank.is_imported_reference
-                else f"{bank.bank_name} {bank.account_masked}",
+                "bank_label": _bank_label(bank),
                 "upi": row.upi_ref,
                 "upi_label": upi.handle if upi else "Bank ASBA",
                 "close_date": ipo.close_date,
@@ -234,7 +238,14 @@ class TrackingRowsSerializer(serializers.Serializer):
         return value
 
 
-class ApplicationListView(APIView):
+class PrivateApplicationView(APIView):
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+
+class ApplicationListView(PrivateApplicationView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, workspace_id):
@@ -247,7 +258,7 @@ class ApplicationListView(APIView):
         return Response(_saved_plan_rows(workspace, items) + _results(items))
 
 
-class StartTrackingView(APIView):
+class StartTrackingView(PrivateApplicationView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, workspace_id, run_id):
@@ -275,7 +286,7 @@ class StartTrackingView(APIView):
         return Response(_results(tracked), status=201)
 
 
-class ApplicationActionView(APIView):
+class ApplicationActionView(PrivateApplicationView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, workspace_id, application_id, action):
@@ -331,7 +342,7 @@ class ApplicationActionView(APIView):
         return Response(_result(changed))
 
 
-class ApplicationBulkView(APIView):
+class ApplicationBulkView(PrivateApplicationView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, workspace_id):
@@ -378,7 +389,7 @@ class ApplicationBulkView(APIView):
         return Response(_results(changed))
 
 
-class WorkspaceOperationsView(APIView):
+class WorkspaceOperationsView(PrivateApplicationView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, workspace_id):

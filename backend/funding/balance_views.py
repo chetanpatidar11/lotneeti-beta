@@ -10,7 +10,6 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import WorkspaceMembership
 from accounts.permissions import WorkspaceDataPermission
 from funding.models import ArchivedBalanceChange, BalanceChange, BankAccount
 from funding.serializers import BankAccountSerializer
@@ -153,6 +152,11 @@ class RecentBalanceChangesView(APIView):
 class WorkspaceBalanceStatementView(APIView):
     permission_classes = [WorkspaceDataPermission]
 
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        response["Cache-Control"] = "private, no-store"
+        return response
+
     def get(self, request, workspace_id):
         bank_id = request.query_params.get("bank", "")
         banks = BankAccount.objects.filter(workspace_id=workspace_id)
@@ -175,10 +179,7 @@ class WorkspaceBalanceStatementView(APIView):
             .prefetch_related("bank__upis")
             .order_by("-created_at", "-id")
         )
-        reveal = WorkspaceMembership.objects.filter(
-            workspace_id=workspace_id, user=request.user, role__in=("OWNER", "OPERATOR")
-        ).exists()
-        bank_serializer = BankAccountSerializer(context={"display_details": reveal})
+        bank_serializer = BankAccountSerializer(context={"display_details": True})
         pages = Paginator(changes, 50)
         page = pages.get_page(page_number)
         page_changes = list(page.object_list)

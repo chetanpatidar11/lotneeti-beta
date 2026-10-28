@@ -57,6 +57,8 @@ Version 2.1 • Approved Planner baseline • September 2026
 
 # 5. Sensitive Data Protection
 
+Founder override, 2026-10-28: all authenticated workspace members, including Viewers, may read full PAN, bank, UPI and demat details in the website. This supersedes masked/reveal-only presentation defaults below. Viewer mutations remain prohibited; workspace scoping, encryption at rest, private no-store responses, and redaction in logs/audit metadata remain required. Deleted-bank history recorded only as a masked reference cannot reconstruct the original number.
+
 | Data | Control |
 | --- | --- |
 | PAN | Application-level encryption; normalized hash for duplicate/exact lookup; UI masked except when explicitly revealed by authorized user. |
