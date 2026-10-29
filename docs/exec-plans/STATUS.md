@@ -1,5 +1,11 @@
 # LotNeeti execution status
 
+## C39 / E08 Separate mandate totals from rolling application counts — verified locally, 2026-10-29
+
+- Founder reports three successful sHNI bids funded by one ₹6,33,000 bank balance. Remove the assumed default ₹5 lakh aggregate bank/UPI rolling amount ceiling. Retain six-application rolling counts, explicit per-UPI/configured amount overrides, cash-at-cutoff checks, owner protection, ordering, quota rules and locks. The changed configuration is captured by existing snapshot/settings hashes. No production balances or bids are edited. Website/backend only.
+- Regression coverage: three ₹2,11,000 minimum sHNI applications from one bank/UPI, same-bank multiple UPIs, deterministic output, insufficient cash, explicit aggregate overrides and count boundaries. File-export investigation follows as a separate ticket.
+- All 550 backend tests and focused Ruff/format checks pass. Historical golden snapshots explicitly replay their original ₹5 lakh aggregate configuration, retaining exact hashes and mappings; current defaults are independently covered. Live inspection/deployment is blocked by an expired AWS CLI session and unreachable restricted SSH; founder asked to sign in while local work continues.
+
 ## C38 Website security fixes and full member detail display — deployed, 2026-10-28
 
 - Production deployment verification caught Node22 fetch replacing the public Host header with the loopback destination, producing Django DisallowedHost. The private auth request now uses native HTTP, preserving Host, scheme and visitor IP, with a30-second timeout,1MiB response budget, no redirects and separate Set-Cookie values. Real loopback connection tests verify the on-wire headers/body/cookies and reject non-loopback targets. All73 website tests, lint/typecheck and production build pass; no backend/security-check relaxation was required. The two real-connection tests also pass on the server's Node22 runtime.

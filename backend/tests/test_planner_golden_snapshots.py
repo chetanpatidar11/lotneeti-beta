@@ -1,4 +1,6 @@
 import json
+from dataclasses import replace
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -25,7 +27,18 @@ def test_versioned_synthetic_plan_matches_reviewed_regression_snapshot(case):
             two_ipos=True,
         ),
     }
-    result = generate_proposal(fixtures[case])
+    # Replay the historical frozen configuration, rather than today's defaults.
+    snapshot = fixtures[case]
+    result = generate_proposal(
+        replace(
+            snapshot,
+            config=replace(
+                snapshot.config,
+                upi_amount_limit=Decimal("500000.00"),
+                bank_amount_limit=Decimal("500000.00"),
+            ),
+        )
+    )
     frozen = GOLDEN[case]
     assert result.audit.valid
     assert result.planner_version == frozen["planner_version"]

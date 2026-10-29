@@ -47,6 +47,25 @@ def plan(data):
     return baseline_retail_coverage(data, choose_retail_wallet)
 
 
+def test_three_minimum_shni_bids_fit_one_bank_with_633000_balance():
+    from planner.engine import generate_proposal
+
+    base = snapshot(mode="SHNI_PREFERRED", balance="633000.00", applicants=3)
+    data = replace(base, ipos=(replace(base.ipos[0], upper_price=Decimal("211"), lot_size=100),))
+    proposal = generate_proposal(data)
+    assert len(proposal.coverage.rows) == 3
+    assert all(
+        (row.category, row.lots, row.amount, row.bank_id)
+        == ("SHNI", 10, Decimal("211000"), "bank-1")
+        for row in proposal.coverage.rows
+    )
+    assert not proposal.audit.issues
+    assert generate_proposal(data) == proposal
+    # Cash remains a hard limit even though aggregate mandate value is uncapped.
+    less_cash = replace(data, banks=(replace(data.banks[0], balance=Decimal("632999")),))
+    assert sum(row.category == "SHNI" for row in generate_proposal(less_cash).coverage.rows) == 2
+
+
 def test_qc004_minimum_shni_quote_replaces_retail_without_topping_up():
     data = snapshot()
     baseline = plan(data)

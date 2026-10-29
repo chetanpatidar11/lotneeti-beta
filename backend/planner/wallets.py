@@ -1,5 +1,7 @@
 """Feasible Retail wallets, with own-name funding preferred."""
 
+from decimal import Decimal
+
 from funding.policy import resolve_cross_funding_policy
 from planner.cash import PlannedAllocation, cash_at_cutoff, expected_release_at
 from planner.coverage import CoverageRow, WalletChoice
@@ -201,15 +203,18 @@ def _choose_wallet(
                 else snapshot.config.upi_amount_limit
             )
             count_headroom = upi_count_limit - limit_check.upi_count_after
-            amount_headroom = upi_amount_limit - limit_check.upi_amount_after
+            amount_headrooms = []
+            if upi_amount_limit is not None:
+                amount_headrooms.append(upi_amount_limit - limit_check.upi_amount_after)
             if snapshot.config.bank_level_enforcement:
                 count_headroom = min(
                     count_headroom, snapshot.config.bank_count_limit - limit_check.bank_count_after
                 )
-                amount_headroom = min(
-                    amount_headroom,
-                    snapshot.config.bank_amount_limit - limit_check.bank_amount_after,
-                )
+                if snapshot.config.bank_amount_limit is not None:
+                    amount_headrooms.append(
+                        snapshot.config.bank_amount_limit - limit_check.bank_amount_after
+                    )
+            amount_headroom = min(amount_headrooms, default=Decimal("0.00"))
             warnings = policy.warnings
             if not owner_safe:
                 warnings += ("OWNER_RESERVE_TRADEOFF",)

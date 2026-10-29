@@ -59,8 +59,11 @@ def test_rl001_and_rl002_upi_count_boundary():
     assert "UPI_LIMIT_EXCEEDED" in sixth.blocking_reasons
 
 
-def test_rl003_amount_cap_and_upi_override():
-    result = check([event(1, amount="490000.00")])
+def test_rl003_explicit_amount_cap_and_upi_override():
+    result = check(
+        [event(1, amount="490000.00")],
+        settings=config(upi_amount_limit=Decimal("500000.00")),
+    )
     assert result.allowed is False
     assert result.upi_amount_after == Decimal("505000.00")
     override = check([], upi_value=upi(amount_limit_override=Decimal("10000.00")))
@@ -81,11 +84,23 @@ def test_bank_amount_cap_aggregates_other_upi_and_respects_cancellation():
         event(1, upi_id="upi-2", amount="490000.00"),
         event(2, upi_id="upi-2", amount="100000.00", cancelled=True),
     ]
-    result = check(events)
+    result = check(events, settings=config(bank_amount_limit=Decimal("500000.00")))
     assert result.upi_amount_after == Decimal("15000.00")
     assert result.bank_amount_after == Decimal("505000.00")
     assert result.blocking_reasons == ("BANK_LIMIT_EXCEEDED",)
     assert check(events, settings=config(bank_level_enforcement=False)).allowed
+
+
+@pytest.mark.parametrize("same_upi", [True, False])
+def test_separate_shni_bids_have_no_default_five_lakh_aggregate_cap(same_upi):
+    events = [
+        event(1, amount="211000.00"),
+        event(2, upi_id="upi-1" if same_upi else "upi-2", amount="211000.00"),
+    ]
+    result = check(events, amount="211000.00")
+    assert result.allowed
+    assert result.bank_amount_after == Decimal("633000.00")
+    assert result.bank_count_after == 3
 
 
 def test_rl005_cancelled_does_not_count_and_rl006_released_still_counts():

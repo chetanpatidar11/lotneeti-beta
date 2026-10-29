@@ -127,7 +127,7 @@ Total defined cases: 120
 | --- | --- | --- | --- | --- |
 | RL-001 | UPI count 5/6 | 5 applications in rolling window | One more application allowed. | P0 |
 | RL-002 | UPI count 6/6 | 6 applications | No further row using UPI. | P0 |
-| RL-003 | UPI amount near cap | ₹4.90L used; new quote ₹15k | Rejected because ₹5k above ₹5L cap. | P0 |
+| RL-003 | Explicit UPI aggregate amount cap | Override configured to ₹5L; ₹4.90L used; new quote ₹15k | Rejected. Without an explicit cap, aggregate rupee usage alone does not reject separate bids. | P0 |
 | RL-004 | Bank shared cap across UPIs | Two UPIs same bank total 6 apps | Neither UPI can create another row if bank-level enforcement on. | P0 |
 | RL-005 | Cancelled app does not count | 6 records but one cancelled | One slot remains. | P0 |
 | RL-006 | Released app still counts inside 24h | Released funds but submitted within window | Still consumes rolling count/amount. | P0 |

@@ -36,8 +36,8 @@ The legacy planner already established useful behavior: one-PAN-per-IPO eligibil
 | Rolling window | 24 hours. |
 | UPI application cap | 6 non-cancelled applications inside the rolling window. |
 | Bank application cap | 6 non-cancelled applications inside the rolling window; shared across UPIs mapped to that bank when bank-level enforcement is enabled. |
-| UPI amount cap | ₹5,00,000 inside the rolling window. |
-| Bank amount cap | ₹5,00,000 inside the rolling window. |
+| UPI aggregate amount cap | No default aggregate cap across separate mandates. Explicit configured overrides remain supported. Founder correction 2026-10-29. |
+| Bank aggregate amount cap | No default aggregate cap across separate mandates. Cash availability and rolling application counts still apply. Founder correction 2026-10-29. |
 | Retail application time | Default 5:00 PM on closing date; admin-configurable. |
 | sHNI application time | Default 4:00 PM on closing date; admin-configurable. |
 | Manual record plan after closing | Explicitly select a closed, allotment or listed IPO to generate/review/save and record submission details at any time. Closed IPOs are never automatically selected. Exchange status and cutoffs are unchanged; late plans cannot be exported for new bids. |
@@ -238,7 +238,7 @@ The 24-hour rolling tracker counts non-cancelled submitted applications inside t
 
 - Default maximum 6 applications per UPI and 6 per bank account.
 
-- Default maximum ₹5,00,000 submitted amount per UPI and per bank account.
+- No default ₹5,00,000 aggregate submitted-amount ceiling per UPI or bank account. Three separate ₹2,11,000 bids may use ₹6,33,000 when cash, counts and funding policies permit. Explicit configured aggregate caps remain enforced. This is independent of a payment provider's per-mandate transaction limits.
 
 - If one bank has multiple UPIs, bank-level enforcement aggregates all of them.
 

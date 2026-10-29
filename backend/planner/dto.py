@@ -129,8 +129,10 @@ class PlannerConfig:
     workspace_cross_funding_policy: str
     upi_count_limit: int = 6
     bank_count_limit: int = 6
-    upi_amount_limit: Decimal = Decimal("500000.00")
-    bank_amount_limit: Decimal = Decimal("500000.00")
+    # No default aggregate rupee cap across separate IPO mandates. Explicit
+    # configured limits remain supported independently of application counts.
+    upi_amount_limit: Decimal | None = None
+    bank_amount_limit: Decimal | None = None
     rolling_window_hours: int = 24
     bank_level_enforcement: bool = True
     plan_cross_funding_override: str = "DEFAULT"

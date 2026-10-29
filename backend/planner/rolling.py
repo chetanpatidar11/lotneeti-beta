@@ -51,10 +51,13 @@ class RollingLimitTracker:
             else config.upi_amount_limit
         )
         reasons = []
-        if upi_count > upi_count_limit or upi_amount > upi_amount_limit:
+        if upi_count > upi_count_limit or (
+            upi_amount_limit is not None and upi_amount > upi_amount_limit
+        ):
             reasons.append("UPI_LIMIT_EXCEEDED")
         if config.bank_level_enforcement and (
-            bank_count > config.bank_count_limit or bank_amount > config.bank_amount_limit
+            bank_count > config.bank_count_limit
+            or (config.bank_amount_limit is not None and bank_amount > config.bank_amount_limit)
         ):
             reasons.append("BANK_LIMIT_EXCEEDED")
         return RollingCheck(
