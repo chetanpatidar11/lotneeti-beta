@@ -211,6 +211,8 @@ Production must not depend directly on undocumented website endpoints. Adapters 
 
 - S3 exports use short-lived signed URLs; no public buckets.
 
+- Website CSV downloads may instead use a direct authenticated attachment generated in memory (C40, 2026-10-29). Reuse the same scoped export validation, audit the exact content hash and source plan hashes, reserve successfully exported IPOs atomically, and mark responses private/no-store. This avoids requiring S3 or a signed-link navigation for the website; the existing private S3 API remains available to other clients. No persistent plaintext file is written by the server.
+
 - AWS Budgets alerts should be configured early to protect student credits.
 
 # 12. Testing Strategy

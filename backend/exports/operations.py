@@ -28,6 +28,39 @@ def _can_export(workspace, actor) -> bool:
     ).exists()
 
 
+@transaction.atomic
+def download_plan_csv(*, plan_run, actor, format_id, ipo_id):
+    """Deliver website CSVs in the authorized response, without an S3 handoff."""
+    from planner.models import PlanRun
+
+    run = PlanRun.objects.select_for_update().get(pk=plan_run.pk)
+    artifact = export_saved_plan(plan_run=run, actor=actor, format_id=format_id, ipo_id=ipo_id)
+    if not artifact.content_type.startswith("text/csv"):
+        raise ValidationError("Choose a CSV export format")
+    issuer = slugify(IPO.objects.get(pk=ipo_id).issuer_name)[:100] if ipo_id else "plan"
+    prefix = "demat" if format_id == "demat_csv" else "lotneeti"
+    filename = f"{prefix}-{issuer or 'ipo'}-{timezone.localdate().isoformat()}.csv"
+    if ipo_id and run.reserved_ipo_ids is not None:
+        run.reserved_ipo_ids = sorted(set(run.reserved_ipo_ids) | {ipo_id})
+        run.save(update_fields=["reserved_ipo_ids"])
+    record_event(
+        action="planner.export.downloaded",
+        target=run,
+        actor=actor,
+        workspace=run.workspace,
+        metadata={
+            "format": artifact.format_id,
+            "version": artifact.format_version,
+            "ipo_id": ipo_id,
+            "content_sha256": sha256(artifact.data).hexdigest(),
+            "plan_output_hash": run.output_hash,
+            "input_snapshot_hash": run.input_snapshot_hash,
+        },
+    )
+    record_beta_event(workspace=run.workspace, event_type=BetaEvent.Type.EXPORT_GENERATED)
+    return artifact, filename
+
+
 def generate_plan_export(
     *, plan_run, actor, storage, format_id="generic_csv", ipo_id=None
 ) -> PlanExport:

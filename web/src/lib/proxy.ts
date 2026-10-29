@@ -33,9 +33,14 @@ export async function proxyWorkspaceRequest(
       cache: "no-store",
     });
     if (response.status === 204) return new NextResponse(null, { status: 204, headers: { "cache-control": "no-store" } });
-    return new NextResponse(await response.text(), {
+    return new NextResponse(await response.arrayBuffer(), {
       status: response.status,
-      headers: { "content-type": "application/json", "cache-control": "no-store" },
+      headers: {
+        "content-type": response.headers.get("content-type") ?? "application/json",
+        "cache-control": "private, no-store",
+        "x-content-type-options": "nosniff",
+        ...(response.headers.has("content-disposition") ? { "content-disposition": response.headers.get("content-disposition")! } : {}),
+      },
     });
   } catch {
     return NextResponse.json({ message: "Service is temporarily unavailable." }, { status: 503 });

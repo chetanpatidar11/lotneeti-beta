@@ -36,8 +36,20 @@ test("same-origin workspace mutations and reads reach Django", async (context) =
   });
   const posted = await proxyWorkspaceRequest(request("POST", { origin: frontend, "content-type": "application/json" }), "workspaces/", "POST");
   assert.equal(posted.status, 200);
-  assert.equal(posted.headers.get("cache-control"), "no-store");
+  assert.equal(posted.headers.get("cache-control"), "private, no-store");
   assert.equal((await proxyWorkspaceRequest(request("DELETE", { "sec-fetch-site": "same-origin" }), "workspaces/", "DELETE")).status, 200);
   assert.equal((await proxyWorkspaceRequest(request("GET"), "workspaces/", "GET")).status, 200);
   assert.deepEqual(methods, ["POST", "DELETE", "GET"]);
+});
+
+test("CSV proxy preserves UTF-8 file bytes and the attachment filename", async (context) => {
+  const body = "Name,PAN\nSynthetic ₹,TESTX0001A\n";
+  context.mock.method(globalThis, "fetch", async () => new Response(body, {
+    headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": 'attachment; filename="demat-synthetic.csv"' },
+  }));
+  const response = await proxyWorkspaceRequest(request("POST", { origin: frontend }), "workspaces/demo/planner/runs/demo/exports/", "POST");
+  assert.equal(response.headers.get("content-type"), "text/csv; charset=utf-8");
+  assert.equal(response.headers.get("content-disposition"), 'attachment; filename="demat-synthetic.csv"');
+  assert.equal(response.headers.get("cache-control"), "private, no-store");
+  assert.equal(await response.text(), body);
 });

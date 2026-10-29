@@ -1,5 +1,12 @@
 # LotNeeti execution status
 
+## C40 / G02 Website CSV delivery — verified locally, deployment pending, 2026-10-29
+
+- Founder reports broken file export. Website currently saves, writes private S3, requests a signed URL and programmatically navigates to that URL; failures are collapsed into generic messages. Live error inspection remains unavailable until AWS login is refreshed. Add a direct authenticated CSV response for the website to remove the storage/link dependency, retain the existing private S3 export API for other clients, and preserve permission, plan readiness, quota validation, audit and successful export reservations. No mobile changes.
+- Direct CSVs are generated in memory, returned as private/no-store attachments, and contain the existing exact demat/quota columns. The website receives file bytes through its same-origin proxy and saves a named Blob download. Export failure details are surfaced; the saved draft is retained. No public objects, persistent plaintext files or credentials are introduced.
+- Verified 554 backend tests, 76 website tests, backend Ruff/format, planner matrix, Django checks/no migration drift, website lint/typecheck/build. A real isolated browser generated three ₹2,11,000 sHNI rows using one bank/UPI with ₹6,33,000 cash, exported successfully without S3 configuration, reserved exactly ₹6,33,000 and downloaded a named CSV. The downloaded bytes have the exact eight demat headers and all three synthetic applicants. Existing S3 adapter/export tests pass unchanged. No production data or mobile source/checks were used.
+- AWS CLI session is expired and pinned-host SSH is unreachable. Founder has been asked to run `aws login`; no live diagnosis, release or production financial mutation has occurred. Both fixes are ready for deployment after access recovery and an encrypted backup.
+
 ## C39 / E08 Separate mandate totals from rolling application counts — verified locally, 2026-10-29
 
 - Founder reports three successful sHNI bids funded by one ₹6,33,000 bank balance. Remove the assumed default ₹5 lakh aggregate bank/UPI rolling amount ceiling. Retain six-application rolling counts, explicit per-UPI/configured amount overrides, cash-at-cutoff checks, owner protection, ordering, quota rules and locks. The changed configuration is captured by existing snapshot/settings hashes. No production balances or bids are edited. Website/backend only.

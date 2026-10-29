@@ -65,7 +65,7 @@ Founder override, 2026-10-28: all authenticated workspace members, including Vie
 | Bank account number | Encrypted; show last 4 digits by default. |
 | UPI ID | Treat as sensitive contact/payment identifier; mask where appropriate in shared/viewer contexts. |
 | Demat identifiers | Encrypt or restrict based on sensitivity; never expose another workspace’s values. |
-| Exports | Private S3 object; short-lived signed download; authorization rechecked before generation/download. |
+| Exports | Private S3 with short-lived signed download, or a direct authenticated in-memory website CSV attachment with private/no-store headers. Authorization and scoped plan validation are required before delivery; audit the content/source hashes. No public objects or persistent server plaintext. |
 | Backups | Encrypted storage, private bucket, restricted IAM, retention policy and restore testing. |
 
 # 6. Admin Site Design

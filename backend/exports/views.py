@@ -1,5 +1,7 @@
 from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
+from django.utils.http import content_disposition_header
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -7,7 +9,7 @@ from rest_framework.views import APIView
 
 from accounts.models import WorkspaceMembership
 from exports.models import PlanExport
-from exports.operations import generate_plan_export, signed_export_download
+from exports.operations import download_plan_csv, generate_plan_export, signed_export_download
 from exports.storage import get_export_storage
 from planner.models import PlanRun
 
@@ -39,6 +41,15 @@ class PlanExportCreateView(APIView):
         if format_id == "demat_csv" and not isinstance(ipo_id, str):
             return Response({"detail": "Choose one IPO for export."}, status=400)
         try:
+            if request.data.get("delivery") == "download":
+                artifact, filename = download_plan_csv(
+                    plan_run=run, actor=request.user, format_id=format_id, ipo_id=ipo_id
+                )
+                response = HttpResponse(artifact.data, content_type=artifact.content_type)
+                response["Content-Disposition"] = content_disposition_header(True, filename)
+                response["Cache-Control"] = "private, no-store"
+                response["X-Content-Type-Options"] = "nosniff"
+                return response
             record = generate_plan_export(
                 plan_run=run,
                 actor=request.user,

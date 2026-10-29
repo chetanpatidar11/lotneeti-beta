@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Drawer } from "@/components/drawer";
 import { formatInr } from "@/lib/money";
+import { downloadPlanCsv } from "@/lib/plan-download";
 import { categoryLabel } from "@/lib/application-category";
 import DraftApplicationEditor from "./draft-application-editor";
 import { amountForLots, peakConcurrentAmount, sumAmounts } from "@/lib/plan-amount";
@@ -213,29 +214,19 @@ export default function PlanScreen({ workspaceId, lookups, canEdit }: {
         body: JSON.stringify({ rows: reviewedMappings(current.rows), reserve_ipo_id: ipoId }),
       });
       const saved = await savedResponse.json();
-      if (!savedResponse.ok) throw new Error("We could not save this plan for export.");
+      if (!savedResponse.ok) throw new Error(typeof saved.detail === "string" ? saved.detail : "We could not save this plan for export.");
+      showPreview({ ...saved as PlanPreview, uncovered: current.uncovered });
       if (saved.status !== "READY") {
-        showPreview({ ...saved as PlanPreview, uncovered: current.uncovered });
         throw new Error("The plan changed. Resolve the blocking issues before export.");
       }
       const exportResponse = await fetch(`/api/workspaces/${workspaceId}/planner/runs/${saved.id}/exports`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ format_id: current.rows.some((row) => row.ipo === ipoId && ["SHARE", "BHNI"].includes(row.category)) ? "quota_csv" : "demat_csv", ipo_id: ipoId }),
+        body: JSON.stringify({ format_id: current.rows.some((row) => row.ipo === ipoId && ["SHARE", "BHNI"].includes(row.category)) ? "quota_csv" : "demat_csv", ipo_id: ipoId, delivery: "download" }),
       });
-      const exportRecord = await exportResponse.json();
-      if (!exportResponse.ok) throw new Error("We could not export this plan.");
-      const downloadResponse = await fetch(`/api/workspaces/${workspaceId}/planner/runs/${saved.id}/exports/${exportRecord.id}/download`);
-      const download = await downloadResponse.json();
-      if (!downloadResponse.ok) throw new Error("We could not prepare the download.");
+      await downloadPlanCsv(exportResponse);
       setMessage("IPO exported. Its planned funds are now reserved.");
       router.refresh();
-      const link = document.createElement("a");
-      link.href = download.download_url;
-      link.rel = "noopener noreferrer";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "We could not export this plan.");
     } finally {
