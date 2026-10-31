@@ -10,6 +10,8 @@ KFin live applicant lookup and dynamic public issue discovery were verified usin
 
 Deploy migration `applications.0004`, then restart API/web/worker/beat through the existing release script after a successful encrypted backup. No new credential or AWS resource is required. Celery carries UUIDs only; normalized registrar records are encrypted, expire after seven days and are purged daily. All private endpoints retain member scope, Viewer read-only permissions and private/no-store responses. POST starts/records share a six-per-minute member throttle; batches cap at 100 PAN/IPO combinations and 500 applications. Public catalogues cache for an hour, outages for one minute, and queries are paced globally per provider. Completed/cancelled bid lanes still participate in ambiguity checks. Planner allocation and mobile source are unchanged.
 
+**Release pending:** implementation is pushed; the encrypted backup succeeded, but SSH/SCP failed before installation. AWS CLI login needs refreshing. The current live site remains healthy; C41 is not deployed yet.
+
 Local gate: 575 backend/79 website tests plus all relevant lint/type/build/migration/matrix checks. Candidate PostgreSQL gate: 49 synthetic checker/lifecycle/P&L tests, isolated database removed. Browser verified editable lots, exact cost override, separate batch confirmation, manual-zero protection, full block release and final capital consistency. Release status and source/backup verification are recorded in `docs/exec-plans/STATUS.md`.
 
 
