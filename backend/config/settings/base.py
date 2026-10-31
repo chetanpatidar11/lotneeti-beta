@@ -112,6 +112,7 @@ RATE_LIMIT_ENABLED = True
 RATE_LIMIT_TRUSTED_PROXY_IPS: set[str] = set()
 # Requests per 60-second fixed window, grouped by user or trusted client IP.
 RATE_LIMIT_RULES = {
+    "allotment": (6, 60),
     "auth_start": (5, 60),
     "auth_verify": (20, 60),
     "auth_password": (5, 60),
@@ -122,6 +123,10 @@ RATE_LIMIT_RULES = {
     "planner": (30, 60),
 }
 CELERY_BEAT_SCHEDULE = {
+    "allotment-result-retention": {
+        "task": "applications.tasks.expire_allotment_results",
+        "schedule": crontab(hour=2, minute=20),
+    },
     "purge-expired-account-import-previews": {
         "task": "investors.tasks.purge_expired_account_import_previews",
         "schedule": crontab(hour=0, minute=10),

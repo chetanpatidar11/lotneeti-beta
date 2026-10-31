@@ -1,5 +1,6 @@
 from django.urls import path
 
+from applications.allotment_views import AllotmentChecksView, RecordAllotmentsView
 from applications.views import (
     ApplicationActionView,
     ApplicationBulkView,
@@ -9,6 +10,16 @@ from applications.views import (
 )
 
 urlpatterns = [
+    path(
+        "workspaces/<uuid:workspace_id>/allotment/checks/",
+        AllotmentChecksView.as_view(),
+        name="allotment-checks",
+    ),
+    path(
+        "workspaces/<uuid:workspace_id>/allotment/checks/<uuid:check_id>/record/",
+        RecordAllotmentsView.as_view(),
+        name="allotment-record",
+    ),
     path(
         "workspaces/<uuid:workspace_id>/operations/",
         WorkspaceOperationsView.as_view(),

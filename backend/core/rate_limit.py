@@ -30,6 +30,8 @@ def _scope(request):
     if path.startswith("/admin/") or path.startswith("/api/v1/platform/"):
         return "admin"
     if path.startswith("/api/v1/workspaces/"):
+        if "/allotment/" in path and method == "POST":
+            return "allotment"
         if any(
             segment in path for segment in ("/imports/", "/account-imports/")
         ) and method not in {"GET", "HEAD", "OPTIONS"}:

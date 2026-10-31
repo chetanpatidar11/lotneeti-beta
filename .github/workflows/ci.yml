@@ -70,7 +70,8 @@ jobs:
         run: bash scripts/check.sh
       - name: Verify application lifecycle, capital and row locks on PostgreSQL
         run: >-
-          python -m pytest backend/tests/test_application_bulk.py
+          python -m pytest backend/tests/test_allotment_checker.py
+          backend/tests/test_application_bulk.py
           backend/tests/test_application_management.py
           backend/tests/test_application_recording.py
           backend/tests/test_application_result_price.py

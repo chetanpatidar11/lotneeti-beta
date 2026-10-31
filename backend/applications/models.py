@@ -116,3 +116,63 @@ class Application(models.Model):
             or (self.upi_id is not None and self.upi.bank_id != self.bank_id)
         ):
             raise ValidationError("Application mapping is outside its workspace")
+
+
+class AllotmentCheck(models.Model):
+    """A lookup is deliberately separate from the financial result transaction."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey("accounts.Workspace", on_delete=models.CASCADE)
+    created_by = models.ForeignKey("accounts.User", on_delete=models.PROTECT)
+    status = models.CharField(max_length=12, default="QUEUED")
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True)
+    started_at = models.DateTimeField(null=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Allotment check {self.pk}"
+
+
+class AllotmentQuery(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    batch = models.ForeignKey(AllotmentCheck, on_delete=models.CASCADE, related_name="queries")
+    ipo = models.ForeignKey("ipos.IPO", on_delete=models.PROTECT)
+    applicant = models.ForeignKey("investors.Investor", on_delete=models.PROTECT)
+    provider = models.CharField(max_length=20, blank=True)
+    state = models.CharField(max_length=20, default="QUEUED")
+    records_ciphertext = models.TextField(blank=True)
+    identity_hash = models.CharField(max_length=64)
+    checked_at = models.DateTimeField(null=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["batch", "ipo", "applicant"], name="unique_allotment_query"
+            )
+        ]
+
+    def __str__(self):
+        return f"Allotment query {self.pk}"
+
+
+class AllotmentReview(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    query = models.ForeignKey(AllotmentQuery, on_delete=models.CASCADE, related_name="reviews")
+    application = models.ForeignKey(Application, on_delete=models.PROTECT)
+    fingerprint = models.CharField(max_length=64)
+    matched_index = models.PositiveIntegerField(null=True)
+    recorded_at = models.DateTimeField(null=True)
+    recorded_index = models.PositiveIntegerField(null=True)
+    recorded_quantity = models.PositiveIntegerField(null=True)
+    recorded_cost = models.DecimalField(max_digits=14, decimal_places=2, null=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["query", "application"], name="unique_allotment_review")
+        ]
+
+    def __str__(self):
+        return f"Allotment review {self.pk}"
