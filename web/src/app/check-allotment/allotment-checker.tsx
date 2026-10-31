@@ -1,13 +1,41 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { ApplicationItem } from "../applications/applications-screen";
 import { categoryLabel } from "@/lib/application-category";
 import { formatInr } from "@/lib/money";
 import { sumAmounts } from "@/lib/plan-amount";
-import { checkedAmount, initialCheckedDraft, validCheckedDraft, type AllotmentDraft, type RegistrarBid } from "@/lib/allotment-check";
+import { checkedAmount, initialCheckedDraft, validCheckedDraft, type AllotmentDraft } from "@/lib/allotment-check";
 
-type ReviewRow = { id: string; query_id: string; application: ApplicationItem; state: string; message: string; provider: string; checked_at: string | null; records: RegistrarBid[]; matched_index: number | null; recorded: boolean; recorded_index: number | null; recorded_quantity: number | null; recorded_cost: string | null };
+import { allotmentReviewRows, type ReviewRow } from "@/lib/allotment-review";
+
+function reviewDraft(row: ReviewRow): AllotmentDraft {
+  const draft = initialCheckedDraft(row.application, row.records, row.recorded ? row.recorded_index : row.matched_index);
+  return row.recorded ? { ...draft, quantity: String(row.recorded_quantity ?? 0), cost: row.recorded_cost ?? "0.00", manualVerified: row.matched_index === null || row.recorded_index !== row.matched_index } : draft;
+}
+
+export function AllotmentResultRow({ row, draft, locked, onEdit }: { row: ReviewRow; draft: AllotmentDraft; locked: boolean; onEdit: (change: Partial<AllotmentDraft>) => void }) {
+  const item = row.application;
+  const label = `${item.ipo_name} · ${item.applicant_name} ${categoryLabel(item.category)}`;
+  const needsVerification = row.check_available && !row.recorded && (row.matched_index === null || draft.sourceIndex !== String(row.matched_index));
+  const status = row.recorded ? Number(draft.quantity) > 0 ? "Allotted" : "Not allotted" : row.state === "CANCELLED" ? "Cancelled" : row.state === "EXPIRED" ? "Expired" : !row.check_available ? "Not checked" : row.matched_index !== null && !needsVerification ? "Matched" : ({ FOUND: "Review bid", NOT_FOUND: "Not found", UNAVAILABLE: "Unavailable", UNSUPPORTED: "Manual check", CHALLENGE: "Verification", PENDING: "Not published", RATE_LIMITED: "Busy", EXPIRED: "Expired", QUEUED: "Waiting", CHECKING: "Checking" }[row.state] ?? "Review");
+  function changeQuantity(quantity: string) { onEdit({ quantity, cost: checkedAmount(item, quantity) }); }
+  return <tr className={row.recorded ? "is-recorded" : ""}>
+    <td className="allotment-record-cell"><input type="checkbox" disabled={locked} checked={draft.selected && !row.recorded} aria-label={`Record ${label}`} onChange={(event) => onEdit({ selected: event.target.checked })} /></td>
+    <th scope="row" title={label}><span className="allotment-person"><span className="allotment-applicant">{item.applicant_name}</span><span className="allotment-category">{categoryLabel(item.category)}</span></span></th>
+
+    <td><input aria-label={`${label} allotted lots`} disabled={locked} type="number" min="0" step="1" max={item.lots} value={draft.quantity !== "" && Number(draft.quantity) % item.lot_size === 0 ? Number(draft.quantity) / item.lot_size : ""} placeholder="—" onChange={(event) => changeQuantity(event.target.value !== "" && Number.isSafeInteger(Number(event.target.value)) ? String(Number(event.target.value) * item.lot_size) : "")} /></td>
+    <td><input aria-label={`${label} allotted shares`} disabled={locked} type="number" min="0" max={item.max_quantity} step="1" value={draft.quantity} placeholder="—" onChange={(event) => changeQuantity(event.target.value)} /></td>
+    <td><input aria-label={`${label} allotment amount`} disabled={locked} type="number" min="0" max={item.amount} step="0.01" value={draft.cost} placeholder="—" onChange={(event) => onEdit({ cost: event.target.value })} /></td>
+    <td><select aria-label={`${label} registrar bid`} disabled={locked} value={draft.sourceIndex} title={row.message} onChange={(event) => {
+      const sourceIndex = event.target.value; const quantity = sourceIndex === "" ? "" : String(row.records[Number(sourceIndex)].quantity);
+      onEdit({ sourceIndex, quantity, cost: checkedAmount(item, quantity), manualVerified: false, selected: false });
+    }}><option value="">{row.recorded ? "Recorded result" : !row.check_available ? row.state === "CANCELLED" ? "—" : "Check to fetch bids" : "Enter verified result"}</option>{row.records.map((bid, index) => <option key={index} value={String(index)}>{bid.reference || `Bid ${index + 1}`} · Applied {bid.applied ?? "?"} · Allotted {bid.quantity}{bid.category ? ` · ${categoryLabel(bid.category)}` : ""}{bid.demat ? ` · ${bid.demat}` : ""}</option>)}</select></td>
+    <td title={`${row.message}${row.provider ? ` · ${row.provider}` : ""}`}><div className="allotment-row-status"><span>{status}</span>{needsVerification && <label><input aria-label={`${label} bid identity verified`} disabled={locked} type="checkbox" checked={draft.manualVerified} onChange={(event) => onEdit({ manualVerified: event.target.checked })} />Verify</label>}</div></td>
+
+  </tr>;
+}
+
 type Check = { id: string; status: string; created_at: string; rows: ReviewRow[] };
 const running = (job: Check | null) => job !== null && ["QUEUED", "RUNNING"].includes(job.status);
 const pending = (item: ApplicationItem) => !item.is_plan_row && ["SUBMITTED", "BLOCKED"].includes(item.status);
@@ -19,8 +47,8 @@ async function readResponse<T>(response: Response): Promise<T> {
   return data as T;
 }
 
-export function AllotmentChecker({ workspaceId, canEdit, items, ipoId, disabled, onRecorded }: {
-  workspaceId: string; canEdit: boolean; items: ApplicationItem[]; ipoId: string; disabled: boolean; onRecorded: (changed: ApplicationItem[]) => void;
+export function AllotmentChecker({ workspaceId, canEdit, items, ipoId, disabled, onRecorded, onShowAll }: {
+  workspaceId: string; canEdit: boolean; items: ApplicationItem[]; ipoId: string; disabled: boolean; onRecorded: (changed: ApplicationItem[]) => void; onShowAll: () => void;
 }) {
   const [job, setJob] = useState<Check | null>(null);
   const [drafts, setDrafts] = useState<Record<string, AllotmentDraft>>({});
@@ -35,7 +63,7 @@ export function AllotmentChecker({ workspaceId, canEdit, items, ipoId, disabled,
   function receive(value: Check | null) {
     setJob(value);
     setDrafts((current) => Object.fromEntries((value?.rows ?? []).map((row) => [row.id,
-      row.recorded ? { ...initialCheckedDraft(row.application, row.records, row.recorded_index), quantity: String(row.recorded_quantity ?? 0), cost: row.recorded_cost ?? "0.00" } : current[row.id]?.dirty ? current[row.id] : initialCheckedDraft(row.application, row.records, row.matched_index),
+      row.recorded ? reviewDraft(row) : current[row.id]?.dirty ? current[row.id] : reviewDraft(row),
     ])));
   }
 
@@ -55,11 +83,14 @@ export function AllotmentChecker({ workspaceId, canEdit, items, ipoId, disabled,
     return () => { alive = false; clearTimeout(timer); };
   }, [url, job?.id, job?.status]);
 
-  const selected = (job?.rows ?? []).filter((row) => !row.recorded && drafts[row.id]?.selected);
+  const visibleRows = allotmentReviewRows(items, job?.rows ?? []).filter((row) => !ipoId || row.application.ipo === ipoId);
+  const selected = visibleRows.filter((row) => row.check_available && !row.recorded && drafts[row.id]?.selected);
   const ready = selected.length > 0 && selected.every((row) => validCheckedDraft(row.application, drafts[row.id], row.matched_index) && row.state !== "EXPIRED");
   const available = items.filter(pending);
   const checkBusy = busy || disabled || loading || running(job);
   const total = sumAmounts(selected.map((row) => /^\d+(?:\.\d{1,2})?$/.test(drafts[row.id].cost) ? drafts[row.id].cost : "0"));
+
+  const released = sumAmounts(selected.map((row) => row.application.amount));
 
   function edit(row: ReviewRow, change: Partial<AllotmentDraft>) {
     setDrafts((current) => ({ ...current, [row.id]: { ...current[row.id], ...change, dirty: true } }));
@@ -67,6 +98,7 @@ export function AllotmentChecker({ workspaceId, canEdit, items, ipoId, disabled,
   }
   async function start(all: boolean) {
     if (checkBusy) return;
+    if (all) onShowAll();
     setBusy(true); setError(""); setMessage(""); setConfirming(false);
     try { receive(await readResponse<Check>(await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ipos: all ? [] : [ipoId] }) }))); }
     catch (caught) { setError(caught instanceof Error ? caught.message : "Check could not start."); }
@@ -85,36 +117,23 @@ export function AllotmentChecker({ workspaceId, canEdit, items, ipoId, disabled,
   }
 
   return <section className="allotment-checker" aria-label="IPO allotment checker">
-    <div className="allotment-checker-heading"><div><h2>Check allotment</h2><p>Checks saved PANs with the IPO registrar. Review the bids below, then record the results.</p></div>
+    <div className="allotment-checker-heading"><h2>Allotment results <span>{visibleRows.length} {visibleRows.length === 1 ? "bid" : "bids"}</span></h2>
       {canEdit && <div className="allotment-checker-actions"><button type="button" disabled={checkBusy || !ipoId || !available.some((item) => item.ipo === ipoId)} onClick={() => void start(false)}>Check this IPO</button><button type="button" className="button-secondary" disabled={checkBusy || available.length === 0} onClick={() => void start(true)}>Check all pending IPOs</button></div>}
     </div>
-    <p className="allotment-checker-note">Checking keeps your money records unchanged. Only submitted or blocked bids are checked.</p>
+    <p className="allotment-checker-note">Select an IPO above or check all pending IPOs. Only recording changes Balance and Blocked.</p>
     {error && <p className="plan-error" role="alert">{error}</p>}{message && <p className="plan-success" role="status">{message}</p>}
-    {job && <details className="allotment-review" open>
-      <summary>Review allotment results · {job.rows.filter((row) => !["QUEUED", "CHECKING"].includes(row.state)).length}/{job.rows.length} bids checked{running(job) ? " · Checking…" : ""}</summary>
-      <p>Check created <time dateTime={job.created_at}>{new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(job.created_at))}</time>. Edit lots, shares and amount below. Enter 0 only for a verified non-allotment.</p>
-      <div className="allotment-review-list">{job.rows.map((row) => {
-        const item = row.application;
-        const draft = drafts[row.id] ?? initialCheckedDraft(item, row.records, row.matched_index);
-        const label = `${item.applicant_name} ${categoryLabel(item.category)}`;
-        const needsVerification = row.matched_index === null || draft.sourceIndex !== String(row.matched_index);
-        const locked = !canEdit || busy || disabled || running(job) || row.recorded || row.state === "EXPIRED";
-        function changeQuantity(quantity: string) { edit(row, { quantity, cost: checkedAmount(item, quantity) }); }
-        return <fieldset key={row.id} className={`allotment-review-row${row.recorded ? " is-recorded" : ""}`} disabled={locked}>
-          <legend>{label} · {item.ipo_name}</legend>
-          <div className="allotment-review-identity"><strong>{item.applicant_name}</strong><span>{item.ipo_name} · {categoryLabel(item.category)}</span><small>{row.recorded ? "Recorded" : row.matched_index !== null ? "Matched bid — review before recording" : row.message}{row.provider ? ` · ${{ kfin: "KFintech", mufg: "MUFG Intime", bigshare: "Bigshare" }[row.provider] ?? row.provider}` : ""}</small></div>
-          <div className="allotment-bid-choice"><label>Registrar bid<select aria-label={`${label} registrar bid`} value={draft.sourceIndex} onChange={(event) => { const sourceIndex = event.target.value; const quantity = sourceIndex === "" ? "" : String(row.records[Number(sourceIndex)].quantity); edit(row, { sourceIndex, quantity, cost: checkedAmount(item, quantity), manualVerified: false, selected: false }); }}><option value="">Enter verified result manually</option>{row.records.map((bid, index) => <option key={index} value={String(index)}>{bid.reference || `Bid ${index + 1}`} · Applied {bid.applied ?? "?"} · Allotted {bid.quantity}{bid.category ? ` · ${categoryLabel(bid.category)}` : ""}{bid.demat ? ` · ${bid.demat}` : ""}</option>)}</select></label>
-            {needsVerification && <label className="allotment-verify"><input aria-label={`${label} bid identity verified`} type="checkbox" checked={draft.manualVerified} onChange={(event) => edit(row, { manualVerified: event.target.checked })} /> I verified this bid and result</label>}
-          </div>
-          <label>Lots<input aria-label={`${label} allotted lots`} type="number" min="0" step="1" max={item.lots} value={draft.quantity !== "" && Number(draft.quantity) % item.lot_size === 0 ? Number(draft.quantity) / item.lot_size : ""} placeholder="Partial" onChange={(event) => changeQuantity(event.target.value !== "" && Number.isSafeInteger(Number(event.target.value)) ? String(Number(event.target.value) * item.lot_size) : "")} /></label>
-          <label>Shares<input aria-label={`${label} allotted shares`} type="number" min="0" max={item.max_quantity} step="1" value={draft.quantity} onChange={(event) => changeQuantity(event.target.value)} /></label>
-          <label>Amount (₹)<input aria-label={`${label} allotment amount`} type="number" min="0" max={item.amount} step="0.01" value={draft.cost} onChange={(event) => edit(row, { cost: event.target.value })} /></label>
-          <label className="allotment-record-choice"><input type="checkbox" checked={draft.selected && !row.recorded} aria-label={`Record ${label}`} onChange={(event) => edit(row, { selected: event.target.checked })} />{row.recorded ? "Recorded" : "Record"}</label>
-        </fieldset>;
-      })}</div>
-      {canEdit && !running(job) && <div className="allotment-record-footer"><p>{selected.length} selected · Allotment cost: <strong>{formatInr(total)}</strong>. Recording releases each selected application’s full block and deducts its actual allotment cost.</p>
+    <div className="allotment-review">
+      <div className="allotment-review-meta">{job ? <span>Last check: <time dateTime={job.created_at}>{new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(job.created_at))}</time>{running(job) ? " · Checking…" : ""}</span> : <span>No checks yet</span>}<details><summary>Review guidance</summary><p>Edit lots, shares and amount before selecting rows. Verify unmatched bids. Enter 0 only for a verified non-allotment; an unchecked bid stays blank. Recording deducts the actual cost and releases the full application block.</p></details></div>
+      {visibleRows.length === 0 ? <p>No applied bids in this selection.</p> : <div className="allotment-table-wrap"><table className="allotment-results-table" aria-label="Allotment bid results"><thead><tr><th scope="col">Record</th><th scope="col">Applicant / Category</th><th scope="col">Lots</th><th scope="col">Shares</th><th scope="col">Amount (₹)</th><th scope="col">Registrar bid</th><th scope="col">Status</th></tr></thead><tbody>
+        {visibleRows.map((row, index) => {
+          const draft = row.recorded ? reviewDraft(row) : drafts[row.id] ?? reviewDraft(row);
+          const locked = !canEdit || busy || disabled || running(job) || row.recorded || !row.check_available || ["EXPIRED", "CANCELLED"].includes(row.state);
+          return <Fragment key={row.id}>{(index === 0 || visibleRows[index - 1].application.ipo !== row.application.ipo) && <tr className="allotment-ipo-group"><th colSpan={7} scope="colgroup">{row.application.ipo_name}</th></tr>}<AllotmentResultRow row={row} draft={draft} locked={locked} onEdit={(change) => edit(row, change)} /></Fragment>;
+        })}
+      </tbody></table></div>}
+      {canEdit && job && !running(job) && <div className="allotment-record-footer"><p>{selected.length} selected · Cost: <strong>{formatInr(total)}</strong> · Block to release: <strong>{formatInr(released)}</strong></p>
         {!confirming ? <button type="button" className="application-result-action" disabled={busy || disabled || !ready} onClick={() => setConfirming(true)}>Record selected results</button> : <div role="group" aria-label="Confirm allotment recording"><strong>Confirm these {selected.length} reviewed results?</strong><button type="button" className="application-result-action" disabled={busy || disabled || !ready} onClick={() => void record()}>{busy ? "Recording…" : "Confirm and record results"}</button><button type="button" className="button-secondary" disabled={busy} onClick={() => setConfirming(false)}>Keep reviewing</button></div>}
       </div>}
-    </details>}
+    </div>
   </section>;
 }

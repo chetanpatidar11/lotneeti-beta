@@ -9,7 +9,7 @@ test("Check Allotment has a separate navigation destination and page controls", 
   assert.deepEqual(navigation.filter((item) => item.label === "Check Allotment").map((item) => item.href), ["/check-allotment"]);
   const page = renderToStaticMarkup(createElement(CheckAllotmentScreen, { workspaceId: "synthetic", canEdit: true, initialItems: [] }));
   assert.match(page, /<h1>Check Allotment<\/h1>/);
-  assert.match(page, /Allotment IPO selection/);
+  assert.match(page, /Applied IPOs/);
   assert.match(page, /Check this IPO/);
   assert.match(page, /Check all pending IPOs/);
   assert.match(page, /href="\/applications"/);
