@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { AllotmentChecker } from "./allotment-checker";
 import { useState } from "react";
 import { applicationHistory, type ApplicationHistoryInput } from "@/lib/application-history";
 import { formatInr } from "@/lib/money";
@@ -286,7 +285,6 @@ export default function ApplicationsScreen({ workspaceId, canEdit, initialItems,
         <label>Category<select value={category} onChange={(event) => { setCategory(event.target.value); setSelectedIds([]); }}><option value="ALL">All categories</option><option value="RETAIL">Retail</option><option value="SHNI">sHNI</option><option value="SHARE">Shareholder</option><option value="BHNI">bHNI</option></select></label>
         <label>Status<select value={filter} onChange={(event) => { setFilter(event.target.value as Filter); setSelectedIds([]); }}><option value="ALL">All</option><option value="PLANNED">Planned</option><option value="SUBMITTED">Submitted</option><option value="BLOCKED">Blocked</option><option value="ALLOTTED">Allotted</option><option value="NOT_ALLOTTED">Not allotted</option><option value="CANCELLED">Cancelled</option></select></label>
       </section>
-      <AllotmentChecker workspaceId={workspaceId} canEdit={canEdit} items={items} ipoId={ipoFilter} disabled={busy} onRecorded={replaceItems} />
       {!ipoFilter && <EmptyState title="Select an IPO above to view applications." detail="Each IPO has its own application list and bulk actions." />}
       {ipoFilter && <>
       <div className="application-summary" aria-label="Application status summary for selected IPO">

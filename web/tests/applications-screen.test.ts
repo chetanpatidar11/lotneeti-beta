@@ -104,3 +104,10 @@ test("unready saved rows require review while tracked applications stay usable",
   assert.equal(savedApplicationNeedsReview(true, "READY"), false);
   assert.equal(savedApplicationNeedsReview(false, "READY"), false);
 });
+
+
+test("Applications keeps application management separate from the allotment checker", () => {
+  const page = render("BLOCKED");
+  assert.doesNotMatch(page, /IPO allotment checker|Check this IPO|Check all pending IPOs/);
+  assert.match(page, /Application filters/);
+});

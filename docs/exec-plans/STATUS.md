@@ -1,5 +1,12 @@
 # LotNeeti execution status
 
+## C42 / J01 Separate Check Allotment navigation — local preview verified, 2026-10-31
+
+- Founder requests a standalone Check Allotment navigation tab, removing the embedded checker from Applications. Add an authenticated website route with its own IPO selector and existing check/review/record flow. Preserve private workspace/role checks, recorded results, pending application data and all financial/planner behavior. Local review only; deployment remains on hold.
+
+- Added `/check-allotment` as its own authenticated route, sidebar entry and compact-screen Menu entry, with an IPO selector and the existing check/review/record controls. Removed the checker import/mount from Applications so normal application management no longer loads or displays the checker. Saved check reviews persist when navigating between the two pages. Backend services, endpoints, roles, money rules, planner and mobile files remain unchanged.
+- Website lint/typecheck, all 82 tests and production build pass. Regressions cover the independent navigation destination, Applications exclusion, Viewer controls and failed-load state. Browser verified Applications has no embedded checker, Menu opens the separate page, and the three existing dummy bid results remain available. New page is left open on the local preview. No deployment or production access was performed; founder review takes precedence over the earlier pending release.
+
 ## C41 / H03-H07 PAN allotment check and reviewed recording — verified, release waiting for SSH access, 2026-10-31
 
 - Founder authorizes website PAN checks across applied IPOs, separate public/shareholder bid matching, editable results and an explicit second recording action. Checking must never change Application status, bank Balance or Portfolio. Record reviewed results through existing atomic lifecycle services, with stale-data checks and exactly-once debits. Preserve planner selection, quotas and mobile.

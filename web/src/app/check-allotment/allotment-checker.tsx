@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ApplicationItem } from "./applications-screen";
+import type { ApplicationItem } from "../applications/applications-screen";
 import { categoryLabel } from "@/lib/application-category";
 import { formatInr } from "@/lib/money";
 import { sumAmounts } from "@/lib/plan-amount";
