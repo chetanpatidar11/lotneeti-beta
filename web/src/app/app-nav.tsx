@@ -14,6 +14,7 @@ export const navigation = [
   { href: "/applications", label: "Applications", icon: "applications" },
   { href: "/check-allotment", label: "Check Allotment", icon: "allotment" },
   { href: "/portfolio", label: "Portfolio", icon: "portfolio" },
+  { href: "/gold", label: "Gold", icon: "gold" },
   { href: "/settings/investors", label: "Settings", icon: "settings" },
 ] as const;
 
@@ -27,6 +28,7 @@ function NavIcon({ name }: { name: (typeof navigation)[number]["icon"] }) {
     {name === "applications" && <><path d="M8 3h9l4 4v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M17 3v5h4M10 12h7M10 16h7"/></>}
     {name === "allotment" && <><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6M7 10l2 2 4-4"/></>}
     {name === "portfolio" && <><path d="M3 20h18M5 16l5-5 4 3 5-7"/><path d="M16 7h3v3"/></>}
+    {name === "gold" && <><path d="m7 5-4 14h18L17 5zM7 5h10M5 13h14"/><path d="M9 9h6"/></>}
     {name === "settings" && <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.86 1.86-.06-.06A1.7 1.7 0 0 0 16 18.4a1.7 1.7 0 0 0-1 1.56V20H9v-.04a1.7 1.7 0 0 0-1-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.86-1.86.06-.06A1.7 1.7 0 0 0 4.6 15 1.7 1.7 0 0 0 3.04 14H3v-4h.04A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88L4.2 7.06 6.06 5.2l.06.06A1.7 1.7 0 0 0 8 5.6 1.7 1.7 0 0 0 9 4.04V4h6v.04A1.7 1.7 0 0 0 16 5.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 1.86 1.86-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.56 1H21v4h-.04A1.7 1.7 0 0 0 19.4 15z"/></>}
   </svg>;
 }

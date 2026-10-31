@@ -1,5 +1,17 @@
 # LotNeeti founder beta handoff — draft, not release approval
 
+## Physical gold tracker C44 — local review, 2026-10-31
+
+Open **Gold** in the website sidebar or the compact browser Menu (`http://127.0.0.1:3411/gold`). This extends the current authoritative `codex/autopilot` checkout only. No deployment or push was performed. The local preview contains clearly named synthetic coin/jewellery records; none of these are real holdings or current market prices.
+
+Use **Add purchase** for a coin, bar, jewellery or other physical-gold lot: enter purity, net gold grams (excluding stones), purchase date and the actual total paid including charges. Owner, seller, notes and a current resale price per gram are optional. The quote must match that lot's purity; update it using **Edit**. Holdings show remaining grams/cost, estimated value and unrealized profit. An unpriced remaining holding makes the aggregate estimate/profit unknown until a quote is provided. Weights are the actual net metal grams at the recorded purity, not a conversion to pure gold.
+
+Choose **Sell** beside a holding for a full/partial sale; enter net money received after charges. The **Sales** tab shows allocated purchase cost and realized profit. Purchase/sale details stay editable; editing cost recalculates past sale profit. **Remove** excludes a record from totals, and **Show removed → Restore** brings it back. Active sales must be removed before their purchase can be removed. Invalid dates and overselling are rejected, including during restoration. Saves are retry-safe, audited, and limited to Owner/Operator; Viewer is read-only. Gold entries do not change IPO bank balances or planner behavior.
+
+Verification: 583 backend / 91 website tests, Ruff/format, Django checks, migration drift, all planner matrix mappings, web lint/typecheck/build, and browser synthetic purchase → partial sale → edit → remove → restore flow passed. The local preview uses SQLite; gold coverage is also included in the existing PostgreSQL CI gate. Mobile remains deferred. Manual acceptance: add your own physical purchase, edit its quote, record a partial sale, review profit, restore a removed record, and check both website themes. There is no live-price feed or price history in this version.
+
+For a later approved release, take the existing backup and apply additive migration `portfolio.0002_goldpurchase_goldsale_and_more`, along with any earlier pending migrations, before restarting the website/API. No new external service is needed. Keep the current local review and pending allotment-checker release status distinct from what is live.
+
 ## Website allotment checker C41 — 2026-10-31
 
 Current source: `/Users/chetanpatidar/Documents/Codex/2026-10-10/con/work/lotneeti-auth-safari`, branch `codex/autopilot`. Older checkout/deployment notes below are historical. Website/backend only; mobile is deferred. Brevo remains the configured email service.
