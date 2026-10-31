@@ -1,5 +1,15 @@
 # LotNeeti founder beta handoff — draft, not release approval
 
+## C41–C45 current website release — deployed 2026-10-31
+
+The founder approved the reviewed local updates for deployment. **[Check Allotment](https://lotneeti.dpdns.org/check-allotment)** and **[Gold with live prices](https://lotneeti.dpdns.org/gold)** are now live; sign in with the normal website account. This release uses authoritative `lotneeti-auth-safari`, branch `codex/autopilot`, runtime commit `36135b1`, with archive SHA-256 `6d4af78a610855da0cc2159249afe0bde18f011c11b73b4cfcd5f79028ab4764`. The older checkout was not used. Earlier local-review/access-blocked sections below are historical.
+
+A fresh encrypted backup succeeded, and a root-only source rollback archive is kept on the server at `/var/backups/lotneeti/source-before-c45-20261031.tar.gz`. The candidate passed 113 isolated PostgreSQL cases before installation; the test database and runner were removed. Server web build and Django production checks passed, all three pending migrations (`applications.0004`, `portfolio.0002`, `portfolio.0003`) applied, and all four application services are active. The 582 source hashes match the tested package. Runtime dependencies have zero audit findings; installer audit warnings are development-only.
+
+Read-only live verification returned authenticated HTTP 200 for all nine website routes, confirmed the live gold feed, checker task registration, secure cookies/HTTPS, Brevo and capital consistency. The temporary verification session was removed. Before/after financial-source hashes are identical: 17 investors, 10 banks, 18 plans/369 rows, 209 applications, 105 balance changes and 17 IPO sales. No application, balance, allotment, gold holding or sale was changed during deployment; all local dummy records stayed local. No mobile changes or deployment infrastructure changes were made. The core planner/selection and application lifecycle source remains identical to C40.
+
+Gold starts empty on production, ready for the user's real physical purchases; the sample holdings and ₹3,500 demo profit are not production data. Gold prices are spot estimates, with explicit source/as-of and manual-price controls. Allotment checks remain separate from Applications, and results only change money after the user reviews and confirms recording. Existing registrar availability/manual-review limitations still apply.
+
 ## Live gold prices C45 — local review, 2026-10-31
 
 The Gold tracker now defaults to live INR spot valuation. Open `http://127.0.0.1:3411/gold`: the quote panel shows 24K/999, 22K/916 and 18K/750 prices per gram, source and last update in IST. It refreshes each minute while the page is visible and not editing, with a manual **Refresh prices** button. Existing purchase lots default to automatic through additive migration `portfolio.0003_goldpurchase_price_mode`; saved manual rates remain intact. Use **Edit → Valuation price → My resale quote (manual)** to use one instead. Unsupported/contradictory purity needs correction or an explicit manual quote. Purchase costs, sale proceeds/profits and IPO bank balances are independent of market changes.
@@ -32,7 +42,7 @@ KFin live applicant lookup and dynamic public issue discovery were verified usin
 
 Deploy migration `applications.0004`, then restart API/web/worker/beat through the existing release script after a successful encrypted backup. No new credential or AWS resource is required. Celery carries UUIDs only; normalized registrar records are encrypted, expire after seven days and are purged daily. All private endpoints retain member scope, Viewer read-only permissions and private/no-store responses. POST starts/records share a six-per-minute member throttle; batches cap at 100 PAN/IPO combinations and 500 applications. Public catalogues cache for an hour, outages for one minute, and queries are paced globally per provider. Completed/cancelled bid lanes still participate in ambiguity checks. Planner allocation and mobile source are unchanged.
 
-**Release pending:** implementation is pushed; the encrypted backup succeeded, but SSH/SCP failed before installation. AWS CLI login needs refreshing. The current live site remains healthy; C41 is not deployed yet.
+**Earlier blocked attempt (superseded by the C41–C45 deployment above):** implementation was pushed and the encrypted backup succeeded, but SSH/SCP failed before installation. Access was later restored and the reviewed release is now deployed.
 
 Local gate: 575 backend/79 website tests plus all relevant lint/type/build/migration/matrix checks. Candidate PostgreSQL gate: 49 synthetic checker/lifecycle/P&L tests, isolated database removed. Browser verified editable lots, exact cost override, separate batch confirmation, manual-zero protection, full block release and final capital consistency. Release status and source/backup verification are recorded in `docs/exec-plans/STATUS.md`.
 
