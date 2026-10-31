@@ -421,3 +421,23 @@ def test_queue_staleness_uses_started_time_and_no_job_returns_204(setup):
     expire_stale_checks(workspace)
     job.refresh_from_db()
     assert job.status == "FAILED" and job.queries.get().state == "UNAVAILABLE"
+
+
+@pytest.mark.parametrize(
+    "depository,dp,client,beneficiary",
+    [
+        ("CDSL", "00000000", "00000001", "0000000000000001"),
+        ("NSDL", "IN000000", "00000001", "IN00000000000001"),
+    ],
+)
+def test_matching_uses_complete_depository_identity(depository, dp, client, beneficiary):
+    demat = SimpleNamespace(
+        depository=depository,
+        dp_id_ciphertext=encrypt_value(dp, purpose="demat"),
+        client_id_ciphertext=encrypt_value(client, purpose="demat"),
+    )
+    app = SimpleNamespace(
+        pk="synthetic", category="RETAIL", lots=1, ipo=SimpleNamespace(lot_size=12), demat=demat
+    )
+    assert match_bids([app], [Bid(0, applied=12, demat=beneficiary)]) == {"synthetic": 0}
+    assert match_bids([app], [Bid(0, applied=12, demat=client)]) == {}

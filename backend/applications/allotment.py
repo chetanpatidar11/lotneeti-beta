@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 from datetime import timedelta
 
 from django.core.exceptions import ValidationError
@@ -127,8 +128,18 @@ def match_bids(applications, bids):
                 dp = decrypt_value(item.demat.dp_id_ciphertext, purpose="demat")
                 client = decrypt_value(item.demat.client_id_ciphertext, purpose="demat")
                 # NSDL uses DP+client, CDSL uses its full beneficiary client ID.
-                expected = client if item.demat.depository == "CDSL" else dp + client
-                if identifier(bid.demat) != identifier(expected):
+                dp_value, client_value = identifier(dp), identifier(client)
+                if item.demat.depository == "CDSL":
+                    expected = client_value
+                    if re.fullmatch(r"\d{8}", dp_value) and re.fullmatch(r"\d{8}", client_value):
+                        expected = dp_value + client_value
+                else:
+                    expected = (
+                        client_value
+                        if re.fullmatch(r"IN\d{14}", client_value)
+                        else dp_value + client_value
+                    )
+                if identifier(bid.demat) != expected:
                     continue
             if bid.quantity > item.lots * item.ipo.lot_size:
                 continue
