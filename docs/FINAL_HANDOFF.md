@@ -1,5 +1,15 @@
 # LotNeeti founder beta handoff — draft, not release approval
 
+## Live gold prices C45 — local review, 2026-10-31
+
+The Gold tracker now defaults to live INR spot valuation. Open `http://127.0.0.1:3411/gold`: the quote panel shows 24K/999, 22K/916 and 18K/750 prices per gram, source and last update in IST. It refreshes each minute while the page is visible and not editing, with a manual **Refresh prices** button. Existing purchase lots default to automatic through additive migration `portfolio.0003_goldpurchase_price_mode`; saved manual rates remain intact. Use **Edit → Valuation price → My resale quote (manual)** to use one instead. Unsupported/contradictory purity needs correction or an explicit manual quote. Purchase costs, sale proceeds/profits and IPO bank balances are independent of market changes.
+
+The documented [Gold API](https://gold-api.com/faqs) public endpoint `https://api.gold-api.com/price/XAU/INR` supplies INR per troy ounce, without signup/key. Its [terms](https://gold-api.com/terms) permit commercial use. The server converts using [NIST's 31.1034768 g/troy oz](https://www.nist.gov/document/precious-metals-conversion-information-march2015pdf), then applies the item's fineness. These are international spot estimates in rupees, excluding local taxes, dealer premiums and making charges, and may differ from an Indian jeweller's actual buying price. No holding details go to the provider. This version has no gold-price history.
+
+Public quotes share the existing cache with a 60-second refresh lock and failure backoff. Source/as-of age and schema are validated; an outage shows a labelled last quote for up to 72 hours, then automatic values become unknown. A failed website refresh also stops displaying automatic values as live. Manual quotes and recorded records remain usable. Default setting `GOLD_LIVE_PRICES_ENABLED=1` requires only outbound HTTPS and the existing cache; `config.settings.test` disables network calls unless explicitly enabled for the isolated preview. No new paid service or credential is needed.
+
+Verification: 619 backend/93 website tests, Ruff/format, planner matrix, Django checks/migration drift, web lint/typecheck/build, and actual HTTPS + local browser live/manual switching passed. Synthetic remaining cost ₹1,45,000 and realized profit ₹3,500 stayed constant while estimated values changed. No deployment/push occurred; apply `portfolio.0002` and `.0003` with other pending migrations during a later approved release. The C44 notes below describe the earlier manual-only version.
+
 ## Physical gold tracker C44 — local review, 2026-10-31
 
 Open **Gold** in the website sidebar or the compact browser Menu (`http://127.0.0.1:3411/gold`). This extends the current authoritative `codex/autopilot` checkout only. No deployment or push was performed. The local preview contains clearly named synthetic coin/jewellery records; none of these are real holdings or current market prices.

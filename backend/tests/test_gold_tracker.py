@@ -25,6 +25,7 @@ def gold():
     payload = {
         "request_id": str(uuid.uuid4()),
         "name": "Synthetic gold coin",
+        "price_mode": "MANUAL",
         "form": "COIN",
         "owner_name": "Synthetic Owner",
         "purity": "24K / 999",
@@ -266,3 +267,45 @@ def test_gold_operator_writes_and_record_ids_cannot_cross_member_scopes(gold):
         == 404
     )
     assert client.get(url).data["summary"]["purchase_count"] == 1
+
+
+@pytest.mark.django_db
+def test_live_valuation_is_default_and_manual_quote_sale_costs_stay_independent(gold, monkeypatch):
+    from portfolio.gold_prices import unavailable
+
+    _, workspace, client, url, payload = gold
+    market = {
+        **unavailable(),
+        "state": "LIVE",
+        "price_per_gram_24k": "10000",
+        "as_of": "2026-10-31T12:00:00+00:00",
+    }
+    monkeypatch.setattr("portfolio.gold.market_quote", lambda: market)
+    automatic = dict(payload)
+    automatic.pop("price_mode")
+    response = client.post(url, automatic, format="json")
+    assert response.status_code == 201
+    purchase = response.data["purchases"][0]
+    assert purchase["price_mode"] == "LIVE" and purchase["price_source"] == "LIVE"
+    assert purchase["current_price_per_gram"] == "7000.00"  # Saved, not overwritten.
+    assert purchase["effective_price_per_gram"] == "9990.00"
+    assert purchase["estimated_value"] == "99900.00"
+    sale_url = reverse("gold-sale-list", args=[workspace.pk])
+    response = client.post(sale_url, sale_data(purchase), format="json")
+    assert response.data["summary"]["realized_profit"] == "3000.00"
+    assert response.data["summary"]["estimated_value"] == "74925.00"
+    market["state"] = "STALE"
+    assert client.get(url).data["purchases"][0]["price_source"] == "STALE"
+    market["state"] = "UNAVAILABLE"
+    result = client.get(url).data
+    assert result["summary"]["estimated_value"] is None
+    assert result["summary"]["realized_profit"] == "3000.00"
+    target = reverse("gold-purchase", args=[workspace.pk, purchase["id"]])
+    manual = client.patch(target, payload, format="json")
+    assert manual.status_code == 200
+    assert manual.data["purchases"][0]["effective_price_per_gram"] == "7000.00"
+    assert manual.data["summary"]["estimated_value"] == "52500.00"
+    assert manual.data["summary"]["realized_profit"] == "3000.00"
+    unknown = client.patch(target, automatic | {"purity": "Unknown"}, format="json")
+    assert unknown.data["purchases"][0]["price_source"] == "UNKNOWN_PURITY"
+    assert unknown.data["summary"]["estimated_value"] is None

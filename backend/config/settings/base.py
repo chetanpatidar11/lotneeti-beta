@@ -145,3 +145,6 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(hour="9-19", minute=0),
     },
 }
+
+# Public INR spot quotes; no key or private holding data is sent.
+GOLD_LIVE_PRICES_ENABLED = os.environ.get("GOLD_LIVE_PRICES_ENABLED", "1") == "1"

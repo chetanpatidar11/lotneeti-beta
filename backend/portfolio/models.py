@@ -48,6 +48,11 @@ class GoldPurchase(models.Model):
         JEWELLERY = "JEWELLERY", "Jewellery"
         OTHER = "OTHER", "Other physical gold"
 
+    class PriceMode(models.TextChoices):
+        LIVE = "LIVE", "Live market price"
+        MANUAL = "MANUAL", "My resale quote"
+
+    price_mode = models.CharField(max_length=6, choices=PriceMode.choices, default=PriceMode.LIVE)
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workspace = models.ForeignKey(
         "accounts.Workspace", on_delete=models.PROTECT, related_name="gold_purchases"

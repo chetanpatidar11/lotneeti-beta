@@ -29,3 +29,5 @@ EMAIL_BACKEND = os.environ.get(
     "LOTNEETI_TEST_EMAIL_BACKEND", "django.core.mail.backends.locmem.EmailBackend"
 )
 EMAIL_FILE_PATH = os.environ.get("LOTNEETI_TEST_EMAIL_FILE_PATH", "/private/tmp/lotneeti-mail")
+
+GOLD_LIVE_PRICES_ENABLED = os.environ.get("GOLD_LIVE_PRICES_ENABLED", "0") == "1"

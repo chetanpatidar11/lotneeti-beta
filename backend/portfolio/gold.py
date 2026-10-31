@@ -1,4 +1,4 @@
-"""Physical gold records and exact lot-based calculations; no bank writes or market feeds."""
+"""Physical gold records and exact lot-based calculations; no bank writes."""
 
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -9,11 +9,13 @@ from django.utils import timezone
 
 from accounts.models import Workspace, WorkspaceMembership
 from core.audit import record_event
+from portfolio.gold_prices import item_price, market_quote
 from portfolio.models import GoldPurchase, GoldSale
 
 MONEY = Decimal("0.01")
 ZERO = Decimal("0")
 PURCHASE_FIELDS = (
+    "price_mode",
     "name",
     "form",
     "owner_name",
@@ -92,7 +94,11 @@ def update_purchase(*, purchase, actor, data):
     writer(item.workspace, actor)
     if item.voided_at:
         raise ValidationError("Restore the purchase before editing it.")
-    before = {"grams_before": str(item.grams), "cost_before": str(item.total_cost)}
+    before = {
+        "grams_before": str(item.grams),
+        "cost_before": str(item.total_cost),
+        "price_mode_before": item.price_mode,
+    }
     price_changed = item.current_price_per_gram != data["current_price_per_gram"]
     for field in PURCHASE_FIELDS:
         setattr(item, field, data[field])
@@ -105,7 +111,12 @@ def update_purchase(*, purchase, actor, data):
         target=item,
         actor=actor,
         workspace=item.workspace,
-        metadata={**before, "grams_after": str(item.grams), "cost_after": str(item.total_cost)},
+        metadata={
+            **before,
+            "grams_after": str(item.grams),
+            "cost_after": str(item.total_cost),
+            "price_mode_after": item.price_mode,
+        },
     )
     return item
 
@@ -163,6 +174,7 @@ def set_removed(*, purchase, actor, removed, sale=None):
 
 
 def gold_report(workspace):
+    market = market_quote()
     purchases = list(
         GoldPurchase.objects.filter(workspace=workspace).prefetch_related("gold_sales")
     )
@@ -202,11 +214,8 @@ def gold_report(workspace):
             )
         remaining = item.grams - sold_grams
         cost_held = item.total_cost - allocated
-        value = (
-            money(remaining * item.current_price_per_gram)
-            if item.current_price_per_gram is not None
-            else None
-        )
+        price, price_source, price_as_of = item_price(item, market)
+        value = money(remaining * price) if price is not None else None
         if remaining == 0:
             value = ZERO
         pnl = value - cost_held if value is not None else None
@@ -232,6 +241,10 @@ def gold_report(workspace):
                 "sold_grams": str(sold_grams),
                 "remaining_grams": str(remaining),
                 "remaining_cost": str(cost_held),
+                "price_mode": item.price_mode,
+                "effective_price_per_gram": str(price) if price is not None else None,
+                "price_source": price_source,
+                "price_as_of": price_as_of,
                 "current_price_per_gram": str(item.current_price_per_gram)
                 if item.current_price_per_gram is not None
                 else None,
@@ -245,6 +258,7 @@ def gold_report(workspace):
         )
     sale_rows.sort(key=lambda sale: (str(sale["sold_on"]), sale["id"]), reverse=True)
     return {
+        "market": market,
         "purchases": purchase_rows,
         "sales": sale_rows,
         "summary": {

@@ -27,6 +27,7 @@ def _writer(workspace, actor):
 
 
 class PurchaseInput(serializers.Serializer):
+    price_mode = serializers.ChoiceField(choices=GoldPurchase.PriceMode.choices, default="LIVE")
     name = serializers.CharField(max_length=120)
     form = serializers.ChoiceField(choices=GoldPurchase.Form.choices)
     owner_name = serializers.CharField(max_length=120, allow_blank=True, default="")
